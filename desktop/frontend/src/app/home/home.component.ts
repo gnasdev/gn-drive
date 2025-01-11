@@ -37,6 +37,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.appService.data$,
       this.appService.configInfo$,
       this.isCurrentProfileValid$,
+      this.appService.currentAction$,
+      this.appService.currentId$,
     ]).subscribe(() => this.cdr.detectChanges());
   }
 

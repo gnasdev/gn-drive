@@ -5,7 +5,6 @@ import {
   Component,
   OnDestroy,
   OnInit,
-  ViewEncapsulation,
 } from "@angular/core";
 import { Action, AppService } from "./app.service.js";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
