@@ -57,7 +57,7 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 
 	for try := 1; try <= fsConfig.Retries; try++ {
 		cmdErr = cb()
-		cmdErr = fs.CountError(cmdErr)
+		cmdErr = fs.CountError(ctx, cmdErr)
 		lastErr := accounting.GlobalStats().GetLastError()
 		if cmdErr == nil {
 			cmdErr = lastErr

@@ -109,19 +109,19 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 		fs.Infof(nil, "Creating CPU profile %q\n", cpuProfile)
 		f, err := os.Create(cpuProfile)
 		if utils.HandleError(err, "", nil, nil) != nil {
-			err = fs.CountError(err)
+			err = fs.CountError(ctx, err)
 			return nil, err
 		}
 		err = pprof.StartCPUProfile(f)
 		if utils.HandleError(err, "", nil, nil) != nil {
-			err = fs.CountError(err)
+			err = fs.CountError(ctx, err)
 			return nil, err
 		}
 		atexit.Register(func() {
 			pprof.StopCPUProfile()
 			err := f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(err)
+				fs.CountError(ctx, err)
 			}
 		})
 	}
@@ -134,15 +134,15 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 			fs.Infof(nil, "Saving Memory profile %q\n", memProfile)
 			f, err := os.Create(memProfile)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(err)
+				fs.CountError(ctx, err)
 			}
 			err = pprof.WriteHeapProfile(f)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(err)
+				fs.CountError(ctx, err)
 			}
 			err = f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(err)
+				fs.CountError(ctx, err)
 			}
 		})
 	}
