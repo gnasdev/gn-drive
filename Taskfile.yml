@@ -3,28 +3,6 @@ version: "3"
 dotenv: [".env"]
 
 tasks:
-  export:
-    cmds:
-      - node export.js
-  import:
-    cmds:
-      - node import.js
-
-  # Client
-  web:
-    cmds:
-      - rclone rcd --rc-web-gui
-
-  # Server
-  backup:
-    cmd: node server-backup.js
-  install-service:
-    cmds:
-      - node install-service.js
-  uninstall-service:
-    cmds:
-      - node uninstall-service.js
-
   # Desktop
   dev-app:
     cmds:
