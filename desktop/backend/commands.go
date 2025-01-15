@@ -23,15 +23,9 @@ func (a *App) Sync(task string, profile models.Profile) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	config, err := utils.LoadConfigFromEnv()
-	if utils.HandleError(err, "", nil, nil) != nil {
-		j, _ := utils.NewCommandErrorDTO(id, err).ToJSON()
-		a.oc <- j
-		cancel()
-		return 0
-	}
+	config := a.ConfigInfo.EnvConfig
 
-	ctx, err = rclone.InitConfig(ctx, config.DebugMode)
+	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
 	if utils.HandleError(err, "", nil, nil) != nil {
 		j, _ := utils.NewCommandErrorDTO(id, err).ToJSON()
 		a.oc <- j
@@ -112,12 +106,7 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 		return dto.NewAppError(err)
 	}
 
-	config, err := utils.LoadConfigFromEnv()
-	if err != nil {
-		return dto.NewAppError(err)
-	}
-
-	err = os.WriteFile(config.ProfileFilePath, profilesJson, 0644)
+	err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0644)
 	if err != nil {
 		return dto.NewAppError(err)
 	}

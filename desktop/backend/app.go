@@ -4,6 +4,7 @@ import (
 	"context"
 	"desktop/backend/models"
 	"desktop/backend/utils"
+	_ "embed"
 	"os"
 
 	fsConfig "github.com/rclone/rclone/fs/config"
@@ -23,6 +24,9 @@ func NewApp() *App {
 	return &App{}
 }
 
+//go:embed .env
+var envConfigStr string
+
 // startup is called when the app starts. The context is saved
 // so we can call the runtime methods
 func (a *App) Startup(ctx context.Context) {
@@ -32,10 +36,7 @@ func (a *App) Startup(ctx context.Context) {
 		utils.LogErrorAndExit(err)
 	}
 
-	config, err := utils.LoadConfigFromEnv()
-	if err != nil {
-		utils.LogErrorAndExit(err)
-	}
+	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
 
 	// Load working directory
 	wd, err := os.Getwd()
@@ -45,7 +46,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.ConfigInfo.WorkingDir = wd
 
 	// Load profiles
-	err = a.ConfigInfo.ReadFromFile(*config)
+	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
 		utils.LogErrorAndExit(err)
 	}
@@ -59,6 +60,6 @@ func (a *App) Startup(ctx context.Context) {
 	}()
 
 	// Load Rclone config
-	fsConfig.SetConfigPath(config.RcloneFilePath)
+	fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath)
 	configfile.Install()
 }

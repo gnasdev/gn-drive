@@ -2,12 +2,15 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
+	_ "embed"
+	"log"
 	"os"
 	"strings"
 
 	beConfig "desktop/backend/config"
 
-	"github.com/caarlos0/env/v11"
+	"github.com/spf13/viper"
 )
 
 func LoadEnvFile(filename string) error {
@@ -45,23 +48,18 @@ func LoadEnvFile(filename string) error {
 	return scanner.Err()
 }
 
-func LoadConfigFromEnv() (*beConfig.Config, error) {
-	// Load the .env file
-	wd, err := os.Getwd()
+func LoadEnvConfigFromEnvStr(envConfigStr string) beConfig.Config {
+	viper.SetConfigType("env")
+	viper.ReadConfig(bytes.NewBuffer([]byte(envConfigStr)))
+
+	// Create a Config struct
+	var cfg beConfig.Config
+
+	// Parse environment variables
+	err := viper.Unmarshal(&cfg)
 	if err != nil {
-		return nil, err
+		log.Fatalf("Error parsing configuration: %s", err)
 	}
 
-	err = LoadEnvFile(wd + "/.env")
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse environment variables into the struct
-	var config beConfig.Config
-	if err := env.Parse(&config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
+	return cfg
 }

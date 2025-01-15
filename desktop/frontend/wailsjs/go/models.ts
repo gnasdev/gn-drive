@@ -1,5 +1,23 @@
 export namespace config {
 	
+	export class Config {
+	    DebugMode: boolean;
+	    ProfileFilePath: string;
+	    ResyncFilePath: string;
+	    RcloneFilePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Config(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.DebugMode = source["DebugMode"];
+	        this.ProfileFilePath = source["ProfileFilePath"];
+	        this.ResyncFilePath = source["ResyncFilePath"];
+	        this.RcloneFilePath = source["RcloneFilePath"];
+	    }
+	}
 	export class Remote {
 	    name: string;
 	    type: string;
@@ -93,6 +111,7 @@ export namespace models {
 	    working_dir: string;
 	    selected_profile_index: number;
 	    profiles: Profile[];
+	    env_config: config.Config;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConfigInfo(source);
@@ -103,6 +122,7 @@ export namespace models {
 	        this.working_dir = source["working_dir"];
 	        this.selected_profile_index = source["selected_profile_index"];
 	        this.profiles = this.convertValues(source["profiles"], Profile);
+	        this.env_config = this.convertValues(source["env_config"], config.Config);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

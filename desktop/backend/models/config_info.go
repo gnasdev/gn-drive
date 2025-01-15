@@ -8,9 +8,10 @@ import (
 )
 
 type ConfigInfo struct {
-	WorkingDir           string   `json:"working_dir"`
-	SelectedProfileIndex uint     `json:"selected_profile_index"`
-	Profiles             Profiles `json:"profiles"`
+	WorkingDir           string        `json:"working_dir"`
+	SelectedProfileIndex uint          `json:"selected_profile_index"`
+	Profiles             Profiles      `json:"profiles"`
+	EnvConfig            config.Config `json:"env_config"`
 }
 
 func (c ConfigInfo) ToJSON() ([]byte, error) {

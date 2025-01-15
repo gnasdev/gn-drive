@@ -16,7 +16,7 @@ import (
 	"github.com/rclone/rclone/fs/filter"
 )
 
-func BiSync(ctx context.Context, config *config.Config, profile models.Profile, resync bool, outLog chan string) error {
+func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outLog chan string) error {
 	var err error
 
 	// Initialize the config

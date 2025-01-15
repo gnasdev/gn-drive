@@ -26,7 +26,7 @@ import (
 	_ "github.com/rclone/rclone/backend/yandex"
 )
 
-func Sync(ctx context.Context, config *beConfig.Config, task string, profile models.Profile, outLog chan string) error {
+func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outLog chan string) error {
 	// Initialize the config
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
