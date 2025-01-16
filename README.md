@@ -1,22 +1,33 @@
 # ngosangns-drive
 
-## Requirements
+## Prerequisites
 
 - Wails 2
-- Golang v1.23.4
+- Go v1.23.4
 - Taskfile
 
-## Commands
+## Build Commands
 
-### Build
+### Windows
 
-- Windows: `task build-app-mac`
-- Mac: `task build-app-win`
+```sh
+task build-app-win
+```
+
+### Mac
+
+```sh
+task build-app-mac
+```
+
+## Execution
+
+Execute the `./desktop.exe` file located in the project's root directory after building.
 
 ## Screenshots
 
 ![Homepage](./screenshots/s1.png)
 
-![Profile manager page](./screenshots/s2.png)
+![Profile Manager Page](./screenshots/s2.png)
 
-![Remote manager page](./screenshots/s3.png)
+![Remote Manager Page](./screenshots/s3.png)
