@@ -1,4 +1,4 @@
-# ngosangns-drive
+# ns-drive
 
 ## Prerequisites
 
