@@ -11,12 +11,11 @@ import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 
 @Component({
-  selector: "app-profiles",
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: "./profiles.component.html",
-  styleUrl: "./profiles.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-profiles",
+    imports: [CommonModule, FormsModule],
+    templateUrl: "./profiles.component.html",
+    styleUrl: "./profiles.component.scss",
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProfilesComponent implements OnInit, OnDestroy {
   Date = Date;

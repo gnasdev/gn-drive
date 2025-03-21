@@ -16,12 +16,11 @@ import { RemotesComponent } from "./remotes/remotes.component.js";
 type Tab = "home" | "profiles" | "remotes";
 
 @Component({
-  selector: "app-root",
-  standalone: true,
-  imports: [CommonModule, HomeComponent, ProfilesComponent, RemotesComponent],
-  templateUrl: "./app.component.html",
-  styleUrl: "./app.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-root",
+    imports: [CommonModule, HomeComponent, ProfilesComponent, RemotesComponent],
+    templateUrl: "./app.component.html",
+    styleUrl: "./app.component.scss",
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent implements OnInit, OnDestroy {
   Action = Action;

@@ -11,12 +11,11 @@ import { Action, AppService } from "../app.service";
 import { models } from "../../../wailsjs/go/models";
 
 @Component({
-  selector: "app-home",
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: "./home.component.html",
-  styleUrl: "./home.component.css",
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-home",
+    imports: [CommonModule],
+    templateUrl: "./home.component.html",
+    styleUrl: "./home.component.css",
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HomeComponent implements OnInit, OnDestroy {
   Action = Action;

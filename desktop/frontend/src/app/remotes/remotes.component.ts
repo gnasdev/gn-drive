@@ -9,12 +9,11 @@ import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
 import { AppService } from "../app.service";
 
 @Component({
-  selector: "app-remotes",
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: "./remotes.component.html",
-  styleUrl: "./remotes.component.scss",
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-remotes",
+    imports: [CommonModule, FormsModule],
+    templateUrl: "./remotes.component.html",
+    styleUrl: "./remotes.component.scss",
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RemotesComponent {
   Date = Date;
