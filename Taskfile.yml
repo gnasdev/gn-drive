@@ -1,25 +1,27 @@
 version: "3"
 
-# dotenv: [".env"]
-
 tasks:
   # Desktop
   dev-app:
     cmds:
       - wails dev
     dir: desktop
-  build-app-mac:
+  build-mac:
     platforms: [darwin]
     cmds:
       - wails build -v 2
+
       # - codesign --sign - --force --deep build/bin/desktop.app
       # - upx --best build/bin/desktop --force-macos
       # - chmod +x build/bin/desktop.app/Contents/MacOS/desktop
+
+      - rm -rf ./desktop/frontend/dist
       - rm -rf ../desktop.app
       - mv build/bin/desktop.app ../desktop.app
-      # - open ../desktop.app
+
+      - open ../desktop.app
     dir: desktop
-  build-app-win:
+  build-win:
     platforms: [windows]
     cmds:
       - wails build -v 2 # -windowsconsole to show the console for debugging

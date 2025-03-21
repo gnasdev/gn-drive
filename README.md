@@ -11,13 +11,13 @@
 ### Windows
 
 ```sh
-task build-app-win
+task build-win
 ```
 
 ### Mac
 
 ```sh
-task build-app-mac
+task build-mac
 ```
 
 ## Execution
