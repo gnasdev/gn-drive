@@ -2,13 +2,14 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
 	fslog "github.com/rclone/rclone/fs/log"
 	"github.com/rclone/rclone/fs/operations"
@@ -26,6 +27,48 @@ const (
 	// time format for logging
 	logTimeFormat = "2006/01/02 15:04:05"
 )
+
+// Custom slog handler that intercepts logs and forwards them to our progress channel
+type progressLogHandler struct {
+	originalHandler     slog.Handler
+	outLog              chan string
+	isOutLogClosed      *bool
+	outLogClosedRecover func()
+}
+
+func (h *progressLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.originalHandler.Enabled(ctx, level)
+}
+
+func (h *progressLogHandler) Handle(ctx context.Context, r slog.Record) error {
+	// Format the log message similar to the original format
+	defer h.outLogClosedRecover()
+	if !*h.isOutLogClosed {
+		logMsg := fmt.Sprintf("%s %-6s: %s", r.Time.Format(logTimeFormat), r.Level.String(), r.Message)
+		h.outLog <- formatToProgress(logMsg)
+	}
+
+	// Also call the original handler
+	return h.originalHandler.Handle(ctx, r)
+}
+
+func (h *progressLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &progressLogHandler{
+		originalHandler:     h.originalHandler.WithAttrs(attrs),
+		outLog:              h.outLog,
+		isOutLogClosed:      h.isOutLogClosed,
+		outLogClosedRecover: h.outLogClosedRecover,
+	}
+}
+
+func (h *progressLogHandler) WithGroup(name string) slog.Handler {
+	return &progressLogHandler{
+		originalHandler:     h.originalHandler.WithGroup(name),
+		outLog:              h.outLog,
+		isOutLogClosed:      h.isOutLogClosed,
+		outLogClosedRecover: h.outLogClosedRecover,
+	}
+}
 
 // formatToProgress prints the progress with an optional log
 func formatToProgress(logMessage string) string {
@@ -86,17 +129,23 @@ func startProgress(outLog chan string) func() {
 	}
 
 	stopStats := make(chan struct{})
-	oldLogOutput := fs.LogOutput
 	oldSyncPrint := operations.SyncPrintf
+	var originalLogger *slog.Logger
+	var customHandler *progressLogHandler
 
 	if !fslog.Redirected() {
-		// Intercept the log calls if not logging to file or syslog
-		fs.LogOutput = func(level fs.LogLevel, text string) {
-			defer outLogClosedRecover()
-			if !isOutLogClosed {
-				outLog <- formatToProgress(fmt.Sprintf("%s %-6s: %s", time.Now().Format(logTimeFormat), level, text))
-			}
+		// Intercept the log calls using a custom slog handler
+		originalLogger = slog.Default()
+		customHandler = &progressLogHandler{
+			originalHandler:     originalLogger.Handler(),
+			outLog:              outLog,
+			isOutLogClosed:      &isOutLogClosed,
+			outLogClosedRecover: outLogClosedRecover,
 		}
+
+		// Set the custom handler as the default logger
+		newLogger := slog.New(customHandler)
+		slog.SetDefault(newLogger)
 	}
 
 	// Intercept output from functions such as HashLister to stdout
@@ -125,7 +174,10 @@ func startProgress(outLog chan string) func() {
 				}
 			case <-stopStats:
 				ticker.Stop()
-				fs.LogOutput = oldLogOutput
+				// Restore the original logger
+				if originalLogger != nil {
+					slog.SetDefault(originalLogger)
+				}
 				operations.SyncPrintf = oldSyncPrint
 				return
 			}
