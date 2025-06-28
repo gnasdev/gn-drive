@@ -26,71 +26,82 @@
 
   <!-- Tabs Interface -->
   <div *ngIf="tabService.tabsValue.length > 0" class="tabs-container">
-    <!-- Vertical Tab Layout -->
-    <div class="vertical-tabs-layout">
-      <!-- Tab Sidebar -->
-      <div class="tab-sidebar">
-        <div class="tab-list">
-          <div
-            *ngFor="let tab of tabService.tabsValue; let i = index"
-            class="tab-item"
-            [class.active]="getActiveTabIndex() === i"
-            (click)="onTabChange(i)"
-          >
-            <div class="tab-label" *ngIf="!tab.isEditing">
-              <span class="tab-name">{{ tab.name }}</span>
-              <button
-                mat-icon-button
-                class="tab-menu-button"
-                [matMenuTriggerFor]="tabMenu"
-                (click)="$event.stopPropagation()"
+    <!-- Modern Tab Layout -->
+    <div class="modern-tabs-layout">
+      <!-- Tab Navigation Bar -->
+      <div class="tab-navigation">
+        <div class="tab-nav-container">
+          <div class="tab-list-wrapper">
+            <div class="tab-list">
+              <div
+                *ngFor="let tab of tabService.tabsValue; let i = index"
+                class="tab-item"
+                [class.active]="getActiveTabIndex() === i"
+                (click)="onTabChange(i)"
               >
-                <mat-icon>more_vert</mat-icon>
-              </button>
+                <div class="tab-inner-content" *ngIf="!tab.isEditing">
+                  <div class="tab-info">
+                    <mat-icon class="tab-icon">tab</mat-icon>
+                    <span class="tab-name">{{ tab.name }}</span>
+                  </div>
+                  <div class="tab-actions">
+                    <button
+                      mat-icon-button
+                      class="tab-menu-button"
+                      [matMenuTriggerFor]="tabMenu"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
 
-              <mat-menu #tabMenu="matMenu">
-                <button mat-menu-item (click)="startRenameTab(tab.id)">
-                  <mat-icon>edit</mat-icon>
-                  <span>Rename</span>
-                </button>
-                <button
-                  mat-menu-item
-                  (click)="deleteTab(tab.id)"
-                  [disabled]="tabService.tabsValue.length === 1"
-                >
-                  <mat-icon>delete</mat-icon>
-                  <span>Delete</span>
-                </button>
-              </mat-menu>
-            </div>
+                    <mat-menu #tabMenu="matMenu">
+                      <button mat-menu-item (click)="startRenameTab(tab.id)">
+                        <mat-icon>edit</mat-icon>
+                        <span>Rename</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="deleteTab(tab.id)"
+                        [disabled]="tabService.tabsValue.length === 1"
+                      >
+                        <mat-icon>delete</mat-icon>
+                        <span>Delete</span>
+                      </button>
+                    </mat-menu>
+                  </div>
+                </div>
 
-            <div class="tab-edit" *ngIf="tab.isEditing">
-              <mat-form-field appearance="outline" class="tab-name-field">
-                <input
-                  matInput
-                  #tabNameInput
-                  [value]="tab.name"
-                  (blur)="finishRenameTab(tab.id, tabNameInput.value)"
-                  (keydown.enter)="finishRenameTab(tab.id, tabNameInput.value)"
-                  (keydown.escape)="cancelRenameTab(tab.id)"
-                  (click)="$event.stopPropagation()"
-                  autofocus
-                />
-              </mat-form-field>
+                <div class="tab-edit" *ngIf="tab.isEditing">
+                  <mat-form-field appearance="outline" class="tab-name-field">
+                    <input
+                      matInput
+                      #tabNameInput
+                      [value]="tab.name"
+                      (blur)="finishRenameTab(tab.id, tabNameInput.value)"
+                      (keydown.enter)="
+                        finishRenameTab(tab.id, tabNameInput.value)
+                      "
+                      (keydown.escape)="cancelRenameTab(tab.id)"
+                      (click)="$event.stopPropagation()"
+                      autofocus
+                    />
+                  </mat-form-field>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Add Tab Button -->
-        <button
-          mat-fab
-          color="primary"
-          class="add-tab-button"
-          (click)="createTab()"
-          matTooltip="Add new tab"
-        >
-          <mat-icon>add</mat-icon>
-        </button>
+          <!-- Add Tab Button -->
+          <div class="add-tab-container">
+            <button
+              mat-icon-button
+              (click)="createTab()"
+              matTooltip="Add new tab"
+            >
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Tab Content Area -->

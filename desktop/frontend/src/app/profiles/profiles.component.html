@@ -41,7 +41,7 @@
           <mat-panel-title>
             <mat-icon>folder</mat-icon>
             <div>
-              <span>{{ setting.name || "Untitled Profile" }}</span> <br />
+              <span>{{ setting.name || "Untitled Profile" }}</span>
               <span class="font-normal italic text-xs">
                 {{ getProfileDescription(setting) }}
               </span>
@@ -57,7 +57,7 @@
               <mat-card-title>Basic Information</mat-card-title>
             </mat-card-header>
             <mat-card-content>
-              <mat-form-field appearance="outline" class="full-width">
+              <mat-form-field appearance="outline" class="full-width mt-4">
                 <mat-label>Profile Name</mat-label>
                 <input
                   matInput
@@ -206,18 +206,12 @@
           </mat-card>
 
           <!-- Actions -->
-          <mat-card class="form-section actions-section">
-            <mat-card-actions>
-              <button
-                mat-raised-button
-                color="warn"
-                (click)="removeProfile(idx)"
-              >
-                <mat-icon>delete</mat-icon>
-                Delete Profile
-              </button>
-            </mat-card-actions>
-          </mat-card>
+          <mat-card-actions>
+            <button mat-raised-button color="warn" (click)="removeProfile(idx)">
+              <mat-icon>delete</mat-icon>
+              Delete Profile
+            </button>
+          </mat-card-actions>
         </div>
       </mat-expansion-panel>
     </mat-accordion>

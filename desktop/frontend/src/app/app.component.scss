@@ -10,8 +10,8 @@
 // Sidebar Styles
 .app-sidenav {
   width: 280px;
-  background: #f5f5f5;
-  border-right: 1px solid #e0e0e0;
+  background: #f1f3f4;
+  border-right: 1px solid #dadce0;
 }
 
 .sidenav-header {
@@ -19,8 +19,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid #e0e0e0;
-  background: linear-gradient(135deg, #424242, #616161);
+  border-bottom: 1px solid #dadce0;
+  background: linear-gradient(135deg, #5f6368, #80868b);
   color: white;
 
   .app-icon {
@@ -120,7 +120,7 @@
   flex: 1;
   overflow: auto;
   padding: 24px;
-  background-color: #fafafa;
+  background-color: #f5f5f5;
   animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -178,13 +178,13 @@
   }
 
   .app-sidenav {
-    background: #1e1e1e;
-    border-right-color: #424242;
+    background: #2d2d2d;
+    border-right-color: #5f6368;
   }
 
   .sidenav-header {
-    border-bottom-color: #424242;
-    background: linear-gradient(135deg, #2c2c2c, #424242);
+    border-bottom-color: #5f6368;
+    background: linear-gradient(135deg, #3c4043, #5f6368);
     color: #ffffff;
 
     .app-title {
@@ -215,8 +215,8 @@
   }
 
   .page-content {
-    background-color: #121212;
-    color: #e0e0e0;
+    background-color: #1e1e1e;
+    color: #e8eaed;
   }
 
   .app-toolbar {
