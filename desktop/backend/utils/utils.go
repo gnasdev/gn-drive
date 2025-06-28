@@ -52,6 +52,8 @@ func CdToNormalizeWorkingDir(ctx context.Context) error {
 var (
 	cmdStore      = make(map[int]func())
 	cmdStoreMutex sync.RWMutex
+	tabStore      = make(map[int]string)
+	tabStoreMutex sync.RWMutex
 )
 
 func AddCmd(pid int, cancel func()) {
@@ -71,6 +73,25 @@ func RemoveCmd(pid int) {
 	cmdStoreMutex.Lock()
 	defer cmdStoreMutex.Unlock()
 	delete(cmdStore, pid)
+}
+
+func AddTabMapping(pid int, tabId string) {
+	tabStoreMutex.Lock()
+	defer tabStoreMutex.Unlock()
+	tabStore[pid] = tabId
+}
+
+func GetTabMapping(pid int) (string, bool) {
+	tabStoreMutex.RLock()
+	defer tabStoreMutex.RUnlock()
+	tabId, exists := tabStore[pid]
+	return tabId, exists
+}
+
+func RemoveTabMapping(pid int) {
+	tabStoreMutex.Lock()
+	defer tabStoreMutex.Unlock()
+	delete(tabStore, pid)
 }
 
 // logError logs the error to a file on the desktop, including stack trace and error line number

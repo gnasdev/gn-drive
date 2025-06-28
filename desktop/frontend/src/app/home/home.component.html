@@ -1,85 +1,170 @@
-<div
-  class="flex flex-col gap-3 text-sm h-screen p-3 pl-0 overflow-x-hidden overflow-y-auto"
->
-  <div class="text-white">
-    <div class="w-full flex justify-start align-center gap-2">
+<div class="flex h-screen text-sm overflow-hidden">
+  <!-- Vertical Tab Bar -->
+  <div class="w-48 bg-gray-800 border-r border-gray-700 flex flex-col">
+    <!-- Tab List -->
+    <div class="flex-1 overflow-y-auto">
+      <div
+        *ngFor="let tab of tabService.tabsValue"
+        class="flex items-center justify-between p-3 border-b border-gray-700 cursor-pointer hover:bg-gray-700"
+        [ngClass]="{ 'bg-gray-700': tab.isActive }"
+        (click)="setActiveTab(tab.id)"
+      >
+        <div class="flex-1 min-w-0" *ngIf="!tab.isEditing">
+          <span class="text-white truncate">{{ tab.name }}</span>
+        </div>
+        <div class="flex-1 min-w-0" *ngIf="tab.isEditing">
+          <input
+            #tabNameInput
+            type="text"
+            [value]="tab.name"
+            (blur)="finishRenameTab(tab.id, tabNameInput.value)"
+            (keydown.enter)="finishRenameTab(tab.id, tabNameInput.value)"
+            (keydown.escape)="cancelRenameTab(tab.id)"
+            (click)="$event.stopPropagation()"
+            class="w-full bg-gray-600 text-white px-2 py-1 rounded text-sm"
+            autofocus
+          />
+        </div>
+        <div class="flex gap-1 ml-2">
+          <button
+            class="text-blue-400 hover:text-blue-300"
+            (click)="startRenameTab(tab.id); $event.stopPropagation()"
+            *ngIf="!tab.isEditing"
+            title="Rename tab"
+          >
+            ✏️
+          </button>
+          <button
+            class="text-red-400 hover:text-red-300"
+            (click)="deleteTab(tab.id); $event.stopPropagation()"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Tab Button -->
+    <div class="p-3 border-t border-gray-700">
       <button
-        [ngClass]="{
-          underline: appService.currentAction$.value === Action.Pull
-        }"
-        (click)="
-          appService.currentAction$.value !== Action.Pull
-            ? pull()
-            : appService.stopCommand()
-        "
-        [disabled]="!(isCurrentProfileValid$ | async)"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+        (click)="createTab()"
       >
-        {{ appService.currentAction$.value === Action.Pull ? "Stop" : "Pull" }}
+        + New Tab
       </button>
-      <button
-        [ngClass]="{
-          underline: appService.currentAction$.value === Action.Push
-        }"
-        (click)="
-          appService.currentAction$.value !== Action.Push
-            ? push()
-            : appService.stopCommand()
-        "
-        [disabled]="!(isCurrentProfileValid$ | async)"
-      >
-        {{ appService.currentAction$.value === Action.Push ? "Stop" : "Push" }}
-      </button>
-      <button
-        [ngClass]="{
-          underline: appService.currentAction$.value === Action.Bi
-        }"
-        (click)="
-          appService.currentAction$.value !== Action.Bi ? bi() : stopCommand()
-        "
-        [disabled]="!(isCurrentProfileValid$ | async)"
-      >
-        {{ appService.currentAction$.value === Action.Bi ? "Stop" : "Sync" }}
-      </button>
-      <button
-        [ngClass]="{
-          underline: appService.currentAction$.value === Action.BiResync
-        }"
-        (click)="
-          appService.currentAction$.value !== Action.BiResync
-            ? biResync()
-            : stopCommand()
-        "
-        [disabled]="!(isCurrentProfileValid$ | async)"
-      >
-        {{
-          appService.currentAction$.value === Action.BiResync
-            ? "Stop"
-            : "Resync"
-        }}
-      </button>
-      <select
-        (change)="changeProfile($event)"
-      >
-        <option selected>Profile is not selected</option>
-        <option
-          *ngFor="
-            let profile of appService.configInfo$.value.profiles;
-            let idx = index
-          "
-          [value]="idx"
-          [selected]="(appService.configInfo$| async)?.selected_profile_index === idx"
-        >
-          {{ profile.name }}
-        </option>
-      </select>
     </div>
   </div>
-  <code class="text-white overflow-hidden">
-    <pre>
-Working directory: {{ (appService.configInfo$ | async)?.working_dir }}</pre
+
+  <!-- Tab Content -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <div
+      *ngIf="tabService.tabsValue.length === 0"
+      class="flex-1 flex items-center justify-center text-white"
     >
-  </code>
-  <code class="text-white grow overflow-hidden">
-    <pre>{{ (appService.data$ | async)?.join("\n") }}</pre>
-  </code>
+      <div class="text-center">
+        <p class="text-lg mb-4">No tabs open</p>
+        <button
+          class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+          (click)="createTab()"
+        >
+          Create your first tab
+        </button>
+      </div>
+    </div>
+
+    <div
+      *ngIf="tabService.getActiveTab() as activeTab"
+      class="flex-1 flex flex-col p-3 overflow-hidden"
+    >
+      <!-- Tab Controls -->
+      <div class="text-white mb-3">
+        <div class="w-full flex justify-start align-center gap-2 mb-2">
+          <button
+            [ngClass]="{
+              underline: activeTab.currentAction === Action.Pull
+            }"
+            (click)="
+              activeTab.currentAction !== Action.Pull
+                ? pullTab(activeTab.id)
+                : stopCommandTab(activeTab.id)
+            "
+            [disabled]="!validateTabProfileIndex(activeTab)"
+          >
+            {{ activeTab.currentAction === Action.Pull ? "Stop" : "Pull" }}
+          </button>
+          <button
+            [ngClass]="{
+              underline: activeTab.currentAction === Action.Push
+            }"
+            (click)="
+              activeTab.currentAction !== Action.Push
+                ? pushTab(activeTab.id)
+                : stopCommandTab(activeTab.id)
+            "
+            [disabled]="!validateTabProfileIndex(activeTab)"
+          >
+            {{ activeTab.currentAction === Action.Push ? "Stop" : "Push" }}
+          </button>
+          <button
+            [ngClass]="{
+              underline: activeTab.currentAction === Action.Bi
+            }"
+            (click)="
+              activeTab.currentAction !== Action.Bi
+                ? biTab(activeTab.id)
+                : stopCommandTab(activeTab.id)
+            "
+            [disabled]="!validateTabProfileIndex(activeTab)"
+          >
+            {{ activeTab.currentAction === Action.Bi ? "Stop" : "Sync" }}
+          </button>
+          <button
+            [ngClass]="{
+              underline: activeTab.currentAction === Action.BiResync
+            }"
+            (click)="
+              activeTab.currentAction !== Action.BiResync
+                ? biResyncTab(activeTab.id)
+                : stopCommandTab(activeTab.id)
+            "
+            [disabled]="!validateTabProfileIndex(activeTab)"
+          >
+            {{
+              activeTab.currentAction === Action.BiResync ? "Stop" : "Resync"
+            }}
+          </button>
+        </div>
+
+        <!-- Profile Selector -->
+        <select
+          (change)="changeProfileTab($event, activeTab.id)"
+          class="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
+        >
+          <option [value]="null">Profile is not selected</option>
+          <option
+            *ngFor="
+              let profile of appService.configInfo$.value.profiles;
+              let idx = index
+            "
+            [value]="idx"
+            [selected]="activeTab.selectedProfileIndex === idx"
+          >
+            {{ profile.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Working Directory -->
+      <code class="text-white overflow-hidden mb-3">
+        <pre>
+Working directory: {{ (appService.configInfo$ | async)?.working_dir }}</pre
+        >
+      </code>
+
+      <!-- Tab Output -->
+      <code class="text-white flex-1 overflow-auto">
+        <pre>{{ activeTab.data.join("\n") }}</pre>
+      </code>
+    </div>
+  </div>
 </div>

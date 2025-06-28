@@ -3,6 +3,7 @@ import { BehaviorSubject } from "rxjs";
 import { config, dto, models } from "../../wailsjs/go/models";
 import {
   Sync,
+  SyncWithTabId,
   StopCommand,
   GetConfigInfo,
   UpdateProfiles,
@@ -12,12 +13,14 @@ import {
   StopAddingRemote,
 } from "../../wailsjs/go/backend/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { TabService } from "./tab.service";
 
 interface CommandDTO {
   command: string;
   pid: number | undefined;
   task: string | undefined;
   error: string | undefined;
+  tab_id: string | undefined;
 }
 
 export enum Action {
@@ -37,7 +40,7 @@ export class AppService implements OnInit, OnDestroy {
   readonly configInfo$: BehaviorSubject<models.ConfigInfo>;
   readonly remotes$ = new BehaviorSubject<config.Remote[]>([]);
 
-  constructor() {
+  constructor(private tabService: TabService) {
     const configInfo = new models.ConfigInfo();
     configInfo.profiles = [];
     this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
@@ -45,6 +48,13 @@ export class AppService implements OnInit, OnDestroy {
     EventsOn("tofe", (data: any) => {
       data = <CommandDTO>JSON.parse(data);
 
+      // If event has tab_id, route to TabService
+      if (data.tab_id) {
+        this.tabService.handleCommandEvent(data);
+        return;
+      }
+
+      // Legacy handling for events without tab_id
       switch (data.command) {
         case dto.Command.command_started:
           this.replaceData("Command started...");
@@ -84,12 +94,40 @@ export class AppService implements OnInit, OnDestroy {
     if (this.currentId$.value) this.currentAction$.next(Action.Pull);
   }
 
+  async pullWithTab(profile: models.Profile, tabId: string) {
+    const tab = this.tabService.getTab(tabId);
+    if (!tab || tab.currentAction === Action.Pull) return;
+
+    this.tabService.updateTab(tabId, { data: ["Pulling..."] });
+    const taskId = await SyncWithTabId(<Action>"pull", profile, tabId);
+    if (taskId) {
+      this.tabService.updateTab(tabId, {
+        currentAction: Action.Pull,
+        currentTaskId: taskId,
+      });
+    }
+  }
+
   async push(profile: models.Profile) {
     if (this.currentAction$.value === Action.Push) return;
 
     this.replaceData("Pushing...");
     this.currentId$.next(await Sync(<Action>"push", profile));
     if (this.currentId$.value) this.currentAction$.next(Action.Push);
+  }
+
+  async pushWithTab(profile: models.Profile, tabId: string) {
+    const tab = this.tabService.getTab(tabId);
+    if (!tab || tab.currentAction === Action.Push) return;
+
+    this.tabService.updateTab(tabId, { data: ["Pushing..."] });
+    const taskId = await SyncWithTabId(<Action>"push", profile, tabId);
+    if (taskId) {
+      this.tabService.updateTab(tabId, {
+        currentAction: Action.Push,
+        currentTaskId: taskId,
+      });
+    }
   }
 
   async bi(profile: models.Profile, resync = false) {
@@ -102,9 +140,33 @@ export class AppService implements OnInit, OnDestroy {
     if (this.currentId$.value) this.currentAction$.next(Action.Bi);
   }
 
+  async biWithTab(profile: models.Profile, tabId: string, resync = false) {
+    const tab = this.tabService.getTab(tabId);
+    if (!tab || tab.currentAction === Action.Bi) return;
+
+    this.tabService.updateTab(tabId, { data: ["Bi..."] });
+    const taskId = await SyncWithTabId(
+      resync ? <Action>"bi-resync" : <Action>"bi",
+      profile,
+      tabId
+    );
+    if (taskId) {
+      this.tabService.updateTab(tabId, {
+        currentAction: Action.Bi,
+        currentTaskId: taskId,
+      });
+    }
+  }
+
   stopCommand() {
     if (!this.currentAction$.value) return;
     StopCommand(this.currentId$.value);
+  }
+
+  stopCommandForTab(tabId: string) {
+    const tab = this.tabService.getTab(tabId);
+    if (!tab || !tab.currentAction || !tab.currentTaskId) return;
+    StopCommand(tab.currentTaskId);
   }
 
   async getConfigInfo() {
@@ -161,6 +223,8 @@ export class AppService implements OnInit, OnDestroy {
     const profile = new models.Profile();
     profile.included_paths = [];
     profile.excluded_paths = [];
+    profile.parallel = 16; // Default value
+    profile.bandwidth = 5; // Default value
     this.configInfo$.value.profiles.push(profile);
     this.updateConfigInfo();
   }
@@ -186,7 +250,7 @@ export class AppService implements OnInit, OnDestroy {
   }
 
   addIncludePath(profileIndex: number) {
-    this.configInfo$.value.profiles[profileIndex].included_paths.push("");
+    this.configInfo$.value.profiles[profileIndex].included_paths.push("/**");
     this.updateConfigInfo();
   }
 
@@ -199,7 +263,7 @@ export class AppService implements OnInit, OnDestroy {
   }
 
   addExcludePath(profileIndex: number) {
-    this.configInfo$.value.profiles[profileIndex].excluded_paths.push("");
+    this.configInfo$.value.profiles[profileIndex].excluded_paths.push("/**");
     this.updateConfigInfo();
   }
 

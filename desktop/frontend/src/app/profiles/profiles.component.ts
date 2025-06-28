@@ -11,11 +11,11 @@ import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 
 @Component({
-    selector: "app-profiles",
-    imports: [CommonModule, FormsModule],
-    templateUrl: "./profiles.component.html",
-    styleUrl: "./profiles.component.scss",
-    changeDetection: ChangeDetectionStrategy.OnPush
+  selector: "app-profiles",
+  imports: [CommonModule, FormsModule],
+  templateUrl: "./profiles.component.html",
+  styleUrl: "./profiles.component.scss",
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfilesComponent implements OnInit, OnDestroy {
   Date = Date;
@@ -29,7 +29,9 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.changeDetectorSub = this.appService.configInfo$.subscribe(() => this.cdr.detectChanges());
+    this.changeDetectorSub = this.appService.configInfo$.subscribe(() =>
+      this.cdr.detectChanges()
+    );
     this.appService.getConfigInfo();
   }
 
@@ -70,7 +72,124 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  trackByFn(index: number, item: any): number {
+  trackByFn(index: number, _item: any): number {
     return index;
+  }
+
+  // Helper method to generate number ranges for selectors
+  getNumberRange(start: number, end: number): number[] {
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+
+  // From path helpers
+  getFromRemote(setting: any): string {
+    if (!setting.from) return "";
+    const colonIndex = setting.from.indexOf(":");
+    return colonIndex > 0 ? setting.from.substring(0, colonIndex) : "";
+  }
+
+  getFromPath(setting: any): string {
+    if (!setting.from) return "";
+    const colonIndex = setting.from.indexOf(":");
+    return colonIndex > 0
+      ? setting.from.substring(colonIndex + 1)
+      : setting.from;
+  }
+
+  updateFromPath(setting: any, remote: string, path: string): void {
+    if (remote) {
+      setting.from = `${remote}:${path || ""}`;
+    } else {
+      setting.from = path || "";
+    }
+    this.cdr.detectChanges();
+  }
+
+  // To path helpers
+  getToRemote(setting: any): string {
+    if (!setting.to) return "";
+    const colonIndex = setting.to.indexOf(":");
+    return colonIndex > 0 ? setting.to.substring(0, colonIndex) : "";
+  }
+
+  getToPath(setting: any): string {
+    if (!setting.to) return "";
+    const colonIndex = setting.to.indexOf(":");
+    return colonIndex > 0 ? setting.to.substring(colonIndex + 1) : setting.to;
+  }
+
+  updateToPath(setting: any, remote: string, path: string): void {
+    if (remote) {
+      setting.to = `${remote}:${path || ""}`;
+    } else {
+      setting.to = path || "";
+    }
+    this.cdr.detectChanges();
+  }
+
+  // Include path helpers
+  getIncludePathType(setting: any, index: number): string {
+    const path = setting.included_paths[index];
+    if (!path) return "folder";
+    return path.endsWith("/**") ? "folder" : "file";
+  }
+
+  getIncludePathValue(setting: any, index: number): string {
+    const path = setting.included_paths[index];
+    if (!path) return "";
+    return path.endsWith("/**") ? path.slice(0, -3) : path;
+  }
+
+  updateIncludePathType(setting: any, index: number, type: string): void {
+    const currentValue = this.getIncludePathValue(setting, index);
+    if (type === "folder") {
+      setting.included_paths[index] = currentValue + "/**";
+    } else {
+      setting.included_paths[index] = currentValue;
+    }
+    this.cdr.detectChanges();
+  }
+
+  updateIncludePathValue(setting: any, index: number, value: string): void {
+    const currentType = this.getIncludePathType(setting, index);
+    if (currentType === "folder") {
+      setting.included_paths[index] = value + "/**";
+    } else {
+      setting.included_paths[index] = value;
+    }
+    this.cdr.detectChanges();
+  }
+
+  // Exclude path helpers
+  getExcludePathType(setting: any, index: number): string {
+    const path = setting.excluded_paths[index];
+    if (!path) return "folder";
+    return path.endsWith("/**") ? "folder" : "file";
+  }
+
+  getExcludePathValue(setting: any, index: number): string {
+    const path = setting.excluded_paths[index];
+    if (!path) return "";
+    return path.endsWith("/**") ? path.slice(0, -3) : path;
+  }
+
+  updateExcludePathType(setting: any, index: number, type: string): void {
+    const currentValue = this.getExcludePathValue(setting, index);
+    if (type === "folder") {
+      setting.excluded_paths[index] = currentValue + "/**";
+    } else {
+      setting.excluded_paths[index] = currentValue;
+    }
+    this.cdr.detectChanges();
+  }
+
+  updateExcludePathValue(setting: any, index: number, value: string): void {
+    const currentType = this.getExcludePathType(setting, index);
+    if (currentType === "folder") {
+      setting.excluded_paths[index] = value + "/**";
+    } else {
+      setting.excluded_paths[index] = value;
+    }
+    this.cdr.detectChanges();
   }
 }

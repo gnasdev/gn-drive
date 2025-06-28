@@ -4,7 +4,7 @@ import {dto} from '../models';
 import {models} from '../models';
 import {config} from '../models';
 
-export function AddRemote(arg1:string,arg2:string,arg3:Record<string, string>):Promise<dto.AppError>;
+export function AddRemote(arg1:string,arg2:string,arg3:{[key: string]: string}):Promise<dto.AppError>;
 
 export function DeleteRemote(arg1:string):Promise<void>;
 
@@ -17,5 +17,9 @@ export function StopAddingRemote():Promise<dto.AppError>;
 export function StopCommand(arg1:number):Promise<void>;
 
 export function Sync(arg1:string,arg2:models.Profile):Promise<number>;
+
+export function SyncWithTab(arg1:string,arg2:models.Profile,arg3:string):Promise<number>;
+
+export function SyncWithTabId(arg1:string,arg2:models.Profile,arg3:string):Promise<number>;
 
 export function UpdateProfiles(arg1:models.Profiles):Promise<dto.AppError>;

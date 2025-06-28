@@ -19,6 +19,10 @@ import (
 )
 
 func (a *App) Sync(task string, profile models.Profile) int {
+	return a.SyncWithTab(task, profile, "")
+}
+
+func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int {
 	id := time.Now().Nanosecond()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -27,7 +31,12 @@ func (a *App) Sync(task string, profile models.Profile) int {
 
 	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
 	if utils.HandleError(err, "", nil, nil) != nil {
-		j, _ := utils.NewCommandErrorDTO(id, err).ToJSON()
+		var j []byte
+		if tabId != "" {
+			j, _ = utils.NewCommandErrorDTOWithTab(id, err, tabId).ToJSON()
+		} else {
+			j, _ = utils.NewCommandErrorDTO(id, err).ToJSON()
+		}
 		a.oc <- j
 		cancel()
 		return 0
@@ -39,6 +48,10 @@ func (a *App) Sync(task string, profile models.Profile) int {
 		cancel()
 	})
 
+	if tabId != "" {
+		utils.AddTabMapping(id, tabId)
+	}
+
 	go func() {
 		for {
 			logEntry, ok := <-outLog
@@ -49,7 +62,12 @@ func (a *App) Sync(task string, profile models.Profile) int {
 				fmt.Println("--------------------")
 				fmt.Println(logEntry)
 			}
-			j, _ := utils.NewCommandOutputDTO(id, logEntry).ToJSON()
+			var j []byte
+			if tabId != "" {
+				j, _ = utils.NewCommandOutputDTOWithTab(id, logEntry, tabId).ToJSON()
+			} else {
+				j, _ = utils.NewCommandOutputDTO(id, logEntry).ToJSON()
+			}
 			a.oc <- j
 		}
 	}()
@@ -67,11 +85,22 @@ func (a *App) Sync(task string, profile models.Profile) int {
 		}
 
 		if utils.HandleError(err, "", nil, nil) != nil {
-			j, _ := utils.NewCommandErrorDTO(0, err).ToJSON()
+			var j []byte
+			if tabId != "" {
+				j, _ = utils.NewCommandErrorDTOWithTab(0, err, tabId).ToJSON()
+			} else {
+				j, _ = utils.NewCommandErrorDTO(0, err).ToJSON()
+			}
 			a.oc <- j
 		}
 
-		j, _ := utils.NewCommandStoppedDTO(id).ToJSON()
+		var j []byte
+		if tabId != "" {
+			j, _ = utils.NewCommandStoppedDTOWithTab(id, tabId).ToJSON()
+			utils.RemoveTabMapping(id)
+		} else {
+			j, _ = utils.NewCommandStoppedDTO(id).ToJSON()
+		}
 		a.oc <- j
 
 		log.Println("Sync stopped!")
@@ -83,14 +112,27 @@ func (a *App) Sync(task string, profile models.Profile) int {
 func (a *App) StopCommand(id int) {
 	cancel, exists := utils.GetCmd(id)
 	if !exists {
-		j, _ := utils.NewCommandErrorDTO(id, errors.New("command not found")).ToJSON()
+		tabId, hasTab := utils.GetTabMapping(id)
+		var j []byte
+		if hasTab {
+			j, _ = utils.NewCommandErrorDTOWithTab(id, errors.New("command not found"), tabId).ToJSON()
+		} else {
+			j, _ = utils.NewCommandErrorDTO(id, errors.New("command not found")).ToJSON()
+		}
 		a.oc <- j
 		return
 	}
 
 	cancel()
 
-	res, _ := utils.NewCommandStoppedDTO(id).ToJSON()
+	tabId, hasTab := utils.GetTabMapping(id)
+	var res []byte
+	if hasTab {
+		res, _ = utils.NewCommandStoppedDTOWithTab(id, tabId).ToJSON()
+		utils.RemoveTabMapping(id)
+	} else {
+		res, _ = utils.NewCommandStoppedDTO(id).ToJSON()
+	}
 	a.oc <- res
 }
 
@@ -141,4 +183,8 @@ func (a *App) StopAddingRemote() *dto.AppError {
 
 func (a *App) DeleteRemote(remoteName string) {
 	fsConfig.DeleteRemote(remoteName)
+}
+
+func (a *App) SyncWithTabId(task string, profile models.Profile, tabId string) int {
+	return a.SyncWithTab(task, profile, tabId)
 }

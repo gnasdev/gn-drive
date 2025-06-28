@@ -33,19 +33,61 @@
           <section class="grid grid-cols-2 gap-6 mt-6">
             <div class="flex flex-col gap-1">
               <label>From path</label>
-              <input
-                type="text"
-                [(ngModel)]="setting.from"
-                placeholder="google-drive:/drive"
-              />
+              <div class="flex gap-2">
+                <select
+                  [ngModel]="getFromRemote(setting)"
+                  (ngModelChange)="
+                    updateFromPath(setting, $event, getFromPath(setting))
+                  "
+                  class="w-32"
+                >
+                  <option value="">Local</option>
+                  <option
+                    *ngFor="let remote of appService.remotes$ | async"
+                    [value]="remote.name"
+                  >
+                    {{ remote.name }}
+                  </option>
+                </select>
+                <input
+                  type="text"
+                  [ngModel]="getFromPath(setting)"
+                  (ngModelChange)="
+                    updateFromPath(setting, getFromRemote(setting), $event)
+                  "
+                  placeholder="/drive"
+                  class="flex-1"
+                />
+              </div>
             </div>
             <div class="flex flex-col gap-1">
               <label>To path</label>
-              <input
-                type="text"
-                [(ngModel)]="setting.to"
-                placeholder="./drive"
-              />
+              <div class="flex gap-2">
+                <select
+                  [ngModel]="getToRemote(setting)"
+                  (ngModelChange)="
+                    updateToPath(setting, $event, getToPath(setting))
+                  "
+                  class="w-32"
+                >
+                  <option value="">Local</option>
+                  <option
+                    *ngFor="let remote of appService.remotes$ | async"
+                    [value]="remote.name"
+                  >
+                    {{ remote.name }}
+                  </option>
+                </select>
+                <input
+                  type="text"
+                  [ngModel]="getToPath(setting)"
+                  (ngModelChange)="
+                    updateToPath(setting, getToRemote(setting), $event)
+                  "
+                  placeholder="./drive"
+                  class="flex-1"
+                />
+              </div>
             </div>
             <div class="flex flex-col gap-1">
               <label>Backup path</label>
@@ -65,21 +107,19 @@
             </div>
             <div class="flex flex-col gap-1">
               <label>Parallel</label>
-              <input
-                type="number"
-                [(ngModel)]="setting.parallel"
-                placeholder="16"
-                min="1"
-              />
+              <select [(ngModel)]="setting.parallel">
+                <option *ngFor="let i of getNumberRange(1, 32)" [value]="i">
+                  {{ i }}
+                </option>
+              </select>
             </div>
             <div class="flex flex-col gap-1">
               <label>Bandwidth (MB/s)</label>
-              <input
-                type="number"
-                [(ngModel)]="setting.bandwidth"
-                placeholder="5"
-                min="1"
-              />
+              <select [(ngModel)]="setting.bandwidth">
+                <option *ngFor="let i of getNumberRange(1, 100)" [value]="i">
+                  {{ i }}
+                </option>
+              </select>
             </div>
             <ul>
               <li>
@@ -93,10 +133,22 @@
                 "
                 class="flex gap-2"
               >
+                <select
+                  [ngModel]="getIncludePathType(setting, idx2)"
+                  (ngModelChange)="updateIncludePathType(setting, idx2, $event)"
+                  class="w-20"
+                >
+                  <option value="folder">Folder</option>
+                  <option value="file">File</option>
+                </select>
                 <input
                   type="text"
-                  [(ngModel)]="setting.included_paths[idx2]"
-                  placeholder="/included/**"
+                  [ngModel]="getIncludePathValue(setting, idx2)"
+                  (ngModelChange)="
+                    updateIncludePathValue(setting, idx2, $event)
+                  "
+                  placeholder="/included"
+                  class="flex-1"
                 />
                 <button
                   class="border-red-500"
@@ -121,10 +173,22 @@
                 "
                 class="flex gap-2"
               >
+                <select
+                  [ngModel]="getExcludePathType(setting, idx2)"
+                  (ngModelChange)="updateExcludePathType(setting, idx2, $event)"
+                  class="w-20"
+                >
+                  <option value="folder">Folder</option>
+                  <option value="file">File</option>
+                </select>
                 <input
                   type="text"
-                  [(ngModel)]="setting.excluded_paths[idx2]"
-                  placeholder="/excluded/**"
+                  [ngModel]="getExcludePathValue(setting, idx2)"
+                  (ngModelChange)="
+                    updateExcludePathValue(setting, idx2, $event)
+                  "
+                  placeholder="/excluded"
+                  class="flex-1"
                 />
                 <button
                   class="border-red-500"

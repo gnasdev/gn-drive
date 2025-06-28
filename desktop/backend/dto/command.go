@@ -21,6 +21,7 @@ type CommandDTO struct {
 	Id      *int    `json:"pid,omitempty"`
 	Error   *string `json:"error,omitempty"`
 	Task    *string `json:"task"`
+	TabId   *string `json:"tab_id,omitempty"`
 }
 
 func (c CommandDTO) ToJSON() ([]byte, error) {

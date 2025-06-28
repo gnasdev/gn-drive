@@ -2,10 +2,11 @@ version: "3"
 
 tasks:
   # Desktop
-  dev-app:
+  dev:
     cmds:
       - wails dev
     dir: desktop
+
   build-mac:
     platforms: [darwin]
     cmds:
@@ -21,6 +22,7 @@ tasks:
 
       - open ../desktop.app
     dir: desktop
+
   build-win:
     platforms: [windows]
     cmds:

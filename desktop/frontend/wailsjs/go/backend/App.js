@@ -30,6 +30,14 @@ export function Sync(arg1, arg2) {
   return window['go']['backend']['App']['Sync'](arg1, arg2);
 }
 
+export function SyncWithTab(arg1, arg2, arg3) {
+  return window['go']['backend']['App']['SyncWithTab'](arg1, arg2, arg3);
+}
+
+export function SyncWithTabId(arg1, arg2, arg3) {
+  return window['go']['backend']['App']['SyncWithTabId'](arg1, arg2, arg3);
+}
+
 export function UpdateProfiles(arg1) {
   return window['go']['backend']['App']['UpdateProfiles'](arg1);
 }
