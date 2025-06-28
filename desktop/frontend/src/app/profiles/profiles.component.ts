@@ -10,9 +10,36 @@ import { AppService } from "../app.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 
+// Material Design imports
+import { MatCardModule } from "@angular/material/card";
+import { MatButtonModule } from "@angular/material/button";
+import { MatIconModule } from "@angular/material/icon";
+import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatInputModule } from "@angular/material/input";
+import { MatSelectModule } from "@angular/material/select";
+import { MatExpansionModule } from "@angular/material/expansion";
+import { MatChipsModule } from "@angular/material/chips";
+import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatSnackBarModule } from "@angular/material/snack-bar";
+import { MatDividerModule } from "@angular/material/divider";
+
 @Component({
   selector: "app-profiles",
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatExpansionModule,
+    MatChipsModule,
+    MatTooltipModule,
+    MatSnackBarModule,
+    MatDividerModule,
+  ],
   templateUrl: "./profiles.component.html",
   styleUrl: "./profiles.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -79,6 +106,13 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   // Helper method to generate number ranges for selectors
   getNumberRange(start: number, end: number): number[] {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+
+  // Get profile description for expansion panel
+  getProfileDescription(setting: any): string {
+    const from = setting.from || "Not configured";
+    const to = setting.to || "Not configured";
+    return `${from} → ${to}`;
   }
 
   // From path helpers

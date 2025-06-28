@@ -1,0 +1,310 @@
+@use "@angular/material" as mat;
+
+.home-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+// Empty State
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+
+  .welcome-card {
+    max-width: 500px;
+    text-align: center;
+
+    mat-card-header {
+      justify-content: center;
+
+      mat-icon {
+        font-size: 48px;
+        width: 48px;
+        height: 48px;
+        color: #1976d2;
+      }
+    }
+
+    mat-card-content {
+      padding: 16px 24px;
+
+      p {
+        color: #666;
+        line-height: 1.6;
+        margin: 0;
+      }
+    }
+
+    mat-card-actions {
+      justify-content: center;
+      padding: 16px 24px 24px;
+    }
+  }
+}
+
+// Tabs Container
+.tabs-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-header {
+  position: relative;
+
+  .add-tab-button {
+    position: absolute;
+    top: 8px;
+    right: 16px;
+    z-index: 10;
+    width: 40px;
+    height: 40px;
+
+    mat-icon {
+      font-size: 20px;
+    }
+  }
+}
+
+.main-tabs {
+  height: 100%;
+
+  ::ng-deep .mat-mdc-tab-group {
+    height: 100%;
+
+    .mat-mdc-tab-header {
+      border-bottom: 1px solid #e0e0e0;
+      background: #fafafa;
+    }
+
+    .mat-mdc-tab-body-wrapper {
+      flex: 1;
+      height: calc(100% - 48px);
+    }
+
+    .mat-mdc-tab-body {
+      height: 100%;
+    }
+
+    .mat-mdc-tab-body-content {
+      height: 100%;
+      overflow: hidden;
+    }
+  }
+}
+
+// Tab Label Styling
+.tab-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 120px;
+
+  .tab-menu-button {
+    opacity: 0;
+    transition: opacity 0.2s;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &:hover .tab-menu-button {
+    opacity: 1;
+  }
+}
+
+.tab-edit {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+
+  .tab-name-field {
+    width: 120px;
+
+    ::ng-deep .mat-mdc-form-field-wrapper {
+      padding-bottom: 0;
+    }
+
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      height: 32px;
+      background: white;
+      border-radius: 4px;
+    }
+
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+
+    input {
+      font-size: 14px;
+      padding: 4px 8px;
+    }
+  }
+}
+
+// Tab Content
+.tab-content {
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+// Control Panel
+.control-panel {
+  .profile-select {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+
+    button {
+      min-width: 120px;
+      height: 40px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &:not(:disabled) {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        &:active {
+          transform: translateY(0);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      mat-icon {
+        margin-right: 8px;
+      }
+    }
+  }
+
+  .progress-bar {
+    margin: 16px 0;
+  }
+
+  .status-chips {
+    margin-top: 8px;
+
+    mat-chip {
+      mat-icon {
+        margin-right: 4px;
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+}
+
+// Info Card
+.info-card {
+  .working-dir {
+    background: #f5f5f5;
+    padding: 12px;
+    border-radius: 4px;
+    display: block;
+    word-break: break-all;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    color: #333;
+  }
+}
+
+// Output Card
+.output-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+
+  mat-card-header {
+    .spacer {
+      flex: 1;
+    }
+  }
+
+  mat-card-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+  }
+
+  .console-output {
+    flex: 1;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px;
+    border-radius: 4px;
+    overflow: auto;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    min-height: 200px;
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .tab-content {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .control-panel .action-buttons {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+  }
+}
+
+// Dark theme support
+@media (prefers-color-scheme: dark) {
+  .info-card .working-dir {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+
+  .console-output {
+    background: #0d1117;
+    color: #c9d1d9;
+  }
+}

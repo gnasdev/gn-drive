@@ -11,11 +11,37 @@ import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
 import { models } from "../../../wailsjs/go/models";
 
+// Material Design imports
+import { MatTabsModule } from "@angular/material/tabs";
+import { MatCardModule } from "@angular/material/card";
+import { MatButtonModule } from "@angular/material/button";
+import { MatIconModule } from "@angular/material/icon";
+import { MatSelectModule } from "@angular/material/select";
+import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatProgressBarModule } from "@angular/material/progress-bar";
+import { MatChipsModule } from "@angular/material/chips";
+import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatMenuModule } from "@angular/material/menu";
+import { FormsModule } from "@angular/forms";
+
 @Component({
   selector: "app-home",
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    MatTabsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatProgressBarModule,
+    MatChipsModule,
+    MatTooltipModule,
+    MatMenuModule,
+    FormsModule,
+  ],
   templateUrl: "./home.component.html",
-  styleUrl: "./home.component.css",
+  styleUrl: "./home.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent implements OnInit, OnDestroy {
@@ -169,15 +195,39 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   stopCommandTab(tabId: string) {
-    this.appService.stopCommandForTab(tabId);
+    const tab = this.tabService.getTab(tabId);
+    if (tab) {
+      console.log(
+        "Stopping command for tab:",
+        tabId,
+        "currentTaskId:",
+        tab.currentTaskId,
+        "currentAction:",
+        tab.currentAction
+      );
+
+      // Set stopping state immediately
+      this.tabService.updateTab(tabId, {
+        isStopping: true,
+        data: [...(tab.data || []), "Stopping command..."],
+      });
+
+      this.appService.stopCommandForTab(tabId);
+    }
   }
 
-  changeProfileTab(event: any, tabId: string) {
-    const selectedIndex = parseInt(event.target.value);
-    if (isNaN(selectedIndex)) {
+  changeProfileTab(selectedValue: any, tabId: string) {
+    if (selectedValue === null || selectedValue === undefined) {
       this.tabService.updateTab(tabId, { selectedProfileIndex: null });
     } else {
-      this.tabService.updateTab(tabId, { selectedProfileIndex: selectedIndex });
+      const selectedIndex = parseInt(selectedValue);
+      if (isNaN(selectedIndex)) {
+        this.tabService.updateTab(tabId, { selectedProfileIndex: null });
+      } else {
+        this.tabService.updateTab(tabId, {
+          selectedProfileIndex: selectedIndex,
+        });
+      }
     }
   }
 
@@ -201,5 +251,68 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   cancelRenameTab(tabId: string) {
     this.tabService.cancelRenameTab(tabId);
+  }
+
+  // New methods for Material Design interface
+  getActiveTabIndex(): number {
+    const activeTabId = this.tabService.activeTabIdValue;
+    if (!activeTabId) return 0;
+    return this.tabService.tabsValue.findIndex((tab) => tab.id === activeTabId);
+  }
+
+  onTabChange(index: number) {
+    const tabs = this.tabService.tabsValue;
+    if (index >= 0 && index < tabs.length) {
+      this.tabService.setActiveTab(tabs[index].id);
+    }
+  }
+
+  getActionColor(action: Action): "primary" | "accent" | "warn" {
+    switch (action) {
+      case Action.Pull:
+        return "primary";
+      case Action.Push:
+        return "accent";
+      case Action.Bi:
+        return "primary";
+      case Action.BiResync:
+        return "warn";
+      default:
+        return "primary";
+    }
+  }
+
+  getActionIcon(action: Action): string {
+    switch (action) {
+      case Action.Pull:
+        return "download";
+      case Action.Push:
+        return "upload";
+      case Action.Bi:
+        return "sync";
+      case Action.BiResync:
+        return "refresh";
+      default:
+        return "play_arrow";
+    }
+  }
+
+  getActionLabel(action: Action): string {
+    switch (action) {
+      case Action.Pull:
+        return "Pulling";
+      case Action.Push:
+        return "Pushing";
+      case Action.Bi:
+        return "Syncing";
+      case Action.BiResync:
+        return "Resyncing";
+      default:
+        return "Running";
+    }
+  }
+
+  clearTabOutput(tabId: string) {
+    this.tabService.updateTab(tabId, { data: [] });
   }
 }

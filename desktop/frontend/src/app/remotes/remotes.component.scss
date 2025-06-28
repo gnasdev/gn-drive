@@ -1,11 +1,98 @@
 summary {
-    @apply select-none;
+  @apply select-none;
 }
 
-.delete-btn {
-    @apply border-red-500;
+.remotes-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+// Header Card
+.header-card {
+  mat-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+// Remotes List
+.remotes-list {
+  flex: 1;
+}
+
+// Remote Item
+.remote-item {
+  border-bottom: 1px solid #e0e0e0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .remote-actions {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+// No Remotes State
+.no-remotes-card {
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+
+  mat-card-header {
+    justify-content: center;
+
+    mat-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #999;
+    }
+  }
+
+  mat-card-content {
+    padding: 16px 24px;
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin: 0;
+    }
+  }
+
+  mat-card-actions {
+    justify-content: center;
+    padding: 16px 24px 24px;
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .remotes-container {
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+// Dark theme support
+@media (prefers-color-scheme: dark) {
+  .remote-item {
+    border-bottom-color: #424242;
+  }
+
+  .no-remotes-card {
+    mat-card-content p {
+      color: #ccc;
+    }
+  }
 }
 
 input {
-    @apply w-full;
+  @apply w-full;
 }

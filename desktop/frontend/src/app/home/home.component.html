@@ -1,170 +1,295 @@
-<div class="flex h-screen text-sm overflow-hidden">
-  <!-- Vertical Tab Bar -->
-  <div class="w-48 bg-gray-800 border-r border-gray-700 flex flex-col">
-    <!-- Tab List -->
-    <div class="flex-1 overflow-y-auto">
-      <div
-        *ngFor="let tab of tabService.tabsValue"
-        class="flex items-center justify-between p-3 border-b border-gray-700 cursor-pointer hover:bg-gray-700"
-        [ngClass]="{ 'bg-gray-700': tab.isActive }"
-        (click)="setActiveTab(tab.id)"
-      >
-        <div class="flex-1 min-w-0" *ngIf="!tab.isEditing">
-          <span class="text-white truncate">{{ tab.name }}</span>
-        </div>
-        <div class="flex-1 min-w-0" *ngIf="tab.isEditing">
-          <input
-            #tabNameInput
-            type="text"
-            [value]="tab.name"
-            (blur)="finishRenameTab(tab.id, tabNameInput.value)"
-            (keydown.enter)="finishRenameTab(tab.id, tabNameInput.value)"
-            (keydown.escape)="cancelRenameTab(tab.id)"
-            (click)="$event.stopPropagation()"
-            class="w-full bg-gray-600 text-white px-2 py-1 rounded text-sm"
-            autofocus
-          />
-        </div>
-        <div class="flex gap-1 ml-2">
-          <button
-            class="text-blue-400 hover:text-blue-300"
-            (click)="startRenameTab(tab.id); $event.stopPropagation()"
-            *ngIf="!tab.isEditing"
-            title="Rename tab"
-          >
-            ✏️
-          </button>
-          <button
-            class="text-red-400 hover:text-red-300"
-            (click)="deleteTab(tab.id); $event.stopPropagation()"
-          >
-            ×
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Tab Button -->
-    <div class="p-3 border-t border-gray-700">
-      <button
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
-        (click)="createTab()"
-      >
-        + New Tab
-      </button>
-    </div>
+<div class="home-container">
+  <!-- Empty State -->
+  <div *ngIf="tabService.tabsValue.length === 0" class="empty-state">
+    <mat-card class="welcome-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>home</mat-icon>
+        <mat-card-title>Welcome to NS Drive</mat-card-title>
+        <mat-card-subtitle
+          >Create your first tab to get started</mat-card-subtitle
+        >
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          Tabs allow you to run multiple sync operations simultaneously. Each
+          tab can have its own profile and run independently.
+        </p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="primary" (click)="createTab()">
+          <mat-icon>add</mat-icon>
+          Create First Tab
+        </button>
+      </mat-card-actions>
+    </mat-card>
   </div>
 
-  <!-- Tab Content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <div
-      *ngIf="tabService.tabsValue.length === 0"
-      class="flex-1 flex items-center justify-center text-white"
-    >
-      <div class="text-center">
-        <p class="text-lg mb-4">No tabs open</p>
-        <button
-          class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
-          (click)="createTab()"
+  <!-- Tabs Interface -->
+  <div *ngIf="tabService.tabsValue.length > 0" class="tabs-container">
+    <!-- Tab Header with Add Button -->
+    <div class="tab-header">
+      <mat-tab-group
+        [selectedIndex]="getActiveTabIndex()"
+        (selectedIndexChange)="onTabChange($event)"
+        class="main-tabs"
+      >
+        <!-- Dynamic Tabs -->
+        <mat-tab
+          *ngFor="let tab of tabService.tabsValue; let i = index"
+          [label]="tab.name"
         >
-          Create your first tab
-        </button>
-      </div>
-    </div>
+          <ng-template mat-tab-label>
+            <div class="tab-label" *ngIf="!tab.isEditing">
+              <span>{{ tab.name }}</span>
+              <button
+                mat-icon-button
+                class="tab-menu-button"
+                [matMenuTriggerFor]="tabMenu"
+                (click)="$event.stopPropagation()"
+              >
+                <mat-icon>more_vert</mat-icon>
+              </button>
 
-    <div
-      *ngIf="tabService.getActiveTab() as activeTab"
-      class="flex-1 flex flex-col p-3 overflow-hidden"
-    >
-      <!-- Tab Controls -->
-      <div class="text-white mb-3">
-        <div class="w-full flex justify-start align-center gap-2 mb-2">
-          <button
-            [ngClass]="{
-              underline: activeTab.currentAction === Action.Pull
-            }"
-            (click)="
-              activeTab.currentAction !== Action.Pull
-                ? pullTab(activeTab.id)
-                : stopCommandTab(activeTab.id)
-            "
-            [disabled]="!validateTabProfileIndex(activeTab)"
-          >
-            {{ activeTab.currentAction === Action.Pull ? "Stop" : "Pull" }}
-          </button>
-          <button
-            [ngClass]="{
-              underline: activeTab.currentAction === Action.Push
-            }"
-            (click)="
-              activeTab.currentAction !== Action.Push
-                ? pushTab(activeTab.id)
-                : stopCommandTab(activeTab.id)
-            "
-            [disabled]="!validateTabProfileIndex(activeTab)"
-          >
-            {{ activeTab.currentAction === Action.Push ? "Stop" : "Push" }}
-          </button>
-          <button
-            [ngClass]="{
-              underline: activeTab.currentAction === Action.Bi
-            }"
-            (click)="
-              activeTab.currentAction !== Action.Bi
-                ? biTab(activeTab.id)
-                : stopCommandTab(activeTab.id)
-            "
-            [disabled]="!validateTabProfileIndex(activeTab)"
-          >
-            {{ activeTab.currentAction === Action.Bi ? "Stop" : "Sync" }}
-          </button>
-          <button
-            [ngClass]="{
-              underline: activeTab.currentAction === Action.BiResync
-            }"
-            (click)="
-              activeTab.currentAction !== Action.BiResync
-                ? biResyncTab(activeTab.id)
-                : stopCommandTab(activeTab.id)
-            "
-            [disabled]="!validateTabProfileIndex(activeTab)"
-          >
-            {{
-              activeTab.currentAction === Action.BiResync ? "Stop" : "Resync"
-            }}
-          </button>
-        </div>
+              <mat-menu #tabMenu="matMenu">
+                <button mat-menu-item (click)="startRenameTab(tab.id)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Rename</span>
+                </button>
+                <button
+                  mat-menu-item
+                  (click)="deleteTab(tab.id)"
+                  [disabled]="tabService.tabsValue.length === 1"
+                >
+                  <mat-icon>delete</mat-icon>
+                  <span>Delete</span>
+                </button>
+              </mat-menu>
+            </div>
 
-        <!-- Profile Selector -->
-        <select
-          (change)="changeProfileTab($event, activeTab.id)"
-          class="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
-        >
-          <option [value]="null">Profile is not selected</option>
-          <option
-            *ngFor="
-              let profile of appService.configInfo$.value.profiles;
-              let idx = index
-            "
-            [value]="idx"
-            [selected]="activeTab.selectedProfileIndex === idx"
-          >
-            {{ profile.name }}
-          </option>
-        </select>
-      </div>
+            <div class="tab-edit" *ngIf="tab.isEditing">
+              <mat-form-field appearance="outline" class="tab-name-field">
+                <input
+                  matInput
+                  #tabNameInput
+                  [value]="tab.name"
+                  (blur)="finishRenameTab(tab.id, tabNameInput.value)"
+                  (keydown.enter)="finishRenameTab(tab.id, tabNameInput.value)"
+                  (keydown.escape)="cancelRenameTab(tab.id)"
+                  (click)="$event.stopPropagation()"
+                  autofocus
+                />
+              </mat-form-field>
+            </div>
+          </ng-template>
 
-      <!-- Working Directory -->
-      <code class="text-white overflow-hidden mb-3">
-        <pre>
-Working directory: {{ (appService.configInfo$ | async)?.working_dir }}</pre
-        >
-      </code>
+          <!-- Tab Content -->
+          <div class="tab-content">
+            <!-- Control Panel -->
+            <mat-card class="control-panel">
+              <mat-card-header>
+                <mat-card-title>Sync Operations</mat-card-title>
+                <mat-card-subtitle
+                  >Choose a profile and sync operation</mat-card-subtitle
+                >
+              </mat-card-header>
 
-      <!-- Tab Output -->
-      <code class="text-white flex-1 overflow-auto">
-        <pre>{{ activeTab.data.join("\n") }}</pre>
-      </code>
+              <mat-card-content>
+                <!-- Profile Selection -->
+                <mat-form-field appearance="outline" class="profile-select">
+                  <mat-label>Select Profile</mat-label>
+                  <mat-select
+                    [value]="tab.selectedProfileIndex"
+                    (selectionChange)="changeProfileTab($event.value, tab.id)"
+                  >
+                    <mat-option [value]="null">No profile selected</mat-option>
+                    <mat-option
+                      *ngFor="
+                        let profile of appService.configInfo$.value.profiles;
+                        let idx = index
+                      "
+                      [value]="idx"
+                    >
+                      {{ profile.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                  <button
+                    mat-raised-button
+                    [color]="
+                      tab.currentAction === Action.Pull ? 'warn' : 'primary'
+                    "
+                    [disabled]="
+                      (!validateTabProfileIndex(tab) &&
+                        tab.currentAction !== Action.Pull) ||
+                      tab.isStopping
+                    "
+                    (click)="
+                      tab.currentAction !== Action.Pull
+                        ? pullTab(tab.id)
+                        : stopCommandTab(tab.id)
+                    "
+                    matTooltip="Download files from remote"
+                  >
+                    <mat-icon>{{
+                      tab.isStopping
+                        ? "hourglass_empty"
+                        : tab.currentAction === Action.Pull
+                        ? "stop"
+                        : "download"
+                    }}</mat-icon>
+                    {{
+                      tab.isStopping
+                        ? "Stopping..."
+                        : tab.currentAction === Action.Pull
+                        ? "Stop Pull"
+                        : "Pull"
+                    }}
+                  </button>
+
+                  <button
+                    mat-raised-button
+                    [color]="
+                      tab.currentAction === Action.Push ? 'warn' : 'accent'
+                    "
+                    [disabled]="
+                      !validateTabProfileIndex(tab) &&
+                      tab.currentAction !== Action.Push
+                    "
+                    (click)="
+                      tab.currentAction !== Action.Push
+                        ? pushTab(tab.id)
+                        : stopCommandTab(tab.id)
+                    "
+                    matTooltip="Upload files to remote"
+                  >
+                    <mat-icon>{{
+                      tab.currentAction === Action.Push ? "stop" : "upload"
+                    }}</mat-icon>
+                    {{
+                      tab.currentAction === Action.Push ? "Stop Push" : "Push"
+                    }}
+                  </button>
+
+                  <button
+                    mat-raised-button
+                    [color]="
+                      tab.currentAction === Action.Bi ? 'warn' : 'primary'
+                    "
+                    [disabled]="
+                      !validateTabProfileIndex(tab) &&
+                      tab.currentAction !== Action.Bi
+                    "
+                    (click)="
+                      tab.currentAction !== Action.Bi
+                        ? biTab(tab.id)
+                        : stopCommandTab(tab.id)
+                    "
+                    matTooltip="Bidirectional sync"
+                  >
+                    <mat-icon>{{
+                      tab.currentAction === Action.Bi ? "stop" : "sync"
+                    }}</mat-icon>
+                    {{ tab.currentAction === Action.Bi ? "Stop Sync" : "Sync" }}
+                  </button>
+
+                  <button
+                    mat-raised-button
+                    [color]="
+                      tab.currentAction === Action.BiResync ? 'warn' : 'warn'
+                    "
+                    [disabled]="
+                      !validateTabProfileIndex(tab) &&
+                      tab.currentAction !== Action.BiResync
+                    "
+                    (click)="
+                      tab.currentAction !== Action.BiResync
+                        ? biResyncTab(tab.id)
+                        : stopCommandTab(tab.id)
+                    "
+                    matTooltip="Force resync all files"
+                  >
+                    <mat-icon>{{
+                      tab.currentAction === Action.BiResync ? "stop" : "refresh"
+                    }}</mat-icon>
+                    {{
+                      tab.currentAction === Action.BiResync
+                        ? "Stop Resync"
+                        : "Resync"
+                    }}
+                  </button>
+                </div>
+
+                <!-- Progress Indicator -->
+                <mat-progress-bar
+                  *ngIf="tab.currentAction"
+                  mode="indeterminate"
+                  class="progress-bar"
+                >
+                </mat-progress-bar>
+
+                <!-- Status Chip -->
+                <mat-chip-set *ngIf="tab.currentAction" class="status-chips">
+                  <mat-chip
+                    [color]="getActionColor(tab.currentAction)"
+                    selected
+                  >
+                    <mat-icon>{{ getActionIcon(tab.currentAction) }}</mat-icon>
+                    {{ getActionLabel(tab.currentAction) }}
+                  </mat-chip>
+                </mat-chip-set>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Working Directory Info -->
+            <mat-card class="info-card">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>folder</mat-icon>
+                <mat-card-title>Working Directory</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <code class="working-dir">{{
+                  (appService.configInfo$ | async)?.working_dir
+                }}</code>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Output Console -->
+            <mat-card class="output-card">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>terminal</mat-icon>
+                <mat-card-title>Console Output</mat-card-title>
+                <div class="spacer"></div>
+                <button
+                  mat-icon-button
+                  (click)="clearTabOutput(tab.id)"
+                  matTooltip="Clear output"
+                >
+                  <mat-icon>clear</mat-icon>
+                </button>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="console-output">
+                  <pre>{{ tab.data.join("\n") || "No output yet..." }}</pre>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
+      <!-- Add Tab Button -->
+      <button
+        mat-fab
+        color="primary"
+        class="add-tab-button"
+        (click)="createTab()"
+        matTooltip="Add new tab"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
     </div>
   </div>
 </div>

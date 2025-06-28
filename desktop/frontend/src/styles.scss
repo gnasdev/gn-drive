@@ -1,39 +1,53 @@
+// Import Angular Material prebuilt theme
+@import "@angular/material/prebuilt-themes/indigo-pink.css";
+
+// Tailwind CSS
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url("mvp.css/mvp.css");
-
+// Global styles
 * {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
+  box-sizing: border-box;
 }
 
-button {
-    @apply text-sm px-2 py-2 m-0 bg-transparent;
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: "Roboto", "Helvetica Neue", sans-serif;
 }
 
-button:disabled {
-    @apply bg-transparent text-gray-500 border-gray-500;
+// Custom Material Design overrides
+.mat-mdc-card {
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
 }
 
-input {
-    @apply bg-transparent outline-none py-1 border-t-0 border-x-0 rounded-none w-full;
+.mat-mdc-button {
+  border-radius: 20px !important;
 }
 
-input:disabled,
-select:disabled {
-    @apply bg-none bg-transparent border-0 text-gray-500;
+.mat-mdc-fab {
+  border-radius: 16px !important;
 }
 
-select {
-    border: 2px solid var(--color-link);
-    border-radius: var(--border-radius);
-    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' version='1.1' height='10px' width='15px'%3E%3Ctext x='0' y='10' fill='gray'%3E%E2%96%BE%3C/text%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-size: 1.5em 1em;
-    background-position: right center;
-    background-clip: border-box;
-    @apply bg-transparent m-0 px-2 py-1;
+// Dark theme support will be handled by Material Design 3
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
 }

@@ -1,20 +1,90 @@
-<div
-  class="fixed top-0 left-0 w-screen min-h-screen overflow-hidden grid bg-gray-900"
-  style="grid-template-columns: max-content 1fr"
->
-  <div class="p-3 text-white">
-    <div class="w-full flex justify-center flex-col gap-3">
-      <h1 class="block text-center font-bold text-3xl select-none cursor-default">
-        Drive
-      </h1>
-      <button (click)="openHome()" [ngClass]="(tab$ | async) === 'home' ? 'underline' : ''">Home</button>
-      <button (click)="openProfiles()" [ngClass]="(tab$ | async) === 'profiles' ? 'underline' : ''">Profiles</button>
-      <button (click)="openRemotes()" [ngClass]="(tab$ | async) === 'remotes' ? 'underline' : ''">Remotes</button>
+<mat-sidenav-container class="app-container">
+  <!-- Sidebar Navigation -->
+  <mat-sidenav
+    #sidenav
+    [mode]="isHandset ? 'over' : 'side'"
+    [opened]="!isHandset"
+    class="app-sidenav"
+    fixedInViewport="true"
+    [disableClose]="!isHandset"
+  >
+    <!-- App Header in Sidebar -->
+    <div class="sidenav-header">
+      <mat-icon class="app-icon">storage</mat-icon>
+      <h1 class="app-title">NS Drive</h1>
     </div>
-  </div>
-  <div [ngSwitch]="tab$ | async">
-    <app-home *ngSwitchCase="'home'"></app-home>
-    <app-profiles *ngSwitchCase="'profiles'"></app-profiles>
-    <app-remotes *ngSwitchCase="'remotes'"></app-remotes>
-  </div>
-</div>
+
+    <!-- Navigation Menu -->
+    <mat-nav-list class="nav-list">
+      <mat-list-item
+        (click)="openHome()"
+        [class.active]="(tab$ | async) === 'home'"
+        class="nav-item"
+      >
+        <mat-icon matListItemIcon>home</mat-icon>
+        <span matListItemTitle>Home</span>
+      </mat-list-item>
+
+      <mat-list-item
+        (click)="openProfiles()"
+        [class.active]="(tab$ | async) === 'profiles'"
+        class="nav-item"
+      >
+        <mat-icon matListItemIcon>settings</mat-icon>
+        <span matListItemTitle>Profiles</span>
+      </mat-list-item>
+
+      <mat-list-item
+        (click)="openRemotes()"
+        [class.active]="(tab$ | async) === 'remotes'"
+        class="nav-item"
+      >
+        <mat-icon matListItemIcon>cloud</mat-icon>
+        <span matListItemTitle>Remotes</span>
+      </mat-list-item>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <!-- Main Content Area -->
+  <mat-sidenav-content class="main-content">
+    <!-- Top Toolbar -->
+    <mat-toolbar class="app-toolbar" color="primary">
+      <button mat-icon-button (click)="sidenav.toggle()" class="menu-button">
+        <mat-icon>menu</mat-icon>
+      </button>
+
+      <span class="toolbar-title">
+        {{
+          (tab$ | async) === "home"
+            ? "Home"
+            : (tab$ | async) === "profiles"
+            ? "Profiles"
+            : (tab$ | async) === "remotes"
+            ? "Remotes"
+            : "NS Drive"
+        }}
+      </span>
+
+      <span class="toolbar-spacer"></span>
+
+      <!-- Action buttons based on current tab -->
+      <div class="toolbar-actions" *ngIf="(tab$ | async) === 'home'">
+        <button
+          mat-icon-button
+          (click)="stopCommand()"
+          [disabled]="!appService.currentAction$.value"
+          matTooltip="Stop Current Operation"
+        >
+          <mat-icon>stop</mat-icon>
+        </button>
+      </div>
+    </mat-toolbar>
+
+    <!-- Page Content -->
+    <div class="page-content" [ngSwitch]="tab$ | async">
+      <app-home *ngSwitchCase="'home'"></app-home>
+      <app-profiles *ngSwitchCase="'profiles'"></app-profiles>
+      <app-remotes *ngSwitchCase="'remotes'"></app-remotes>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

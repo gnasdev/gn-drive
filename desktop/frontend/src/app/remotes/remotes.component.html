@@ -1,93 +1,88 @@
-<ul
-  class="text-white text-sm h-screen p-3 pl-0 flex flex-col items-start gap-3"
->
-  <section class="flex gap-2 w-full">
-    <button popovertarget="create-remote-dialog">Add +</button>
-    <dialog popover id="create-remote-dialog" class="bg-gray-900 p-0">
-      <form
-        class="shadow-none border-0 bg-[var(--color-accent)]"
-        (submit)="addRemote($event)"
+<div class="remotes-container">
+  <!-- Header Section -->
+  <mat-card class="header-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>cloud</mat-icon>
+      <mat-card-title>Remote Storage Management</mat-card-title>
+      <mat-card-subtitle
+        >Configure cloud storage connections for sync
+        operations</mat-card-subtitle
       >
-        <fieldset
-          [disabled]="isAddingRemote$ | async"
-          class="grid grid-cols-2 gap-3 text-white"
+    </mat-card-header>
+
+    <mat-card-actions>
+      <button mat-raised-button color="primary" (click)="openAddRemoteDialog()">
+        <mat-icon>add</mat-icon>
+        Add Remote
+      </button>
+    </mat-card-actions>
+  </mat-card>
+  <!-- Remotes List -->
+  <div class="remotes-list">
+    <mat-card *ngIf="(appService.remotes$ | async)?.length; else noRemotes">
+      <mat-card-header>
+        <mat-card-title>Connected Remotes</mat-card-title>
+        <mat-card-subtitle
+          >{{ (appService.remotes$ | async)?.length }} remote(s)
+          configured</mat-card-subtitle
         >
-          <div>
-            <label>Name</label>
-            <input type="text" name="name" placeholder="google-drive" />
-          </div>
-          <div>
-            <label>Type</label>
-            <select name="type" class="w-full">
-              <option value="drive">Google Drive</option>
-              <option value="dropbox">Dropbox</option>
-              <option value="onedrive">Onedrive</option>
-              <option value="yandex">Yandex Disk</option>
-              <option value="gphotos">Google Photos</option>
-            </select>
-          </div>
+      </mat-card-header>
+
+      <mat-card-content>
+        <mat-list>
+          <mat-list-item
+            *ngFor="let remote of appService.remotes$ | async"
+            class="remote-item"
+          >
+            <mat-icon matListItemIcon>{{
+              getRemoteIcon(remote.type)
+            }}</mat-icon>
+
+            <div matListItemTitle>{{ remote.name }}</div>
+            <div matListItemLine>{{ getRemoteTypeLabel(remote.type) }}</div>
+
+            <div matListItemMeta class="remote-actions">
+              <button
+                mat-icon-button
+                color="warn"
+                (click)="confirmDeleteRemote(remote)"
+                matTooltip="Delete remote"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </mat-list-item>
+        </mat-list>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- No Remotes State -->
+    <ng-template #noRemotes>
+      <mat-card class="no-remotes-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>cloud_off</mat-icon>
+          <mat-card-title>No Remotes Configured</mat-card-title>
+          <mat-card-subtitle
+            >Add your first cloud storage connection</mat-card-subtitle
+          >
+        </mat-card-header>
+        <mat-card-content>
+          <p>
+            Remotes allow you to sync files with cloud storage services like
+            Google Drive, Dropbox, OneDrive, and more.
+          </p>
+        </mat-card-content>
+        <mat-card-actions>
           <button
-            *ngIf="!(isAddingRemote$ | async)"
-            type="submit"
-            class="col-span-2"
+            mat-raised-button
+            color="primary"
+            (click)="openAddRemoteDialog()"
           >
-            Create
+            <mat-icon>add</mat-icon>
+            Add First Remote
           </button>
-        </fieldset>
-        <button
-          *ngIf="isAddingRemote$ | async"
-          type="button"
-          class="w-full delete-btn text-white mt-3"
-          (click)="stopAddingRemote()"
-        >
-          Stop
-        </button>
-      </form>
-    </dialog>
-    <div class="grow"></div>
-  </section>
-  <ul
-    class="w-full grow bg-[var(--color-accent)] overflow-x-hidden overflow-y-auto rounded-md px-3 scrollbar scrollbar-thumb-gray-900 scrollbar-track-[var(--color-accent)]"
-  >
-    <li class="sticky top-0 bg-gray-900 p-0">
-      <section
-        class="grid grid-cols-[1fr,1fr,min-content] gap-3 py-3 border-b border-solid bg-[var(--color-accent)]"
-      >
-        <label>Name</label>
-        <label>Type</label>
-        <label class="w-[3.75rem] text-right">Action</label>
-      </section>
-    </li>
-    <li *ngFor="let remote of appService.remotes$ | async">
-      <section
-        class="grid grid-cols-[1fr,1fr,min-content] gap-3 my-3 items-center"
-      >
-        <label>{{ remote.name }}</label>
-        <label>{{ remote.type }}</label>
-        <button
-          [attr.popovertarget]="'delete-remote-confirm-dialog-' + remote.name"
-          class="delete-btn w-min mr-[1px]"
-        >
-          Delete
-        </button>
-        <dialog
-          popover
-          [id]="'delete-remote-confirm-dialog-' + remote.name"
-          class="bg-gray-900 p-0"
-        >
-          <div
-            class="flex flex-col gap-3 text-center bg-[var(--color-accent)] p-3 text-white"
-          >
-            <p>
-              Are you sure you want to delete <strong>{{ remote.name }}</strong
-              >?
-            </p>
-            <button (click)="deleteRemote(remote.name, this)">
-              Yes! Delete it!
-            </button>
-          </div>
-        </dialog>
-      </section>
-    </li>
-  </ul>
-</ul>
+        </mat-card-actions>
+      </mat-card>
+    </ng-template>
+  </div>
+</div>

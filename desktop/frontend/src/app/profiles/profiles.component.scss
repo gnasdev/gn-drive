@@ -1,11 +1,160 @@
-summary {
-    @apply select-none;
+.profiles-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  overflow-y: auto;
 }
 
-.delete-btn {
-    @apply border-red-500;
+// Header Card
+.header-card {
+  mat-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .spacer {
+      flex: 1;
+    }
+  }
 }
 
-input {
-    @apply w-full;
+// Profiles List
+.profiles-list {
+  flex: 1;
+}
+
+// Profile Panel
+.profile-panel {
+  margin-bottom: 16px;
+
+  mat-expansion-panel-header {
+    mat-panel-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      mat-icon {
+        color: #1976d2;
+      }
+    }
+  }
+}
+
+// Profile Form
+.profile-form {
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-section {
+  &.actions-section {
+    mat-card-actions {
+      justify-content: flex-end;
+    }
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+// Path Configuration
+.path-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.path-section {
+  h4 {
+    margin: 0 0 16px 0;
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.path-input-group {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+
+  .remote-select {
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+
+  .path-input {
+    flex: 1;
+  }
+}
+
+// Performance Settings
+.performance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// No Profiles State
+.no-profiles-card {
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+
+  mat-card-header {
+    justify-content: center;
+
+    mat-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #999;
+    }
+  }
+
+  mat-card-content {
+    padding: 16px 24px;
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin: 0;
+    }
+  }
+
+  mat-card-actions {
+    justify-content: center;
+    padding: 16px 24px 24px;
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .profiles-container {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .path-input-group {
+    flex-direction: column;
+
+    .remote-select {
+      min-width: unset;
+    }
+  }
 }

@@ -11,6 +11,7 @@ export interface Tab {
   data: string[];
   isActive: boolean;
   isEditing: boolean;
+  isStopping?: boolean;
 }
 
 interface CommandDTO {
@@ -59,6 +60,7 @@ export class TabService {
       data: [],
       isActive: false,
       isEditing: false,
+      isStopping: false,
     };
 
     const currentTabs = this.tabs$.value;
@@ -164,6 +166,7 @@ export class TabService {
         this.updateTab(data.tab_id, {
           currentAction: undefined,
           currentTaskId: 0,
+          isStopping: false,
         });
         break;
       case "command_output":
