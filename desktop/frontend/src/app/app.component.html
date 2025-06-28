@@ -64,20 +64,6 @@
             : "NS Drive"
         }}
       </span>
-
-      <span class="toolbar-spacer"></span>
-
-      <!-- Action buttons based on current tab -->
-      <div class="toolbar-actions" *ngIf="(tab$ | async) === 'home'">
-        <button
-          mat-icon-button
-          (click)="stopCommand()"
-          [disabled]="!appService.currentAction$.value"
-          matTooltip="Stop Current Operation"
-        >
-          <mat-icon>stop</mat-icon>
-        </button>
-      </div>
     </mat-toolbar>
 
     <!-- Page Content -->

@@ -4,10 +4,9 @@
     <mat-card-header>
       <mat-icon mat-card-avatar>settings</mat-icon>
       <mat-card-title>Profile Management</mat-card-title>
-      <mat-card-subtitle
-        >Configure sync profiles for different directories and
-        remotes</mat-card-subtitle
-      >
+      <mat-card-subtitle>
+        Configure sync profiles for different directories and remotes
+      </mat-card-subtitle>
     </mat-card-header>
 
     <mat-card-actions>
@@ -41,11 +40,13 @@
         <mat-expansion-panel-header>
           <mat-panel-title>
             <mat-icon>folder</mat-icon>
-            {{ setting.name || "Untitled Profile" }}
+            <div>
+              <span>{{ setting.name || "Untitled Profile" }}</span> <br />
+              <span class="font-normal italic text-xs">
+                {{ getProfileDescription(setting) }}
+              </span>
+            </div>
           </mat-panel-title>
-          <mat-panel-description>
-            {{ getProfileDescription(setting) }}
-          </mat-panel-description>
         </mat-expansion-panel-header>
 
         <!-- Profile Form -->
@@ -72,100 +73,94 @@
           <mat-card class="form-section">
             <mat-card-header>
               <mat-card-title>Path Configuration</mat-card-title>
-              <mat-card-subtitle
-                >Configure source and destination paths</mat-card-subtitle
-              >
+              <mat-card-subtitle>
+                Configure source and destination paths
+              </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="path-grid">
-                <!-- From Path -->
-                <div class="path-section">
-                  <h4>Source Path</h4>
-                  <div class="path-input-group">
-                    <mat-form-field appearance="outline" class="remote-select">
-                      <mat-label>Remote</mat-label>
-                      <mat-select
-                        [value]="getFromRemote(setting)"
-                        (selectionChange)="
-                          updateFromPath(
-                            setting,
-                            $event.value,
-                            getFromPath(setting)
-                          )
-                        "
+              <!-- From Path -->
+              <div class="path-section">
+                <h4>Source Path</h4>
+                <div class="path-input-group">
+                  <mat-form-field appearance="outline" class="remote-select">
+                    <mat-label>Remote</mat-label>
+                    <mat-select
+                      [value]="getFromRemote(setting)"
+                      (selectionChange)="
+                        updateFromPath(
+                          setting,
+                          $event.value,
+                          getFromPath(setting)
+                        )
+                      "
+                    >
+                      <mat-option value="">Local</mat-option>
+                      <mat-option
+                        *ngFor="let remote of appService.remotes$ | async"
+                        [value]="remote.name"
                       >
-                        <mat-option value="">Local</mat-option>
-                        <mat-option
-                          *ngFor="let remote of appService.remotes$ | async"
-                          [value]="remote.name"
-                        >
-                          {{ remote.name }}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
+                        {{ remote.name }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
 
-                    <mat-form-field appearance="outline" class="path-input">
-                      <mat-label>Path</mat-label>
-                      <input
-                        matInput
-                        [value]="getFromPath(setting)"
-                        (input)="
-                          updateFromPath(
-                            setting,
-                            getFromRemote(setting),
-                            $any($event.target).value
-                          )
-                        "
-                        placeholder="/source/path"
-                      />
-                      <mat-icon matSuffix>folder_open</mat-icon>
-                    </mat-form-field>
-                  </div>
+                  <mat-form-field appearance="outline" class="path-input">
+                    <mat-label>Path</mat-label>
+                    <input
+                      matInput
+                      [value]="getFromPath(setting)"
+                      (input)="
+                        updateFromPath(
+                          setting,
+                          getFromRemote(setting),
+                          $any($event.target).value
+                        )
+                      "
+                      placeholder="/source/path"
+                    />
+                    <mat-icon matSuffix>folder_open</mat-icon>
+                  </mat-form-field>
                 </div>
+              </div>
 
-                <!-- To Path -->
-                <div class="path-section">
-                  <h4>Destination Path</h4>
-                  <div class="path-input-group">
-                    <mat-form-field appearance="outline" class="remote-select">
-                      <mat-label>Remote</mat-label>
-                      <mat-select
-                        [value]="getToRemote(setting)"
-                        (selectionChange)="
-                          updateToPath(
-                            setting,
-                            $event.value,
-                            getToPath(setting)
-                          )
-                        "
+              <!-- To Path -->
+              <div class="path-section">
+                <h4>Destination Path</h4>
+                <div class="path-input-group">
+                  <mat-form-field appearance="outline" class="remote-select">
+                    <mat-label>Remote</mat-label>
+                    <mat-select
+                      [value]="getToRemote(setting)"
+                      (selectionChange)="
+                        updateToPath(setting, $event.value, getToPath(setting))
+                      "
+                    >
+                      <mat-option value="">Local</mat-option>
+                      <mat-option
+                        *ngFor="let remote of appService.remotes$ | async"
+                        [value]="remote.name"
                       >
-                        <mat-option value="">Local</mat-option>
-                        <mat-option
-                          *ngFor="let remote of appService.remotes$ | async"
-                          [value]="remote.name"
-                        >
-                          {{ remote.name }}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
+                        {{ remote.name }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
 
-                    <mat-form-field appearance="outline" class="path-input">
-                      <mat-label>Path</mat-label>
-                      <input
-                        matInput
-                        [value]="getToPath(setting)"
-                        (input)="
-                          updateToPath(
-                            setting,
-                            getToRemote(setting),
-                            $any($event.target).value
-                          )
-                        "
-                        placeholder="/destination/path"
-                      />
-                      <mat-icon matSuffix>folder_open</mat-icon>
-                    </mat-form-field>
-                  </div>
+                  <mat-form-field appearance="outline" class="path-input">
+                    <mat-label>Path</mat-label>
+                    <input
+                      matInput
+                      [value]="getToPath(setting)"
+                      (input)="
+                        updateToPath(
+                          setting,
+                          getToRemote(setting),
+                          $any($event.target).value
+                        )
+                      "
+                      placeholder="/destination/path"
+                    />
+                    <mat-icon matSuffix>folder_open</mat-icon>
+                  </mat-form-field>
                 </div>
               </div>
             </mat-card-content>
@@ -175,13 +170,12 @@
           <mat-card class="form-section">
             <mat-card-header>
               <mat-card-title>Performance Settings</mat-card-title>
-              <mat-card-subtitle
-                >Configure parallel transfers and bandwidth
-                limits</mat-card-subtitle
-              >
+              <mat-card-subtitle>
+                Configure parallel transfers and bandwidth limits
+              </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <div class="performance-grid">
+              <div class="performance-grid mt-5">
                 <mat-form-field appearance="outline">
                   <mat-label>Parallel Transfers</mat-label>
                   <mat-select [(ngModel)]="setting.parallel">

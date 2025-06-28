@@ -1,5 +1,5 @@
-// Import Angular Material prebuilt theme
-@import "@angular/material/prebuilt-themes/indigo-pink.css";
+// Import a neutral Material theme and customize with CSS
+@import "@angular/material/prebuilt-themes/deeppurple-amber.css";
 
 // Tailwind CSS
 @tailwind base;
@@ -16,12 +16,135 @@ body {
   height: 100%;
   margin: 0;
   font-family: "Roboto", "Helvetica Neue", sans-serif;
+  background-color: #fafafa;
+  color: #212121;
+}
+
+// Dark mode global styles
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  // Ensure all text elements are light in dark mode
+  * {
+    color: inherit;
+  }
+
+  // Material components text colors
+  .mat-mdc-card-title {
+    color: #ffffff !important;
+  }
+
+  .mat-mdc-card-subtitle {
+    color: #bdbdbd !important;
+  }
+
+  .mat-mdc-card-content {
+    color: #e0e0e0;
+  }
+
+  .mat-mdc-form-field-label {
+    color: #bdbdbd !important;
+  }
+
+  .mat-mdc-select-value-text {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-select-arrow {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-select-trigger {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-select {
+    color: #e0e0e0 !important;
+
+    * {
+      color: #e0e0e0 !important;
+    }
+  }
+
+  .mat-mdc-select-value {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-select-placeholder {
+    color: #bdbdbd !important;
+  }
+
+  // Target all possible select-related text elements
+  .mat-select-value,
+  .mat-select-value-text,
+  .mat-select-arrow,
+  .mat-mdc-select *,
+  .mat-mdc-form-field-type-mat-select .mat-mdc-form-field-infix,
+  .mat-mdc-form-field-type-mat-select .mat-mdc-form-field-infix *,
+  .mat-mdc-form-field-type-mat-select .mat-mdc-select-trigger,
+  .mat-mdc-form-field-type-mat-select .mat-mdc-select-value-text {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-input-element {
+    color: #e0e0e0 !important;
+  }
+
+  .mat-mdc-button {
+    color: #e0e0e0;
+  }
+
+  .mat-mdc-list-item {
+    color: #e0e0e0;
+  }
+
+  // Dropdown panel options
+  .mat-mdc-option {
+    color: #e0e0e0 !important;
+    background-color: transparent !important;
+
+    &:hover {
+      background-color: #333333 !important;
+      color: #ffffff !important;
+    }
+
+    &.mdc-list-item--selected {
+      background-color: #424242 !important;
+      color: #ffffff !important;
+    }
+  }
+
+  .mat-mdc-option-text {
+    color: #e0e0e0 !important;
+  }
+
+  // Global option styling for any context
+  .cdk-overlay-pane .mat-mdc-select-panel,
+  .mat-mdc-select-panel {
+    .mat-mdc-option {
+      color: #e0e0e0 !important;
+
+      * {
+        color: #e0e0e0 !important;
+      }
+    }
+  }
 }
 
 // Custom Material Design overrides
 .mat-mdc-card {
   border-radius: 16px !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mat-mdc-card {
+    background-color: #1e1e1e;
+  }
 }
 
 .mat-mdc-button {
@@ -32,22 +155,132 @@ body {
   border-radius: 16px !important;
 }
 
-// Dark theme support will be handled by Material Design 3
+// Custom color overrides for white/gray/black theme
+:root {
+  // Light theme colors
+  --mdc-theme-primary: #424242;
+  --mdc-theme-secondary: #616161;
+  --mdc-theme-surface: #ffffff;
+  --mdc-theme-background: #fafafa;
+  --mdc-theme-on-primary: #ffffff;
+  --mdc-theme-on-secondary: #ffffff;
+  --mdc-theme-on-surface: #212121;
+  --mdc-theme-on-background: #212121;
+}
 
-html,
-body {
-  height: 100%;
-}
-body {
-  margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
+@media (prefers-color-scheme: dark) {
+  :root {
+    // Dark theme colors
+    --mdc-theme-primary: #e0e0e0;
+    --mdc-theme-secondary: #bdbdbd;
+    --mdc-theme-surface: #1e1e1e;
+    --mdc-theme-background: #121212;
+    --mdc-theme-on-primary: #121212;
+    --mdc-theme-on-secondary: #121212;
+    --mdc-theme-on-surface: #e0e0e0;
+    --mdc-theme-on-background: #e0e0e0;
+  }
 }
 
-html,
-body {
-  height: 100%;
+// Override Material components with custom colors
+.mat-mdc-button.mat-primary {
+  --mdc-filled-button-container-color: var(--mdc-theme-primary);
+  --mdc-filled-button-label-text-color: var(--mdc-theme-on-primary);
 }
-body {
-  margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
+
+.mat-mdc-button.mat-accent {
+  --mdc-filled-button-container-color: var(--mdc-theme-secondary);
+  --mdc-filled-button-label-text-color: var(--mdc-theme-on-secondary);
+}
+
+.mat-mdc-card {
+  --mdc-elevated-card-container-color: var(--mdc-theme-surface);
+  color: var(--mdc-theme-on-surface);
+}
+
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: var(--mdc-theme-surface);
+  --mdc-filled-text-field-label-text-color: var(--mdc-theme-on-surface);
+  --mdc-filled-text-field-input-text-color: var(--mdc-theme-on-surface);
+
+  .mat-mdc-form-field-flex {
+    align-items: center;
+  }
+
+  // Hide prefix container when empty or not needed
+  .mat-mdc-form-field-prefix:empty {
+    display: none;
+  }
+
+  // Remove extra spacing for select fields without prefix
+  &.mat-mdc-form-field-type-mat-select:not(.mat-form-field-has-prefix) {
+    .mat-mdc-form-field-infix {
+      padding-left: 0;
+    }
+  }
+
+  // Adjust spacing when no prefix
+  &:not(.mat-form-field-has-prefix) .mat-mdc-form-field-infix {
+    padding-left: 0;
+  }
+}
+
+// Ensure mat-select uses theme colors in dark mode
+@media (prefers-color-scheme: dark) {
+  .mat-mdc-form-field.mat-mdc-form-field-type-mat-select {
+    --mdc-filled-text-field-input-text-color: #e0e0e0 !important;
+    --mdc-filled-text-field-label-text-color: #bdbdbd !important;
+    --mdc-filled-text-field-active-label-text-color: #bdbdbd !important;
+    --mdc-filled-text-field-focus-label-text-color: #bdbdbd !important;
+    --mdc-outlined-text-field-input-text-color: #e0e0e0 !important;
+    --mdc-outlined-text-field-label-text-color: #bdbdbd !important;
+    --mat-select-trigger-text-color: #e0e0e0 !important;
+    --mat-select-placeholder-text-color: #bdbdbd !important;
+    --mat-select-enabled-trigger-text-color: #e0e0e0 !important;
+
+    color: #e0e0e0 !important;
+
+    // Force all child elements to inherit light color
+    *,
+    .mat-mdc-select,
+    .mat-mdc-select-trigger,
+    .mat-mdc-select-value,
+    .mat-mdc-select-value-text,
+    .mat-mdc-form-field-infix {
+      color: #e0e0e0 !important;
+    }
+  }
+
+  .mat-mdc-select-panel {
+    background-color: #1e1e1e !important;
+
+    .mat-mdc-option {
+      color: #e0e0e0 !important;
+      background-color: transparent !important;
+
+      &:hover {
+        background-color: #333333 !important;
+        color: #ffffff !important;
+      }
+
+      &.mdc-list-item--selected {
+        background-color: #424242 !important;
+        color: #ffffff !important;
+      }
+
+      &.mat-mdc-option-active {
+        background-color: #333333 !important;
+        color: #ffffff !important;
+      }
+    }
+
+    .mat-mdc-option-text {
+      color: #e0e0e0 !important;
+    }
+
+    // Target all text elements within options
+    .mat-mdc-option * {
+      color: #e0e0e0 !important;
+    }
+  }
 }

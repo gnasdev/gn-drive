@@ -2,6 +2,11 @@ summary {
   @apply select-none;
 }
 
+// Icon styling - lighter colors
+mat-icon {
+  color: #9e9e9e !important; // Light gray for light theme
+}
+
 .remotes-container {
   height: 100%;
   display: flex;
@@ -72,24 +77,76 @@ summary {
   }
 }
 
+// Dark theme support
+@media (prefers-color-scheme: dark) {
+  // Light icon colors for dark theme
+  mat-icon {
+    color: #bdbdbd !important; // Lighter gray for dark theme
+  }
+
+  .remotes-container {
+    color: #e0e0e0;
+  }
+
+  .header-card {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  .remotes-list {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  .no-remotes-card {
+    mat-card-header {
+      mat-card-title {
+        color: #ffffff;
+      }
+
+      mat-card-subtitle {
+        color: #bdbdbd;
+      }
+
+      mat-icon {
+        color: #757575;
+      }
+    }
+
+    mat-card-content p {
+      color: #e0e0e0;
+    }
+  }
+
+  .remote-item {
+    color: #e0e0e0;
+    border-bottom-color: #424242;
+
+    div[matListItemTitle] {
+      color: #ffffff;
+    }
+
+    div[matListItemLine] {
+      color: #bdbdbd;
+    }
+  }
+}
+
 // Responsive Design
 @media (max-width: 768px) {
   .remotes-container {
     padding: 16px;
     gap: 16px;
-  }
-}
-
-// Dark theme support
-@media (prefers-color-scheme: dark) {
-  .remote-item {
-    border-bottom-color: #424242;
-  }
-
-  .no-remotes-card {
-    mat-card-content p {
-      color: #ccc;
-    }
   }
 }
 

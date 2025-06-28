@@ -10,7 +10,7 @@
 // Sidebar Styles
 .app-sidenav {
   width: 280px;
-  background: #e3f2fd;
+  background: #f5f5f5;
   border-right: 1px solid #e0e0e0;
 }
 
@@ -20,7 +20,7 @@
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid #e0e0e0;
-  background: linear-gradient(135deg, #1976d2, #00acc1);
+  background: linear-gradient(135deg, #424242, #616161);
   color: white;
 
   .app-icon {
@@ -67,7 +67,6 @@
     &:hover {
       background-color: #bbdefb;
       transform: translateX(4px);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
       &::before {
         left: 100%;
@@ -78,7 +77,6 @@
       background-color: #90caf9;
       color: #1565c0;
       transform: translateX(8px);
-      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
 
       mat-icon {
         color: #1976d2;
@@ -101,7 +99,6 @@
 }
 
 .app-toolbar {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   z-index: 10;
 
   .toolbar-title {
@@ -116,11 +113,6 @@
 
   .menu-button {
     margin-right: 8px;
-  }
-
-  .toolbar-actions {
-    display: flex;
-    gap: 8px;
   }
 }
 
@@ -181,27 +173,62 @@
 
 // Dark theme support
 @media (prefers-color-scheme: dark) {
+  .app-container {
+    color: #e0e0e0;
+  }
+
   .app-sidenav {
-    background: #212121;
+    background: #1e1e1e;
     border-right-color: #424242;
   }
 
   .sidenav-header {
     border-bottom-color: #424242;
+    background: linear-gradient(135deg, #2c2c2c, #424242);
+    color: #ffffff;
+
+    .app-title {
+      color: #ffffff;
+    }
   }
 
   .nav-list .nav-item {
+    color: #e0e0e0;
+
     &:hover {
       background-color: #424242;
+      color: #ffffff;
     }
 
     &.active {
-      background-color: #0d47a1;
-      color: #90caf9;
+      background-color: #424242;
+      color: #ffffff;
+    }
+
+    mat-icon {
+      color: #e0e0e0;
+    }
+
+    span {
+      color: #e0e0e0;
     }
   }
 
   .page-content {
     background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  .app-toolbar {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+
+    .toolbar-title {
+      color: #ffffff;
+    }
+
+    button {
+      color: #e0e0e0;
+    }
   }
 }

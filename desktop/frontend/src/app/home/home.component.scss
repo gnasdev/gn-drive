@@ -1,5 +1,40 @@
 @use "@angular/material" as mat;
 
+// Light border styling for Material components
+::ng-deep .mat-mdc-form-field-outline {
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: #e0e0e0 !important;
+  }
+}
+
+::ng-deep
+  .mat-mdc-form-field-outline:not(.mdc-notched-outline--upgraded)
+  .mdc-notched-outline__outline {
+  border-color: #e0e0e0 !important;
+}
+
+::ng-deep .mat-mdc-form-field-focus-overlay {
+  background-color: transparent !important;
+}
+
+::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-form-field-outline {
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: #e0e0e0 !important;
+  }
+}
+
+::ng-deep .mat-mdc-select-panel {
+  border: 1px solid #e0e0e0 !important;
+}
+
+::ng-deep .mat-mdc-select-trigger {
+  border-color: #e0e0e0 !important;
+}
+
 .home-container {
   height: 100%;
   display: flex;
@@ -25,7 +60,7 @@
         font-size: 48px;
         width: 48px;
         height: 48px;
-        color: #1976d2;
+        color: #424242;
       }
     }
 
@@ -53,47 +88,69 @@
   flex-direction: column;
 }
 
-.tab-header {
-  position: relative;
+// Vertical Tabs Layout
+.vertical-tabs-layout {
+  display: flex;
+  height: 100%;
+  flex: 1;
+}
 
-  .add-tab-button {
-    position: absolute;
-    top: 8px;
-    right: 16px;
-    z-index: 10;
-    width: 40px;
-    height: 40px;
+.tab-sidebar {
+  width: 250px;
+  min-width: 250px;
+  background: #fafafa;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
 
-    mat-icon {
-      font-size: 20px;
+.tab-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+  min-height: 48px;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  &.active {
+    background: #424242;
+    border-color: transparent;
+    color: #ffffff;
+
+    .tab-name {
+      font-weight: 600;
     }
   }
 }
 
-.main-tabs {
-  height: 100%;
+.tab-content-area {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
 
-  ::ng-deep .mat-mdc-tab-group {
-    height: 100%;
+.add-tab-button {
+  margin: 16px auto 0;
+  width: 40px;
+  height: 40px;
 
-    .mat-mdc-tab-header {
-      border-bottom: 1px solid #e0e0e0;
-      background: #fafafa;
-    }
-
-    .mat-mdc-tab-body-wrapper {
-      flex: 1;
-      height: calc(100% - 48px);
-    }
-
-    .mat-mdc-tab-body {
-      height: 100%;
-    }
-
-    .mat-mdc-tab-body-content {
-      height: 100%;
-      overflow: hidden;
-    }
+  mat-icon {
+    font-size: 20px;
   }
 }
 
@@ -103,34 +160,44 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-width: 120px;
+  flex: 1;
+  height: 24px;
+
+  .tab-name {
+    flex: 1;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .tab-menu-button {
     opacity: 0;
     transition: opacity 0.2s;
-    width: 20px;
-    height: 20px;
-    line-height: 20px;
 
     mat-icon {
       font-size: 16px;
       width: 16px;
       height: 16px;
+      margin: 0;
+      padding: 0;
     }
   }
+}
 
-  &:hover .tab-menu-button {
-    opacity: 1;
-  }
+.tab-item:hover .tab-label .tab-menu-button {
+  opacity: 1;
 }
 
 .tab-edit {
   display: flex;
   align-items: center;
-  min-width: 120px;
+  width: 100%;
 
   .tab-name-field {
-    width: 120px;
+    width: 100%;
 
     ::ng-deep .mat-mdc-form-field-wrapper {
       padding-bottom: 0;
@@ -155,12 +222,24 @@
 
 // Tab Content
 .tab-content {
-  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out;
   padding: 24px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
+
+  &.active {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 // Control Panel
@@ -184,16 +263,12 @@
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
       &:not(:disabled) {
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
         &:hover {
           transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         &:active {
           transform: translateY(0);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
       }
 
@@ -281,30 +356,177 @@
 }
 
 // Responsive Design
-@media (max-width: 768px) {
-  .tab-content {
-    padding: 16px;
-    gap: 16px;
-  }
+.vertical-tabs-layout {
+  flex-direction: column;
+}
 
-  .control-panel .action-buttons {
-    flex-direction: column;
+.tab-sidebar {
+  width: 100%;
+  min-width: auto;
+  border-right: none;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 0;
+}
 
-    button {
-      width: 100%;
-    }
+.tab-list {
+  flex-direction: row;
+  overflow-x: auto;
+  padding: 0 8px;
+  gap: 8px;
+}
+
+.tab-item {
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.add-tab-button {
+  margin: 8px 16px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.tab-content {
+  padding: 16px;
+  gap: 16px;
+}
+
+.control-panel .action-buttons {
+  flex-direction: column;
+
+  button {
+    width: 100%;
   }
 }
 
 // Dark theme support
 @media (prefers-color-scheme: dark) {
-  .info-card .working-dir {
-    background: #2d2d2d;
+  // Global text colors for dark mode
+  .home-container {
     color: #e0e0e0;
+  }
+
+  .empty-state .welcome-card {
+    mat-card-header mat-icon {
+      color: #e0e0e0;
+    }
+
+    mat-card-content p {
+      color: #e0e0e0;
+    }
+
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  .info-card {
+    .working-dir {
+      background: #2d2d2d;
+      color: #e0e0e0;
+    }
+
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
   }
 
   .console-output {
     background: #0d1117;
     color: #c9d1d9;
+  }
+
+  .tab-sidebar {
+    background: #1e1e1e;
+    border-right-color: #424242;
+  }
+
+  .tab-item {
+    color: #e0e0e0;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    &.active {
+      background: #1a237e;
+      border-color: #3f51b5;
+      color: #ffffff;
+    }
+  }
+
+  .tab-edit .tab-name-field {
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      background: #2d2d2d;
+    }
+
+    input {
+      color: #e0e0e0;
+    }
+  }
+
+  .control-panel {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+
+    .status-chips mat-chip {
+      color: #e0e0e0;
+    }
+
+    // Light text styling for profile select in dark mode
+    .profile-select {
+      ::ng-deep .mat-mdc-select-value {
+        color: #e0e0e0 !important;
+      }
+
+      ::ng-deep .mat-mdc-select-placeholder {
+        color: #bdbdbd !important;
+      }
+
+      ::ng-deep .mat-mdc-form-field-label {
+        color: #bdbdbd !important;
+      }
+
+      ::ng-deep .mat-mdc-select-arrow {
+        color: #e0e0e0 !important;
+      }
+
+      // Light text for dropdown options
+      ::ng-deep .mat-mdc-option {
+        color: #e0e0e0 !important;
+      }
+    }
+  }
+
+  .output-card {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  // Dark theme responsive design
+  @media (max-width: 768px) {
+    .tab-sidebar {
+      background: #1e1e1e;
+      border-bottom-color: #424242;
+    }
   }
 }

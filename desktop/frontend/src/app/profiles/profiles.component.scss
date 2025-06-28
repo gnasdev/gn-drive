@@ -28,17 +28,32 @@
 // Profile Panel
 .profile-panel {
   margin-bottom: 16px;
+  background-color: #2d2d2d !important;
+  color: #e0e0e0;
 
   mat-expansion-panel-header {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0;
+
     mat-panel-title {
       display: flex;
       align-items: center;
       gap: 8px;
+      color: #ffffff;
 
       mat-icon {
-        color: #1976d2;
+        color: #e0e0e0;
       }
     }
+
+    mat-panel-description {
+      color: #bdbdbd;
+    }
+  }
+
+  .mat-expansion-panel-body {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0;
   }
 }
 
@@ -51,6 +66,23 @@
 }
 
 .form-section {
+  background-color: #3d3d3d !important;
+  color: #e0e0e0;
+
+  mat-card-header {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  mat-card-content {
+    color: #e0e0e0;
+  }
+
   &.actions-section {
     mat-card-actions {
       justify-content: flex-end;
@@ -62,21 +94,10 @@
   width: 100%;
 }
 
-// Path Configuration
-.path-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-}
-
 .path-section {
   h4 {
     margin: 0 0 16px 0;
-    color: #666;
+    color: #e0e0e0;
     font-size: 14px;
     font-weight: 500;
     text-transform: uppercase;
@@ -107,6 +128,17 @@
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
+  }
+
+  // Fix for select fields showing unnecessary prefix space
+  .mat-mdc-form-field {
+    .mat-mdc-form-field-prefix {
+      display: none;
+    }
+
+    .mat-mdc-form-field-infix {
+      padding-left: 0 !important;
+    }
   }
 }
 
@@ -140,6 +172,43 @@
   mat-card-actions {
     justify-content: center;
     padding: 16px 24px 24px;
+  }
+}
+
+// Dark theme support
+@media (prefers-color-scheme: dark) {
+  .profiles-container {
+    color: #e0e0e0;
+  }
+
+  .header-card {
+    mat-card-title {
+      color: #ffffff;
+    }
+
+    mat-card-subtitle {
+      color: #bdbdbd;
+    }
+  }
+
+  .no-profiles-card {
+    mat-card-header {
+      mat-card-title {
+        color: #ffffff;
+      }
+
+      mat-card-subtitle {
+        color: #bdbdbd;
+      }
+
+      mat-icon {
+        color: #757575;
+      }
+    }
+
+    mat-card-content p {
+      color: #e0e0e0;
+    }
   }
 }
 
