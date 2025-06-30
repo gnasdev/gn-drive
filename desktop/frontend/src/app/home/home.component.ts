@@ -10,6 +10,12 @@ import { combineLatest, map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
 import { models } from "../../../wailsjs/go/models";
+import {
+  isValidProfileIndex,
+  getActionConfig,
+  parseProfileSelection,
+  validateTabProfileSelection,
+} from "./home.types";
 
 // Material Design imports
 import { MatCardModule } from "@angular/material/card";
@@ -17,10 +23,14 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatSelectModule } from "@angular/material/select";
 import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatInputModule } from "@angular/material/input";
 import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatMenuModule } from "@angular/material/menu";
+import { MatListModule } from "@angular/material/list";
+import { MatToolbarModule } from "@angular/material/toolbar";
+import { MatTabsModule } from "@angular/material/tabs";
 import { FormsModule } from "@angular/forms";
 
 @Component({
@@ -32,14 +42,17 @@ import { FormsModule } from "@angular/forms";
     MatIconModule,
     MatSelectModule,
     MatFormFieldModule,
+    MatInputModule,
     MatProgressBarModule,
     MatChipsModule,
     MatTooltipModule,
     MatMenuModule,
+    MatListModule,
+    MatToolbarModule,
+    MatTabsModule,
     FormsModule,
   ],
   templateUrl: "./home.component.html",
-  styleUrl: "./home.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent implements OnInit, OnDestroy {
@@ -57,7 +70,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly cdr: ChangeDetectorRef
   ) {}
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.changeDetectorSub = combineLatest([
       this.appService.data$,
       this.appService.configInfo$,
@@ -69,73 +82,72 @@ export class HomeComponent implements OnInit, OnDestroy {
     ]).subscribe(() => this.cdr.detectChanges());
   }
 
-  ngOnDestroy() {
+  ngOnDestroy(): void {
     this.changeDetectorSub?.unsubscribe();
   }
 
-  changeProfile(e: Event) {
-    this.appService.configInfo$.value.selected_profile_index = parseInt(
-      (e.target as HTMLSelectElement).value
-    );
-    this.appService.configInfo$.next(this.appService.configInfo$.value);
-    this.appService.saveConfigInfo();
+  changeProfile(e: Event): void {
+    const target = e.target as HTMLSelectElement;
+    const selectedIndex = parseProfileSelection(target.value);
+
+    if (
+      selectedIndex !== null &&
+      isValidProfileIndex(this.appService.configInfo$.value, selectedIndex)
+    ) {
+      this.appService.configInfo$.value.selected_profile_index = selectedIndex;
+      this.appService.configInfo$.next(this.appService.configInfo$.value);
+      this.appService.saveConfigInfo();
+    }
   }
 
-  validateCurrentProfileIndex(configInfo: models.ConfigInfo) {
+  validateCurrentProfileIndex(
+    configInfo: models.ConfigInfo
+  ): models.Profile | undefined {
     return configInfo.profiles?.[configInfo.selected_profile_index];
   }
 
-  pull() {
-    if (!this.validateCurrentProfileIndex(this.appService.configInfo$.value))
-      return;
-    this.appService.pull(
-      this.appService.configInfo$.value.profiles[
-        this.appService.configInfo$.value.selected_profile_index
-      ]
+  pull(): void {
+    const profile = this.validateCurrentProfileIndex(
+      this.appService.configInfo$.value
     );
+    if (!profile) return;
+    this.appService.pull(profile);
   }
 
-  push() {
-    if (!this.validateCurrentProfileIndex(this.appService.configInfo$.value))
-      return;
-    this.appService.push(
-      this.appService.configInfo$.value.profiles[
-        this.appService.configInfo$.value.selected_profile_index
-      ]
+  push(): void {
+    const profile = this.validateCurrentProfileIndex(
+      this.appService.configInfo$.value
     );
+    if (!profile) return;
+    this.appService.push(profile);
   }
 
-  bi() {
-    if (!this.validateCurrentProfileIndex(this.appService.configInfo$.value))
-      return;
-    this.appService.bi(
-      this.appService.configInfo$.value.profiles[
-        this.appService.configInfo$.value.selected_profile_index
-      ]
+  bi(): void {
+    const profile = this.validateCurrentProfileIndex(
+      this.appService.configInfo$.value
     );
+    if (!profile) return;
+    this.appService.bi(profile);
   }
 
-  biResync() {
-    if (!this.validateCurrentProfileIndex(this.appService.configInfo$.value))
-      return;
-    this.appService.bi(
-      this.appService.configInfo$.value.profiles[
-        this.appService.configInfo$.value.selected_profile_index
-      ],
-      true
+  biResync(): void {
+    const profile = this.validateCurrentProfileIndex(
+      this.appService.configInfo$.value
     );
+    if (!profile) return;
+    this.appService.bi(profile, true);
   }
 
-  stopCommand() {
+  stopCommand(): void {
     this.appService.stopCommand();
   }
 
   // Tab management methods
-  createTab() {
+  createTab(): void {
     this.tabService.createTab();
   }
 
-  deleteTab(tabId: string) {
+  deleteTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
     if (tab && tab.currentTaskId) {
       this.appService.stopCommandForTab(tabId);
@@ -143,56 +155,80 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.tabService.deleteTab(tabId);
   }
 
-  setActiveTab(tabId: string) {
+  setActiveTab(tabId: string): void {
     this.tabService.setActiveTab(tabId);
   }
 
   // Tab-specific sync methods
-  pullTab(tabId: string) {
+  pullTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.selectedProfileIndex === null) return;
+    if (
+      !tab ||
+      !validateTabProfileSelection(
+        this.appService.configInfo$.value,
+        tab.selectedProfileIndex
+      )
+    ) {
+      return;
+    }
 
     const profile =
-      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex];
-    if (profile) {
-      this.appService.pullWithTab(profile, tabId);
-    }
+      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
+    this.appService.pullWithTab(profile, tabId);
   }
 
-  pushTab(tabId: string) {
+  pushTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.selectedProfileIndex === null) return;
+    if (
+      !tab ||
+      !validateTabProfileSelection(
+        this.appService.configInfo$.value,
+        tab.selectedProfileIndex
+      )
+    ) {
+      return;
+    }
 
     const profile =
-      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex];
-    if (profile) {
-      this.appService.pushWithTab(profile, tabId);
-    }
+      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
+    this.appService.pushWithTab(profile, tabId);
   }
 
-  biTab(tabId: string) {
+  biTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.selectedProfileIndex === null) return;
+    if (
+      !tab ||
+      !validateTabProfileSelection(
+        this.appService.configInfo$.value,
+        tab.selectedProfileIndex
+      )
+    ) {
+      return;
+    }
 
     const profile =
-      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex];
-    if (profile) {
-      this.appService.biWithTab(profile, tabId);
-    }
+      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
+    this.appService.biWithTab(profile, tabId);
   }
 
-  biResyncTab(tabId: string) {
+  biResyncTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.selectedProfileIndex === null) return;
+    if (
+      !tab ||
+      !validateTabProfileSelection(
+        this.appService.configInfo$.value,
+        tab.selectedProfileIndex
+      )
+    ) {
+      return;
+    }
 
     const profile =
-      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex];
-    if (profile) {
-      this.appService.biWithTab(profile, tabId, true);
-    }
+      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
+    this.appService.biWithTab(profile, tabId, true);
   }
 
-  stopCommandTab(tabId: string) {
+  stopCommandTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
     if (tab) {
       console.log(
@@ -214,40 +250,28 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  changeProfileTab(selectedValue: any, tabId: string) {
-    if (selectedValue === null || selectedValue === undefined) {
-      this.tabService.updateTab(tabId, { selectedProfileIndex: null });
-    } else {
-      const selectedIndex = parseInt(selectedValue);
-      if (isNaN(selectedIndex)) {
-        this.tabService.updateTab(tabId, { selectedProfileIndex: null });
-      } else {
-        this.tabService.updateTab(tabId, {
-          selectedProfileIndex: selectedIndex,
-        });
-      }
-    }
+  changeProfileTab(selectedValue: string | number | null, tabId: string): void {
+    const selectedIndex = parseProfileSelection(selectedValue);
+    this.tabService.updateTab(tabId, { selectedProfileIndex: selectedIndex });
   }
 
   validateTabProfileIndex(tab: Tab): boolean {
-    if (tab.selectedProfileIndex === null) return false;
-    const profiles = this.appService.configInfo$.value.profiles;
-    return (
-      tab.selectedProfileIndex >= 0 &&
-      tab.selectedProfileIndex < profiles.length
+    return validateTabProfileSelection(
+      this.appService.configInfo$.value,
+      tab.selectedProfileIndex
     );
   }
 
   // Tab rename methods
-  startRenameTab(tabId: string) {
+  startRenameTab(tabId: string): void {
     this.tabService.startRenameTab(tabId);
   }
 
-  finishRenameTab(tabId: string, newName: string) {
+  finishRenameTab(tabId: string, newName: string): void {
     this.tabService.finishRenameTab(tabId, newName);
   }
 
-  cancelRenameTab(tabId: string) {
+  cancelRenameTab(tabId: string): void {
     this.tabService.cancelRenameTab(tabId);
   }
 
@@ -258,7 +282,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.tabService.tabsValue.findIndex((tab) => tab.id === activeTabId);
   }
 
-  onTabChange(index: number) {
+  onTabChange(index: number): void {
     const tabs = this.tabService.tabsValue;
     if (index >= 0 && index < tabs.length) {
       this.tabService.setActiveTab(tabs[index].id);
@@ -266,51 +290,21 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getActionColor(action: Action): "primary" | "accent" | "warn" {
-    switch (action) {
-      case Action.Pull:
-        return "primary";
-      case Action.Push:
-        return "accent";
-      case Action.Bi:
-        return "primary";
-      case Action.BiResync:
-        return "warn";
-      default:
-        return "primary";
-    }
+    const config = getActionConfig(action);
+    return config.color;
   }
 
   getActionIcon(action: Action): string {
-    switch (action) {
-      case Action.Pull:
-        return "download";
-      case Action.Push:
-        return "upload";
-      case Action.Bi:
-        return "sync";
-      case Action.BiResync:
-        return "refresh";
-      default:
-        return "play_arrow";
-    }
+    const config = getActionConfig(action);
+    return config.icon;
   }
 
   getActionLabel(action: Action): string {
-    switch (action) {
-      case Action.Pull:
-        return "Pulling";
-      case Action.Push:
-        return "Pushing";
-      case Action.Bi:
-        return "Syncing";
-      case Action.BiResync:
-        return "Resyncing";
-      default:
-        return "Running";
-    }
+    const config = getActionConfig(action);
+    return config.label;
   }
 
-  clearTabOutput(tabId: string) {
+  clearTabOutput(tabId: string): void {
     this.tabService.updateTab(tabId, { data: [] });
   }
 }

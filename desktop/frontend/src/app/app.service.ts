@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, OnInit } from "@angular/core";
+import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { config, dto, models } from "../../wailsjs/go/models";
 import {
@@ -33,7 +33,7 @@ export enum Action {
 @Injectable({
   providedIn: "root",
 })
-export class AppService implements OnInit, OnDestroy {
+export class AppService {
   readonly currentId$ = new BehaviorSubject<number>(0);
   readonly currentAction$ = new BehaviorSubject<Action | undefined>(undefined);
   readonly data$ = new BehaviorSubject<string[]>([]);
@@ -77,10 +77,6 @@ export class AppService implements OnInit, OnDestroy {
     this.getConfigInfo();
     this.getRemotes();
   }
-
-  async ngOnInit() {}
-
-  ngOnDestroy() {}
 
   replaceData(str: string) {
     this.data$.next([str]);
@@ -180,42 +176,52 @@ export class AppService implements OnInit, OnDestroy {
     }
   }
 
-  async getRemotes() {
+  async getRemotes(): Promise<void> {
     try {
       const remotes = await GetRemotes();
       this.remotes$.next(remotes ?? []);
-    } catch (e) {
-      console.error(e);
-      alert("Error getting remotes");
+    } catch (error) {
+      console.error("Error getting remotes:", error);
+      throw new Error("Failed to get remotes");
     }
   }
 
-  async addRemote(objData: Record<string, string>) {
+  async addRemote(objData: Record<string, string>): Promise<void> {
+    if (!objData["name"] || !objData["type"]) {
+      throw new Error("Remote name and type are required");
+    }
+
     try {
       const err = await AddRemote(objData["name"], objData["type"], {});
-      if (err) throw err.message;
+      if (err) throw new Error(err.message);
       await this.getRemotes();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error("Error adding remote:", error);
+      throw error;
     }
   }
 
-  async stopAddingRemote() {
+  async stopAddingRemote(): Promise<void> {
     try {
       const err = await StopAddingRemote();
-      if (err) throw err.message;
-    } catch (e) {
-      console.error(e);
+      if (err) throw new Error(err.message);
+    } catch (error) {
+      console.error("Error stopping add remote:", error);
+      throw error;
     }
   }
 
-  async deleteRemote(name: string) {
+  async deleteRemote(name: string): Promise<void> {
+    if (!name) {
+      throw new Error("Remote name is required");
+    }
+
     try {
       await DeleteRemote(name);
       await this.getRemotes();
-    } catch (e) {
-      console.error(e);
-      alert("Error deleting remote");
+    } catch (error) {
+      console.error("Error deleting remote:", error);
+      throw new Error("Failed to delete remote");
     }
   }
 

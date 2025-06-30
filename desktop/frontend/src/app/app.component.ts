@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  OnDestroy,
   OnInit,
 } from "@angular/core";
 import { Action, AppService } from "./app.service.js";
@@ -46,10 +45,9 @@ type Tab = "home" | "profiles" | "remotes";
     LayoutModule,
   ],
   templateUrl: "./app.component.html",
-  styleUrl: "./app.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class AppComponent implements OnInit {
   Action = Action;
 
   readonly tab$ = new BehaviorSubject<Tab>("home");
@@ -79,8 +77,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.tab$,
     ]).subscribe(() => this.cdr.detectChanges());
   }
-
-  ngOnDestroy() {}
 
   async pull(profile: models.Profile) {
     this.tab$.next("home");

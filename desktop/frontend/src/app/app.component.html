@@ -1,76 +1,92 @@
-<mat-sidenav-container class="app-container">
-  <!-- Sidebar Navigation -->
+<!-- Modern App Layout with Angular Material -->
+<mat-sidenav-container>
+  <!-- Navigation Drawer -->
   <mat-sidenav
-    #sidenav
+    #drawer
     [mode]="isHandset ? 'over' : 'side'"
     [opened]="!isHandset"
-    class="app-sidenav"
     fixedInViewport="true"
     [disableClose]="!isHandset"
   >
-    <!-- App Header in Sidebar -->
-    <div class="sidenav-header">
-      <mat-icon class="app-icon">storage</mat-icon>
-      <h1 class="app-title">NS Drive</h1>
-    </div>
+    <!-- Drawer Header -->
+    <mat-toolbar>
+      <mat-icon>storage</mat-icon>
+      <span>NS Drive</span>
+    </mat-toolbar>
 
     <!-- Navigation Menu -->
-    <mat-nav-list class="nav-list">
-      <mat-list-item
-        (click)="openHome()"
-        [class.active]="(tab$ | async) === 'home'"
-        class="nav-item"
+    <mat-nav-list>
+      <a
+        mat-list-item
+        href="javascript:void(0)"
+        (click)="openHome(); isHandset && drawer.close()"
+        [activated]="(tab$ | async) === 'home'"
       >
-        <mat-icon matListItemIcon>home</mat-icon>
-        <span matListItemTitle>Home</span>
-      </mat-list-item>
+        <mat-icon matListItemIcon>dashboard</mat-icon>
+        <span matListItemTitle>Dashboard</span>
+      </a>
 
-      <mat-list-item
-        (click)="openProfiles()"
-        [class.active]="(tab$ | async) === 'profiles'"
-        class="nav-item"
+      <a
+        mat-list-item
+        href="javascript:void(0)"
+        (click)="openProfiles(); isHandset && drawer.close()"
+        [activated]="(tab$ | async) === 'profiles'"
       >
-        <mat-icon matListItemIcon>settings</mat-icon>
-        <span matListItemTitle>Profiles</span>
-      </mat-list-item>
+        <mat-icon matListItemIcon>folder_shared</mat-icon>
+        <span matListItemTitle>Sync Profiles</span>
+      </a>
 
-      <mat-list-item
-        (click)="openRemotes()"
-        [class.active]="(tab$ | async) === 'remotes'"
-        class="nav-item"
+      <a
+        mat-list-item
+        href="javascript:void(0)"
+        (click)="openRemotes(); isHandset && drawer.close()"
+        [activated]="(tab$ | async) === 'remotes'"
       >
-        <mat-icon matListItemIcon>cloud</mat-icon>
-        <span matListItemTitle>Remotes</span>
-      </mat-list-item>
+        <mat-icon matListItemIcon>cloud_queue</mat-icon>
+        <span matListItemTitle>Cloud Storage</span>
+      </a>
+
+      <mat-divider></mat-divider>
     </mat-nav-list>
   </mat-sidenav>
 
-  <!-- Main Content Area -->
-  <mat-sidenav-content class="main-content">
-    <!-- Top Toolbar -->
-    <mat-toolbar class="app-toolbar" color="primary">
-      <button mat-icon-button (click)="sidenav.toggle()" class="menu-button">
+  <!-- Main Content -->
+  <mat-sidenav-content>
+    <!-- App Bar -->
+    <mat-toolbar color="primary">
+      <button mat-icon-button (click)="drawer.toggle()" *ngIf="isHandset">
         <mat-icon>menu</mat-icon>
       </button>
 
-      <span class="toolbar-title">
+      <span>
         {{
           (tab$ | async) === "home"
-            ? "Home"
+            ? "Dashboard"
             : (tab$ | async) === "profiles"
-            ? "Profiles"
+            ? "Sync Profiles"
             : (tab$ | async) === "remotes"
-            ? "Remotes"
+            ? "Cloud Storage"
             : "NS Drive"
         }}
       </span>
+
+      <span class="spacer"></span>
+
+      <!-- Action Buttons -->
+      <button mat-icon-button matTooltip="Settings">
+        <mat-icon>settings</mat-icon>
+      </button>
+
+      <button mat-icon-button matTooltip="Help">
+        <mat-icon>help</mat-icon>
+      </button>
     </mat-toolbar>
 
-    <!-- Page Content -->
-    <div class="page-content" [ngSwitch]="tab$ | async">
+    <!-- Page Content Container -->
+    <main [ngSwitch]="tab$ | async">
       <app-home *ngSwitchCase="'home'"></app-home>
       <app-profiles *ngSwitchCase="'profiles'"></app-profiles>
       <app-remotes *ngSwitchCase="'remotes'"></app-remotes>
-    </div>
+    </main>
   </mat-sidenav-content>
 </mat-sidenav-container>

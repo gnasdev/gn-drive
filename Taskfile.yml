@@ -4,22 +4,20 @@ tasks:
   # Desktop
   dev:
     cmds:
+      - rm -rf ./frontend/dist
       - wails dev
     dir: desktop
 
   build-mac:
     platforms: [darwin]
     cmds:
+      - rm -rf ./frontend/dist
       - wails build -v 2
-
+      - rm -rf ../desktop.app
+      - mv build/bin/desktop.app ../desktop.app
       # - codesign --sign - --force --deep build/bin/desktop.app
       # - upx --best build/bin/desktop --force-macos
       # - chmod +x build/bin/desktop.app/Contents/MacOS/desktop
-
-      - rm -rf ./desktop/frontend/dist
-      - rm -rf ../desktop.app
-      - mv build/bin/desktop.app ../desktop.app
-
       - open ../desktop.app
     dir: desktop
 

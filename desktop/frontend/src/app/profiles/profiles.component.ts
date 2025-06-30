@@ -9,6 +9,17 @@ import {
 import { AppService } from "../app.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
+import { models } from "../../../wailsjs/go/models";
+import {
+  parseRemotePath,
+  buildRemotePath,
+  parsePathConfig,
+  buildPath,
+  isValidProfileIndex,
+  isValidPathIndex,
+  DEFAULT_BANDWIDTH_OPTIONS,
+  DEFAULT_PARALLEL_OPTIONS,
+} from "./profiles.types";
 
 // Material Design imports
 import { MatCardModule } from "@angular/material/card";
@@ -41,7 +52,6 @@ import { MatDividerModule } from "@angular/material/divider";
     MatDividerModule,
   ],
   templateUrl: "./profiles.component.html",
-  styleUrl: "./profiles.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfilesComponent implements OnInit, OnDestroy {
@@ -49,6 +59,10 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   private changeDetectorSub: Subscription | undefined;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
+
+  // Configuration options
+  readonly bandwidthOptions = DEFAULT_BANDWIDTH_OPTIONS;
+  readonly parallelOptions = DEFAULT_PARALLEL_OPTIONS;
 
   constructor(
     public readonly appService: AppService,
@@ -62,44 +76,84 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     this.appService.getConfigInfo();
   }
 
-  ngOnDestroy(): void {}
+  ngOnDestroy(): void {
+    this.changeDetectorSub?.unsubscribe();
+  }
 
-  addProfile() {
+  addProfile(): void {
     this.appService.addProfile();
   }
 
-  removeProfile(idx: number) {
+  removeProfile(idx: number): void {
+    if (!isValidProfileIndex(this.appService.configInfo$.value.profiles, idx)) {
+      console.error("Invalid profile index:", idx);
+      return;
+    }
     this.appService.removeProfile(idx);
   }
 
-  saveConfigInfo() {
+  saveConfigInfo(): void {
     this.appService.saveConfigInfo();
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
     this.cdr.detectChanges();
   }
 
-  addIncludePath(profileIndex: number) {
+  addIncludePath(profileIndex: number): void {
+    if (
+      !isValidProfileIndex(
+        this.appService.configInfo$.value.profiles,
+        profileIndex
+      )
+    ) {
+      console.error("Invalid profile index:", profileIndex);
+      return;
+    }
     this.appService.addIncludePath(profileIndex);
     this.cdr.detectChanges();
   }
 
-  removeIncludePath(profileIndex: number, idx: number) {
+  removeIncludePath(profileIndex: number, idx: number): void {
+    const profiles = this.appService.configInfo$.value.profiles;
+    if (
+      !isValidProfileIndex(profiles, profileIndex) ||
+      !isValidPathIndex(profiles[profileIndex].included_paths, idx)
+    ) {
+      console.error("Invalid indices:", { profileIndex, pathIndex: idx });
+      return;
+    }
     this.appService.removeIncludePath(profileIndex, idx);
     this.cdr.detectChanges();
   }
 
-  addExcludePath(profileIndex: number) {
+  addExcludePath(profileIndex: number): void {
+    if (
+      !isValidProfileIndex(
+        this.appService.configInfo$.value.profiles,
+        profileIndex
+      )
+    ) {
+      console.error("Invalid profile index:", profileIndex);
+      return;
+    }
     this.appService.addExcludePath(profileIndex);
     this.cdr.detectChanges();
   }
 
-  removeExcludePath(profileIndex: number, idx: number) {
+  removeExcludePath(profileIndex: number, idx: number): void {
+    const profiles = this.appService.configInfo$.value.profiles;
+    if (
+      !isValidProfileIndex(profiles, profileIndex) ||
+      !isValidPathIndex(profiles[profileIndex].excluded_paths, idx)
+    ) {
+      console.error("Invalid indices:", { profileIndex, pathIndex: idx });
+      return;
+    }
     this.appService.removeExcludePath(profileIndex, idx);
     this.cdr.detectChanges();
   }
 
-  trackByFn(index: number, _item: any): number {
+  trackByFn(index: number): number {
     return index;
   }
 
@@ -109,121 +163,135 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   }
 
   // Get profile description for expansion panel
-  getProfileDescription(setting: any): string {
-    const from = setting.from || "Not configured";
-    const to = setting.to || "Not configured";
+  getProfileDescription(profile: models.Profile): string {
+    const from = profile.from || "Not configured";
+    const to = profile.to || "Not configured";
     return `${from} → ${to}`;
   }
 
   // From path helpers
-  getFromRemote(setting: any): string {
-    if (!setting.from) return "";
-    const colonIndex = setting.from.indexOf(":");
-    return colonIndex > 0 ? setting.from.substring(0, colonIndex) : "";
+  getFromRemote(profile: models.Profile): string {
+    const parsed = parseRemotePath(profile.from || "");
+    return parsed.remote;
   }
 
-  getFromPath(setting: any): string {
-    if (!setting.from) return "";
-    const colonIndex = setting.from.indexOf(":");
-    return colonIndex > 0
-      ? setting.from.substring(colonIndex + 1)
-      : setting.from;
+  getFromPath(profile: models.Profile): string {
+    const parsed = parseRemotePath(profile.from || "");
+    return parsed.path;
   }
 
-  updateFromPath(setting: any, remote: string, path: string): void {
-    if (remote) {
-      setting.from = `${remote}:${path || ""}`;
-    } else {
-      setting.from = path || "";
-    }
+  updateFromPath(profile: models.Profile, remote: string, path: string): void {
+    profile.from = buildRemotePath(remote, path);
     this.cdr.detectChanges();
   }
 
   // To path helpers
-  getToRemote(setting: any): string {
-    if (!setting.to) return "";
-    const colonIndex = setting.to.indexOf(":");
-    return colonIndex > 0 ? setting.to.substring(0, colonIndex) : "";
+  getToRemote(profile: models.Profile): string {
+    const parsed = parseRemotePath(profile.to || "");
+    return parsed.remote;
   }
 
-  getToPath(setting: any): string {
-    if (!setting.to) return "";
-    const colonIndex = setting.to.indexOf(":");
-    return colonIndex > 0 ? setting.to.substring(colonIndex + 1) : setting.to;
+  getToPath(profile: models.Profile): string {
+    const parsed = parseRemotePath(profile.to || "");
+    return parsed.path;
   }
 
-  updateToPath(setting: any, remote: string, path: string): void {
-    if (remote) {
-      setting.to = `${remote}:${path || ""}`;
-    } else {
-      setting.to = path || "";
-    }
+  updateToPath(profile: models.Profile, remote: string, path: string): void {
+    profile.to = buildRemotePath(remote, path);
     this.cdr.detectChanges();
   }
 
   // Include path helpers
-  getIncludePathType(setting: any, index: number): string {
-    const path = setting.included_paths[index];
-    if (!path) return "folder";
-    return path.endsWith("/**") ? "folder" : "file";
-  }
-
-  getIncludePathValue(setting: any, index: number): string {
-    const path = setting.included_paths[index];
-    if (!path) return "";
-    return path.endsWith("/**") ? path.slice(0, -3) : path;
-  }
-
-  updateIncludePathType(setting: any, index: number, type: string): void {
-    const currentValue = this.getIncludePathValue(setting, index);
-    if (type === "folder") {
-      setting.included_paths[index] = currentValue + "/**";
-    } else {
-      setting.included_paths[index] = currentValue;
+  getIncludePathType(profile: models.Profile, index: number): string {
+    if (!isValidPathIndex(profile.included_paths, index)) {
+      return "folder";
     }
+    const parsed = parsePathConfig(profile.included_paths[index]);
+    return parsed.type;
+  }
+
+  getIncludePathValue(profile: models.Profile, index: number): string {
+    if (!isValidPathIndex(profile.included_paths, index)) {
+      return "";
+    }
+    const parsed = parsePathConfig(profile.included_paths[index]);
+    return parsed.value;
+  }
+
+  updateIncludePathType(
+    profile: models.Profile,
+    index: number,
+    type: string
+  ): void {
+    if (!isValidPathIndex(profile.included_paths, index)) {
+      console.error("Invalid path index:", index);
+      return;
+    }
+    const currentValue = this.getIncludePathValue(profile, index);
+    const pathConfig = { type: type as "file" | "folder", value: currentValue };
+    profile.included_paths[index] = buildPath(pathConfig);
     this.cdr.detectChanges();
   }
 
-  updateIncludePathValue(setting: any, index: number, value: string): void {
-    const currentType = this.getIncludePathType(setting, index);
-    if (currentType === "folder") {
-      setting.included_paths[index] = value + "/**";
-    } else {
-      setting.included_paths[index] = value;
+  updateIncludePathValue(
+    profile: models.Profile,
+    index: number,
+    value: string
+  ): void {
+    if (!isValidPathIndex(profile.included_paths, index)) {
+      console.error("Invalid path index:", index);
+      return;
     }
+    const currentType = this.getIncludePathType(profile, index);
+    const pathConfig = { type: currentType as "file" | "folder", value };
+    profile.included_paths[index] = buildPath(pathConfig);
     this.cdr.detectChanges();
   }
 
   // Exclude path helpers
-  getExcludePathType(setting: any, index: number): string {
-    const path = setting.excluded_paths[index];
-    if (!path) return "folder";
-    return path.endsWith("/**") ? "folder" : "file";
-  }
-
-  getExcludePathValue(setting: any, index: number): string {
-    const path = setting.excluded_paths[index];
-    if (!path) return "";
-    return path.endsWith("/**") ? path.slice(0, -3) : path;
-  }
-
-  updateExcludePathType(setting: any, index: number, type: string): void {
-    const currentValue = this.getExcludePathValue(setting, index);
-    if (type === "folder") {
-      setting.excluded_paths[index] = currentValue + "/**";
-    } else {
-      setting.excluded_paths[index] = currentValue;
+  getExcludePathType(profile: models.Profile, index: number): string {
+    if (!isValidPathIndex(profile.excluded_paths, index)) {
+      return "folder";
     }
+    const parsed = parsePathConfig(profile.excluded_paths[index]);
+    return parsed.type;
+  }
+
+  getExcludePathValue(profile: models.Profile, index: number): string {
+    if (!isValidPathIndex(profile.excluded_paths, index)) {
+      return "";
+    }
+    const parsed = parsePathConfig(profile.excluded_paths[index]);
+    return parsed.value;
+  }
+
+  updateExcludePathType(
+    profile: models.Profile,
+    index: number,
+    type: string
+  ): void {
+    if (!isValidPathIndex(profile.excluded_paths, index)) {
+      console.error("Invalid path index:", index);
+      return;
+    }
+    const currentValue = this.getExcludePathValue(profile, index);
+    const pathConfig = { type: type as "file" | "folder", value: currentValue };
+    profile.excluded_paths[index] = buildPath(pathConfig);
     this.cdr.detectChanges();
   }
 
-  updateExcludePathValue(setting: any, index: number, value: string): void {
-    const currentType = this.getExcludePathType(setting, index);
-    if (currentType === "folder") {
-      setting.excluded_paths[index] = value + "/**";
-    } else {
-      setting.excluded_paths[index] = value;
+  updateExcludePathValue(
+    profile: models.Profile,
+    index: number,
+    value: string
+  ): void {
+    if (!isValidPathIndex(profile.excluded_paths, index)) {
+      console.error("Invalid path index:", index);
+      return;
     }
+    const currentType = this.getExcludePathType(profile, index);
+    const pathConfig = { type: currentType as "file" | "folder", value };
+    profile.excluded_paths[index] = buildPath(pathConfig);
     this.cdr.detectChanges();
   }
 }

@@ -30,21 +30,6 @@ module.exports = tseslint.config(
           style: "kebab-case",
         },
       ],
-      "prettier/prettier": [
-        "error",
-        {
-          endOfLine: "lf",
-          singleQuote: false,
-          tabWidth: 4,
-          useTabs: false,
-          trailingComma: "es5",
-          semi: true,
-          bracketSpacing: true,
-          arrowParens: "avoid",
-          bracketSameLine: true,
-          printWidth: 120,
-        },
-      ],
     },
   },
   {
@@ -53,22 +38,6 @@ module.exports = tseslint.config(
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
     ],
-    rules: {
-      "prettier/prettier": [
-        "error",
-        {
-          endOfLine: "lf",
-          singleQuote: false,
-          tabWidth: 4,
-          useTabs: false,
-          trailingComma: "es5",
-          semi: true,
-          bracketSpacing: true,
-          arrowParens: "avoid",
-          bracketSameLine: true,
-          printWidth: 120,
-        },
-      ],
-    },
+    rules: {},
   }
 );

@@ -29,8 +29,6 @@ export class TabService {
   private tabs$ = new BehaviorSubject<Tab[]>([]);
   private activeTabId$ = new BehaviorSubject<string | null>(null);
 
-  constructor() {}
-
   get tabs() {
     return this.tabs$.asObservable();
   }
@@ -175,9 +173,8 @@ export class TabService {
         });
         break;
       case "error":
-        const currentData = tab.data;
         this.updateTab(data.tab_id, {
-          data: [...currentData, data.error || ""],
+          data: [...tab.data, data.error || ""],
         });
         break;
     }
