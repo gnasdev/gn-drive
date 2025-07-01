@@ -1,0 +1,25 @@
+/* Home component specific styles */
+
+.mat-mdc-list-item .mat-icon[color="primary"] {
+  color: #1976d2 !important;
+}
+
+/* Dark mode support for home component */
+.dark-theme .mat-mdc-list-item .mat-icon[color="primary"],
+@media (prefers-color-scheme: dark) {
+  .mat-mdc-list-item .mat-icon[color="primary"] {
+    color: #64b5f6 !important; /* Lighter blue for dark mode */
+  }
+}
+
+/* Card avatar icon */
+.mat-mdc-card-header .mat-icon {
+  color: #1976d2 !important;
+}
+
+.dark-theme .mat-mdc-card-header .mat-icon,
+@media (prefers-color-scheme: dark) {
+  .mat-mdc-card-header .mat-icon {
+    color: #64b5f6 !important;
+  }
+}

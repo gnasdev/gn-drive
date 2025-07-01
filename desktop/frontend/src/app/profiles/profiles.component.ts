@@ -7,6 +7,7 @@ import {
   OnInit,
 } from "@angular/core";
 import { AppService } from "../app.service";
+import { NavigationService } from "../navigation.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 import { models } from "../../../wailsjs/go/models";
@@ -33,6 +34,7 @@ import { MatChipsModule } from "@angular/material/chips";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatDividerModule } from "@angular/material/divider";
+import { MatListModule } from "@angular/material/list";
 
 @Component({
   selector: "app-profiles",
@@ -50,13 +52,15 @@ import { MatDividerModule } from "@angular/material/divider";
     MatTooltipModule,
     MatSnackBarModule,
     MatDividerModule,
+    MatListModule,
   ],
   templateUrl: "./profiles.component.html",
+  styleUrl: "./profiles.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfilesComponent implements OnInit, OnDestroy {
   Date = Date;
-  private changeDetectorSub: Subscription | undefined;
+  private subscriptions = new Subscription();
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
 
@@ -66,22 +70,27 @@ export class ProfilesComponent implements OnInit, OnDestroy {
 
   constructor(
     public readonly appService: AppService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly navigationService: NavigationService
   ) {}
 
   ngOnInit(): void {
-    this.changeDetectorSub = this.appService.configInfo$.subscribe(() =>
-      this.cdr.detectChanges()
+    this.subscriptions.add(
+      this.appService.configInfo$.subscribe(() => this.cdr.detectChanges())
     );
     this.appService.getConfigInfo();
   }
 
   ngOnDestroy(): void {
-    this.changeDetectorSub?.unsubscribe();
+    this.subscriptions.unsubscribe();
   }
 
   addProfile(): void {
     this.appService.addProfile();
+  }
+
+  editProfile(index: number): void {
+    this.navigationService.navigateToProfileEdit(index);
   }
 
   removeProfile(idx: number): void {

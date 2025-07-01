@@ -1,0 +1,23 @@
+.fab-button {
+  position: fixed;
+  bottom: 80px; /* Above bottom tabs */
+  right: 16px;
+  z-index: 1000;
+}
+
+.profile-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.profile-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Dark mode support */
+.dark-theme .profile-item:hover,
+@media (prefers-color-scheme: dark) {
+  .profile-item:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+}

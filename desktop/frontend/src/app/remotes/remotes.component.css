@@ -1,0 +1,6 @@
+.fab-button {
+  position: fixed;
+  bottom: 80px; /* Above bottom tabs */
+  right: 16px;
+  z-index: 1000;
+}

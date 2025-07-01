@@ -1,71 +1,66 @@
-<!-- Header Section -->
-<mat-card>
-  <mat-card-header>
-    <mat-icon mat-card-avatar>cloud</mat-icon>
-    <mat-card-title>Remote Storage Management</mat-card-title>
-    <mat-card-subtitle>
-      Configure cloud storage connections for sync operations
-    </mat-card-subtitle>
-  </mat-card-header>
-
-  <mat-card-actions>
-    <button mat-raised-button color="primary" (click)="openAddRemoteDialog()">
-      <mat-icon>add</mat-icon>
-      Add Remote
-    </button>
-  </mat-card-actions>
-</mat-card>
 <!-- Remotes List -->
-<mat-card *ngIf="(appService.remotes$ | async)?.length; else noRemotes">
-  <mat-card-header>
-    <mat-card-title>Connected Remotes</mat-card-title>
-    <mat-card-subtitle>
-      {{ (appService.remotes$ | async)?.length }} remote(s) configured
-    </mat-card-subtitle>
-  </mat-card-header>
+<div class="page-container content-spacing">
+  <mat-card
+    *ngIf="(appService.remotes$ | async)?.length; else noRemotes"
+    class="card-spacing"
+  >
+    <mat-card-header>
+      <mat-card-title>Connected Remotes</mat-card-title>
+      <mat-card-subtitle>
+        {{ (appService.remotes$ | async)?.length }} remote(s) configured
+      </mat-card-subtitle>
+    </mat-card-header>
 
-  <mat-card-content>
-    <mat-list>
-      <mat-list-item *ngFor="let remote of appService.remotes$ | async">
-        <mat-icon matListItemIcon>{{ getRemoteIcon(remote.type) }}</mat-icon>
-        <div matListItemTitle>{{ remote.name }}</div>
-        <div matListItemLine>{{ getRemoteTypeLabel(remote.type) }}</div>
-        <div matListItemMeta>
-          <button
-            mat-icon-button
-            color="warn"
-            (click)="confirmDeleteRemote(remote)"
-            matTooltip="Delete remote"
-          >
-            <mat-icon>delete</mat-icon>
-          </button>
-        </div>
-      </mat-list-item>
-    </mat-list>
-  </mat-card-content>
-</mat-card>
+    <mat-card-content>
+      <mat-list>
+        <mat-list-item *ngFor="let remote of appService.remotes$ | async">
+          <mat-icon matListItemIcon>{{ getRemoteIcon(remote.type) }}</mat-icon>
+          <div matListItemTitle>{{ remote.name }}</div>
+          <div matListItemLine>{{ getRemoteTypeLabel(remote.type) }}</div>
+          <div matListItemMeta>
+            <button
+              mat-icon-button
+              color="warn"
+              (click)="confirmDeleteRemote(remote)"
+              matTooltip="Delete remote"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </mat-list-item>
+      </mat-list>
+    </mat-card-content>
+  </mat-card>
+</div>
 
 <!-- No Remotes State -->
 <ng-template #noRemotes>
-  <mat-card>
-    <mat-card-header>
-      <mat-icon mat-card-avatar>cloud_off</mat-icon>
-      <mat-card-title>No Remotes Configured</mat-card-title>
-      <mat-card-subtitle>
-        Add your first cloud storage connection
-      </mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <p>
-        Remotes allow you to sync files with cloud storage services like Google
-        Drive, Dropbox, OneDrive, and more.
-      </p>
-    </mat-card-content>
-    <mat-card-actions>
-      <button mat-raised-button color="primary" (click)="openAddRemoteDialog()">
-        <mat-icon>add</mat-icon>
-        Add First Remote
-      </button>
-    </mat-card-actions>
-  </mat-card>
+  <div class="page-container">
+    <mat-card class="card-spacing">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>cloud_off</mat-icon>
+        <mat-card-title>No Remotes Configured</mat-card-title>
+        <mat-card-subtitle>
+          Add your first cloud storage connection
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          Remotes allow you to sync files with cloud storage services like
+          Google Drive, Dropbox, OneDrive, and more.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  </div>
 </ng-template>
+
+<!-- Floating Action Button -->
+<button
+  mat-fab
+  color="primary"
+  (click)="openAddRemoteDialog()"
+  class="fab-button"
+  matTooltip="Add Remote"
+>
+  <mat-icon>add</mat-icon>
+</button>

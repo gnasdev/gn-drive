@@ -1,0 +1,155 @@
+<!-- Header with Back Button -->
+<mat-toolbar>
+  <button mat-icon-button (click)="goBack()" matTooltip="Back to Profiles">
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+  <span>Edit Profile</span>
+  <span class="spacer"></span>
+  <button mat-raised-button color="accent" (click)="saveProfile()">
+    <mat-icon>save</mat-icon>
+    {{ saveBtnText$ | async }}
+  </button>
+</mat-toolbar>
+
+<div class="page-container content-spacing" *ngIf="profile">
+  <!-- Profile Form -->
+  <mat-card class="card-spacing">
+    <mat-card-header>
+      <mat-card-title>Basic Information</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="form-spacing">
+      <mat-form-field appearance="outline">
+        <mat-label>Profile Name</mat-label>
+        <input
+          matInput
+          [(ngModel)]="profile.name"
+          placeholder="Enter profile name"
+        />
+        <mat-icon matSuffix>edit</mat-icon>
+      </mat-form-field>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Path Configuration -->
+  <mat-card class="card-spacing">
+    <mat-card-header>
+      <mat-card-title>Path Configuration</mat-card-title>
+      <mat-card-subtitle>
+        Configure source and destination paths
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="form-spacing">
+      <!-- From Path -->
+      <div class="section-spacing">
+        <h4>Source Path</h4>
+        <mat-form-field appearance="outline">
+          <mat-label>Remote</mat-label>
+          <mat-select
+            [value]="getFromRemote()"
+            (selectionChange)="updateFromPath($event.value, getFromPath())"
+          >
+            <mat-option value="">Local</mat-option>
+            <mat-option
+              *ngFor="let remote of appService.remotes$ | async"
+              [value]="remote.name"
+            >
+              {{ remote.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Path</mat-label>
+          <input
+            matInput
+            [value]="getFromPath()"
+            (input)="updateFromPath(getFromRemote(), $any($event.target).value)"
+            placeholder="/source/path"
+          />
+          <mat-icon matSuffix>folder_open</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <!-- To Path -->
+      <div class="section-spacing">
+        <h4>Destination Path</h4>
+        <mat-form-field appearance="outline">
+          <mat-label>Remote</mat-label>
+          <mat-select
+            [value]="getToRemote()"
+            (selectionChange)="updateToPath($event.value, getToPath())"
+          >
+            <mat-option value="">Local</mat-option>
+            <mat-option
+              *ngFor="let remote of appService.remotes$ | async"
+              [value]="remote.name"
+            >
+              {{ remote.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Path</mat-label>
+          <input
+            matInput
+            [value]="getToPath()"
+            (input)="updateToPath(getToRemote(), $any($event.target).value)"
+            placeholder="/destination/path"
+          />
+          <mat-icon matSuffix>folder_open</mat-icon>
+        </mat-form-field>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Performance Settings -->
+  <mat-card class="card-spacing">
+    <mat-card-header>
+      <mat-card-title>Performance Settings</mat-card-title>
+      <mat-card-subtitle>
+        Configure parallel transfers and bandwidth limits
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="form-spacing">
+      <mat-form-field appearance="outline">
+        <mat-label>Parallel Transfers</mat-label>
+        <mat-select [(ngModel)]="profile.parallel">
+          <mat-option *ngFor="let num of getNumberRange(1, 32)" [value]="num">
+            {{ num }}
+          </mat-option>
+        </mat-select>
+        <mat-icon matSuffix>speed</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Bandwidth Limit (MB/s)</mat-label>
+        <mat-select [(ngModel)]="profile.bandwidth">
+          <mat-option *ngFor="let num of getNumberRange(1, 100)" [value]="num">
+            {{ num }}
+          </mat-option>
+        </mat-select>
+        <mat-icon matSuffix>network_check</mat-icon>
+      </mat-form-field>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Actions -->
+  <mat-card class="card-spacing">
+    <mat-card-actions>
+      <button mat-raised-button color="warn" (click)="deleteProfile()">
+        <mat-icon>delete</mat-icon>
+        Delete Profile
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="!profile" class="page-container">
+  <mat-card class="card-spacing">
+    <mat-card-content>
+      <p>Loading profile...</p>
+    </mat-card-content>
+  </mat-card>
+</div>

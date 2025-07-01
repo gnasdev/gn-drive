@@ -51,11 +51,12 @@ import {
     MatTooltipModule,
   ],
   templateUrl: "./remotes.component.html",
+  styleUrl: "./remotes.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RemotesComponent implements OnInit, OnDestroy {
   Date = Date;
-  private changeDetectorSub: Subscription | undefined;
+  private subscriptions = new Subscription();
   readonly isAddingRemote$ = new BehaviorSubject<boolean>(false);
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
@@ -71,15 +72,17 @@ export class RemotesComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.changeDetectorSub = combineLatest([
-      this.appService.configInfo$,
-      this.appService.remotes$,
-    ]).subscribe(() => this.cdr.detectChanges());
+    this.subscriptions.add(
+      combineLatest([
+        this.appService.configInfo$,
+        this.appService.remotes$,
+      ]).subscribe(() => this.cdr.detectChanges())
+    );
     this.appService.getConfigInfo();
   }
 
   ngOnDestroy(): void {
-    this.changeDetectorSub?.unsubscribe();
+    this.subscriptions.unsubscribe();
   }
 
   async addRemote(e: SubmitEvent): Promise<void> {

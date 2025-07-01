@@ -1,7 +1,10 @@
 <!-- Dashboard Layout -->
-<div *ngIf="tabService.tabsValue.length === 0">
+<div
+  class="page-container content-spacing"
+  *ngIf="tabService.tabsValue.length === 0"
+>
   <!-- Welcome State -->
-  <mat-card>
+  <mat-card class="card-spacing">
     <mat-card-header>
       <div mat-card-avatar>
         <mat-icon>dashboard</mat-icon>
@@ -14,9 +17,9 @@
 
     <mat-card-content>
       <p>
-        Sync operations allow you to synchronize files between local
-        directories and cloud storage services. Each operation runs
-        independently with its own configuration and profile.
+        Sync operations allow you to synchronize files between local directories
+        and cloud storage services. Each operation runs independently with its
+        own configuration and profile.
       </p>
 
       <mat-list>
@@ -62,26 +65,32 @@
   </mat-toolbar>
 
   <!-- Tab Navigation -->
-  <mat-tab-group [selectedIndex]="getActiveTabIndex()" (selectedIndexChange)="onTabChange($event)">
-    <mat-tab *ngFor="let tab of tabService.tabsValue; let i = index">
+  <mat-tab-group
+    [selectedIndex]="getActiveTabIndex()"
+    (selectedIndexChange)="onTabChange($event)"
+  >
+    <mat-tab
+      *ngFor="
+        let tab of tabService.tabsValue;
+        let i = index;
+        trackBy: trackByTabId
+      "
+    >
       <ng-template mat-tab-label>
-        <mat-icon>{{ tab.currentAction ? getActionIcon(tab.currentAction) : "folder" }}</mat-icon>
-        {{ tab.name || "Operation " + (i + 1) }}
-        <button mat-icon-button [matMenuTriggerFor]="tabMenu" (click)="$event.stopPropagation()">
+        <mat-icon>{{
+          tab?.currentAction ? getActionIcon(tab.currentAction!) : "folder"
+        }}</mat-icon>
+        {{ tab?.name || "Operation " + (i + 1) }}
+        <button
+          mat-icon-button
+          [matMenuTriggerFor]="tabMenu"
+          (click)="$event.stopPropagation(); setCurrentTabForMenu(tab.id)"
+          *ngIf="tab && tab.id"
+        >
           <mat-icon>more_vert</mat-icon>
         </button>
-        <mat-menu #tabMenu="matMenu">
-          <button mat-menu-item (click)="startRenameTab(tab.id)">
-            <mat-icon>edit</mat-icon>
-            <span>Rename</span>
-          </button>
-          <button mat-menu-item (click)="deleteTab(tab.id)">
-            <mat-icon>delete</mat-icon>
-            <span>Delete</span>
-          </button>
-        </mat-menu>
       </ng-template>
-      
+
       <!-- Tab Content -->
       <mat-card>
         <mat-card-header>
@@ -99,8 +108,9 @@
           <mat-form-field appearance="outline">
             <mat-label>Sync Profile</mat-label>
             <mat-select
-              [value]="tab.selectedProfileIndex"
-              (selectionChange)="changeProfileTab($event.value, tab.id)"
+              [value]="tab?.selectedProfileIndex"
+              (selectionChange)="changeProfileTab($event.value, tab?.id)"
+              [disabled]="!tab || !tab.id"
             >
               <mat-option [value]="null">
                 <em>No profile selected</em>
@@ -123,8 +133,16 @@
             <button
               mat-raised-button
               [color]="tab.currentAction === Action.Pull ? 'warn' : 'primary'"
-              [disabled]="(!validateTabProfileIndex(tab) && tab.currentAction !== Action.Pull) || tab.isStopping"
-              (click)="tab.currentAction !== Action.Pull ? pullTab(tab.id) : stopCommandTab(tab.id)"
+              [disabled]="
+                (!validateTabProfileIndex(tab) &&
+                  tab.currentAction !== Action.Pull) ||
+                tab.isStopping
+              "
+              (click)="
+                tab.currentAction !== Action.Pull
+                  ? pullTab(tab.id)
+                  : stopCommandTab(tab.id)
+              "
             >
               <mat-icon>{{
                 tab.isStopping
@@ -145,31 +163,59 @@
             <button
               mat-raised-button
               [color]="tab.currentAction === Action.Push ? 'warn' : 'accent'"
-              [disabled]="!validateTabProfileIndex(tab) && tab.currentAction !== Action.Push"
-              (click)="tab.currentAction !== Action.Push ? pushTab(tab.id) : stopCommandTab(tab.id)"
+              [disabled]="
+                !validateTabProfileIndex(tab) &&
+                tab.currentAction !== Action.Push
+              "
+              (click)="
+                tab.currentAction !== Action.Push
+                  ? pushTab(tab.id)
+                  : stopCommandTab(tab.id)
+              "
             >
-              <mat-icon>{{ tab.currentAction === Action.Push ? "stop" : "upload" }}</mat-icon>
+              <mat-icon>{{
+                tab.currentAction === Action.Push ? "stop" : "upload"
+              }}</mat-icon>
               {{ tab.currentAction === Action.Push ? "Stop Push" : "Push" }}
             </button>
 
             <button
               mat-raised-button
               [color]="tab.currentAction === Action.Bi ? 'warn' : 'primary'"
-              [disabled]="!validateTabProfileIndex(tab) && tab.currentAction !== Action.Bi"
-              (click)="tab.currentAction !== Action.Bi ? biTab(tab.id) : stopCommandTab(tab.id)"
+              [disabled]="
+                !validateTabProfileIndex(tab) && tab.currentAction !== Action.Bi
+              "
+              (click)="
+                tab.currentAction !== Action.Bi
+                  ? biTab(tab.id)
+                  : stopCommandTab(tab.id)
+              "
             >
-              <mat-icon>{{ tab.currentAction === Action.Bi ? "stop" : "sync" }}</mat-icon>
+              <mat-icon>{{
+                tab.currentAction === Action.Bi ? "stop" : "sync"
+              }}</mat-icon>
               {{ tab.currentAction === Action.Bi ? "Stop Sync" : "Sync" }}
             </button>
 
             <button
               mat-raised-button
               color="warn"
-              [disabled]="!validateTabProfileIndex(tab) && tab.currentAction !== Action.BiResync"
-              (click)="tab.currentAction !== Action.BiResync ? biResyncTab(tab.id) : stopCommandTab(tab.id)"
+              [disabled]="
+                !validateTabProfileIndex(tab) &&
+                tab.currentAction !== Action.BiResync
+              "
+              (click)="
+                tab.currentAction !== Action.BiResync
+                  ? biResyncTab(tab.id)
+                  : stopCommandTab(tab.id)
+              "
             >
-              <mat-icon>{{ tab.currentAction === Action.BiResync ? "stop" : "refresh" }}</mat-icon>
-              {{ tab.currentAction === Action.BiResync ? "Stop Resync" : "Resync" }}
+              <mat-icon>{{
+                tab.currentAction === Action.BiResync ? "stop" : "refresh"
+              }}</mat-icon>
+              {{
+                tab.currentAction === Action.BiResync ? "Stop Resync" : "Resync"
+              }}
             </button>
           </mat-card-actions>
 
@@ -178,7 +224,9 @@
             <mat-progress-bar mode="indeterminate"></mat-progress-bar>
             <mat-chip-set>
               <mat-chip>
-                <mat-icon matChipAvatar>{{ getActionIcon(tab.currentAction) }}</mat-icon>
+                <mat-icon matChipAvatar>{{
+                  getActionIcon(tab.currentAction)
+                }}</mat-icon>
                 {{ getActionLabel(tab.currentAction) }}
               </mat-chip>
             </mat-chip-set>
@@ -207,7 +255,11 @@
             Console Output
           </mat-card-title>
           <span class="spacer"></span>
-          <button mat-icon-button (click)="clearTabOutput(tab.id)" matTooltip="Clear output">
+          <button
+            mat-icon-button
+            (click)="clearTabOutput(tab.id)"
+            matTooltip="Clear output"
+          >
             <mat-icon>clear</mat-icon>
           </button>
         </mat-card-header>
@@ -217,4 +269,16 @@
       </mat-card>
     </mat-tab>
   </mat-tab-group>
+
+  <!-- Shared Tab Menu -->
+  <mat-menu #tabMenu="matMenu">
+    <button mat-menu-item (click)="startRenameTab(currentTabIdForMenu)">
+      <mat-icon>edit</mat-icon>
+      <span>Rename</span>
+    </button>
+    <button mat-menu-item (click)="deleteTab(currentTabIdForMenu)">
+      <mat-icon>delete</mat-icon>
+      <span>Delete</span>
+    </button>
+  </mat-menu>
 </div>

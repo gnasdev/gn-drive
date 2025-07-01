@@ -4,29 +4,23 @@ import {
   ChangeDetectorRef,
   Component,
   OnInit,
+  OnDestroy,
 } from "@angular/core";
 import { Action, AppService } from "./app.service.js";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
 import { HomeComponent } from "./home/home.component.js";
 import { models } from "../../wailsjs/go/models.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
+import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
+import { NavigationService } from "./navigation.service.js";
 
 // Material Design imports
-import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatToolbarModule } from "@angular/material/toolbar";
-import { MatListModule } from "@angular/material/list";
 import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatRippleModule } from "@angular/material/core";
-import {
-  BreakpointObserver,
-  Breakpoints,
-  LayoutModule,
-} from "@angular/cdk/layout";
-
-type Tab = "home" | "profiles" | "remotes";
+import { MatTabsModule } from "@angular/material/tabs";
 
 @Component({
   selector: "app-root",
@@ -34,62 +28,92 @@ type Tab = "home" | "profiles" | "remotes";
     CommonModule,
     HomeComponent,
     ProfilesComponent,
+    ProfileEditComponent,
     RemotesComponent,
-    MatSidenavModule,
     MatToolbarModule,
-    MatListModule,
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
-    MatRippleModule,
-    LayoutModule,
+    MatTabsModule,
   ],
   templateUrl: "./app.component.html",
+  styleUrl: "./app.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   Action = Action;
 
-  readonly tab$ = new BehaviorSubject<Tab>("home");
+  isDarkMode = false;
 
-  private changeDetectorSub: Subscription | undefined;
-
-  // Responsive design
-  isHandset = false;
+  private subscriptions = new Subscription();
+  private isInitialized = false;
 
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    private breakpointObserver: BreakpointObserver
-  ) {}
+    public readonly navigationService: NavigationService
+  ) {
+    console.log("AppComponent constructor called");
+    console.log(
+      "AppComponent navigationService initial state:",
+      this.navigationService.currentState
+    );
+
+    // Initialize dark mode from localStorage or system preference
+    const savedTheme = localStorage.getItem("dark-mode");
+    if (savedTheme !== null) {
+      this.isDarkMode = savedTheme === "true";
+    } else {
+      this.isDarkMode = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+    }
+    this.applyTheme();
+  }
 
   ngOnInit() {
-    // Setup responsive breakpoint observer
-    this.breakpointObserver
-      .observe([Breakpoints.Handset])
-      .subscribe((result) => {
-        this.isHandset = result.matches;
-        this.cdr.detectChanges();
-      });
+    console.log(
+      "AppComponent ngOnInit called, isInitialized:",
+      this.isInitialized
+    );
 
-    this.changeDetectorSub = combineLatest([
-      this.appService.currentAction$,
-      this.tab$,
-    ]).subscribe(() => this.cdr.detectChanges());
+    if (this.isInitialized) {
+      console.warn("AppComponent already initialized, skipping");
+      return;
+    }
+
+    this.isInitialized = true;
+
+    // Combine observables for change detection - remove tab$ to avoid circular updates
+    this.subscriptions.add(
+      combineLatest([
+        this.appService.currentAction$,
+        this.navigationService.currentState$,
+      ]).subscribe(() => {
+        console.log("AppComponent combineLatest triggered");
+        this.cdr.detectChanges();
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    console.log("AppComponent ngOnDestroy called");
+    this.isInitialized = false;
+    this.subscriptions.unsubscribe();
   }
 
   async pull(profile: models.Profile) {
-    this.tab$.next("home");
+    this.navigationService.navigateToHome();
     this.appService.pull(profile);
   }
 
   async push(profile: models.Profile) {
-    this.tab$.next("home");
+    this.navigationService.navigateToHome();
     this.appService.push(profile);
   }
 
   async bi(profile: models.Profile) {
-    this.tab$.next("home");
+    this.navigationService.navigateToHome();
     this.appService.bi(profile);
   }
 
@@ -98,14 +122,60 @@ export class AppComponent implements OnInit {
   }
 
   openHome() {
-    this.tab$.next("home");
+    this.navigationService.navigateToHome();
   }
 
   openProfiles() {
-    this.tab$.next("profiles");
+    this.navigationService.navigateToProfiles();
   }
 
   openRemotes() {
-    this.tab$.next("remotes");
+    this.navigationService.navigateToRemotes();
+  }
+
+  getSelectedTabIndex(): number {
+    const currentState = this.navigationService.currentState;
+    switch (currentState.page) {
+      case "home":
+        return 0;
+      case "profiles":
+      case "profile-edit":
+        return 1;
+      case "remotes":
+        return 2;
+      default:
+        return 0;
+    }
+  }
+
+  onTabChange(index: number): void {
+    console.log("AppComponent onTabChange called with index:", index);
+    switch (index) {
+      case 0:
+        this.navigationService.navigateToHome();
+        break;
+      case 1:
+        this.navigationService.navigateToProfiles();
+        break;
+      case 2:
+        this.navigationService.navigateToRemotes();
+        break;
+    }
+  }
+
+  toggleDarkMode() {
+    this.isDarkMode = !this.isDarkMode;
+    localStorage.setItem("dark-mode", this.isDarkMode.toString());
+    this.applyTheme();
+    this.cdr.detectChanges();
+  }
+
+  private applyTheme() {
+    const body = document.body;
+    if (this.isDarkMode) {
+      body.classList.add("dark-theme");
+    } else {
+      body.classList.remove("dark-theme");
+    }
   }
 }

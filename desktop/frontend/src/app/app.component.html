@@ -1,92 +1,67 @@
-<!-- Modern App Layout with Angular Material -->
-<mat-sidenav-container>
-  <!-- Navigation Drawer -->
-  <mat-sidenav
-    #drawer
-    [mode]="isHandset ? 'over' : 'side'"
-    [opened]="!isHandset"
-    fixedInViewport="true"
-    [disableClose]="!isHandset"
-  >
-    <!-- Drawer Header -->
-    <mat-toolbar>
-      <mat-icon>storage</mat-icon>
-      <span>NS Drive</span>
-    </mat-toolbar>
+<!-- Modern App Layout with Bottom Tabs -->
+<div class="app-container">
+  <!-- App Bar -->
+  <mat-toolbar color="primary">
+    <mat-icon>storage</mat-icon>
+    <span>NS Drive</span>
 
-    <!-- Navigation Menu -->
-    <mat-nav-list>
-      <a
-        mat-list-item
-        href="javascript:void(0)"
-        (click)="openHome(); isHandset && drawer.close()"
-        [activated]="(tab$ | async) === 'home'"
-      >
-        <mat-icon matListItemIcon>dashboard</mat-icon>
-        <span matListItemTitle>Dashboard</span>
-      </a>
+    <span class="spacer"></span>
 
-      <a
-        mat-list-item
-        href="javascript:void(0)"
-        (click)="openProfiles(); isHandset && drawer.close()"
-        [activated]="(tab$ | async) === 'profiles'"
-      >
-        <mat-icon matListItemIcon>folder_shared</mat-icon>
-        <span matListItemTitle>Sync Profiles</span>
-      </a>
+    <!-- Action Buttons -->
+    <button
+      mat-icon-button
+      (click)="toggleDarkMode()"
+      [matTooltip]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+    >
+      <mat-icon>{{ isDarkMode ? "light_mode" : "dark_mode" }}</mat-icon>
+    </button>
 
-      <a
-        mat-list-item
-        href="javascript:void(0)"
-        (click)="openRemotes(); isHandset && drawer.close()"
-        [activated]="(tab$ | async) === 'remotes'"
-      >
-        <mat-icon matListItemIcon>cloud_queue</mat-icon>
-        <span matListItemTitle>Cloud Storage</span>
-      </a>
+    <button mat-icon-button matTooltip="Help">
+      <mat-icon>help</mat-icon>
+    </button>
+  </mat-toolbar>
 
-      <mat-divider></mat-divider>
-    </mat-nav-list>
-  </mat-sidenav>
+  <!-- Main Content with Bottom Tabs -->
+  <div class="content-container">
+    <mat-tab-group
+      [selectedIndex]="getSelectedTabIndex()"
+      (selectedIndexChange)="onTabChange($event)"
+      headerPosition="below"
+      animationDuration="300ms"
+    >
+      <!-- Operations Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>dashboard</mat-icon>
+          <span>Operations</span>
+        </ng-template>
+        <app-home></app-home>
+      </mat-tab>
 
-  <!-- Main Content -->
-  <mat-sidenav-content>
-    <!-- App Bar -->
-    <mat-toolbar color="primary">
-      <button mat-icon-button (click)="drawer.toggle()" *ngIf="isHandset">
-        <mat-icon>menu</mat-icon>
-      </button>
+      <!-- Profiles Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>folder_shared</mat-icon>
+          <span>Profiles</span>
+        </ng-template>
+        <app-profiles
+          *ngIf="(navigationService.currentState$ | async)?.page === 'profiles'"
+        ></app-profiles>
+        <app-profile-edit
+          *ngIf="
+            (navigationService.currentState$ | async)?.page === 'profile-edit'
+          "
+        ></app-profile-edit>
+      </mat-tab>
 
-      <span>
-        {{
-          (tab$ | async) === "home"
-            ? "Dashboard"
-            : (tab$ | async) === "profiles"
-            ? "Sync Profiles"
-            : (tab$ | async) === "remotes"
-            ? "Cloud Storage"
-            : "NS Drive"
-        }}
-      </span>
-
-      <span class="spacer"></span>
-
-      <!-- Action Buttons -->
-      <button mat-icon-button matTooltip="Settings">
-        <mat-icon>settings</mat-icon>
-      </button>
-
-      <button mat-icon-button matTooltip="Help">
-        <mat-icon>help</mat-icon>
-      </button>
-    </mat-toolbar>
-
-    <!-- Page Content Container -->
-    <main [ngSwitch]="tab$ | async">
-      <app-home *ngSwitchCase="'home'"></app-home>
-      <app-profiles *ngSwitchCase="'profiles'"></app-profiles>
-      <app-remotes *ngSwitchCase="'remotes'"></app-remotes>
-    </main>
-  </mat-sidenav-content>
-</mat-sidenav-container>
+      <!-- Remotes Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>cloud_queue</mat-icon>
+          <span>Remotes</span>
+        </ng-template>
+        <app-remotes></app-remotes>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>

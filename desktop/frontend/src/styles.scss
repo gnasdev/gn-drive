@@ -1,6 +1,22 @@
 // Angular Material Theme - Using prebuilt theme with proper dark mode support
 @import "@angular/material/prebuilt-themes/azure-blue.css";
 
+// Light theme variables (default)
+:root {
+  --background-color: #fafafa;
+  --surface-color: #ffffff;
+  --primary-text: rgba(0, 0, 0, 0.87);
+  --secondary-text: rgba(0, 0, 0, 0.6);
+  --tertiary-text: rgba(0, 0, 0, 0.38);
+  --border-color: rgba(0, 0, 0, 0.12);
+  --hover-color: rgba(0, 0, 0, 0.04);
+  --card-background: #ffffff;
+  --toolbar-background: #1976d2;
+  --toolbar-text: #ffffff;
+  --button-text: #1976d2;
+  --icon-color: rgba(0, 0, 0, 0.54);
+}
+
 // Global styles - minimal setup for Angular Material
 * {
   box-sizing: border-box;
@@ -11,8 +27,286 @@ body {
   height: 100%;
   margin: 0;
   font-family: "Roboto", "Helvetica Neue", sans-serif;
+  background-color: var(--background-color);
+  color: var(--primary-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// Smooth transitions for all elements
+* {
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .spacer {
   flex: 1 1 auto;
+}
+
+// Spacing utilities for consistent layout
+.page-container {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.content-spacing {
+  > * + * {
+    margin-top: 16px;
+  }
+}
+
+.card-spacing {
+  margin-bottom: 16px;
+}
+
+.form-spacing {
+  mat-form-field {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+}
+
+.section-spacing {
+  margin: 24px 0;
+}
+
+.tight-spacing {
+  > * + * {
+    margin-top: 8px;
+  }
+}
+
+// Dark theme variables
+.dark-theme {
+  --background-color: #121212;
+  --surface-color: #1e1e1e;
+  --primary-text: rgba(255, 255, 255, 0.87);
+  --secondary-text: rgba(255, 255, 255, 0.6);
+  --tertiary-text: rgba(255, 255, 255, 0.38);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --hover-color: rgba(255, 255, 255, 0.08);
+  --card-background: #1e1e1e;
+  --toolbar-background: #1976d2;
+  --toolbar-text: #ffffff;
+  --button-text: #64b5f6;
+  --icon-color: rgba(255, 255, 255, 0.6);
+}
+
+// System dark mode preference
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-color: #121212;
+    --surface-color: #1e1e1e;
+    --primary-text: rgba(255, 255, 255, 0.87);
+    --secondary-text: rgba(255, 255, 255, 0.6);
+    --tertiary-text: rgba(255, 255, 255, 0.38);
+    --border-color: rgba(255, 255, 255, 0.12);
+    --hover-color: rgba(255, 255, 255, 0.08);
+    --card-background: #1e1e1e;
+    --toolbar-background: #1976d2;
+    --toolbar-text: #ffffff;
+    --button-text: #64b5f6;
+    --icon-color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+// Global text styling using CSS variables
+body,
+html {
+  color: var(--primary-text) !important;
+}
+
+// All text elements use CSS variables
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--primary-text) !important;
+}
+
+p,
+span,
+div {
+  color: var(--primary-text) !important;
+}
+
+// Material Design Components - Universal styling
+.mat-mdc-card {
+  background-color: var(--card-background) !important;
+  color: var(--primary-text) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.mat-mdc-card-title {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-card-subtitle {
+  color: var(--secondary-text) !important;
+}
+
+.mat-mdc-card-content {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-tab-header {
+  background-color: var(--surface-color) !important;
+  border-top: 1px solid var(--border-color);
+}
+
+.mat-mdc-tab-label {
+  color: var(--secondary-text) !important;
+}
+
+.mat-mdc-tab-label.mdc-tab--active {
+  color: var(--primary-text) !important;
+}
+
+.mat-toolbar {
+  background-color: var(--toolbar-background) !important;
+  color: var(--toolbar-text) !important;
+}
+
+.mat-mdc-list-item {
+  color: var(--primary-text) !important;
+  background-color: transparent !important;
+}
+
+.mat-mdc-list-item:hover {
+  background-color: var(--hover-color) !important;
+}
+
+.mat-mdc-list-item .mat-mdc-list-item-icon {
+  color: var(--icon-color) !important;
+}
+
+// Form fields
+.mat-mdc-form-field {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-label {
+  color: var(--secondary-text) !important;
+}
+
+.mat-mdc-form-field.mat-focused .mat-mdc-form-field-label {
+  color: var(--button-text) !important;
+}
+
+.mat-mdc-input-element {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-select-value {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-form-field-outline {
+  color: var(--border-color) !important;
+}
+
+.mat-mdc-form-field.mat-focused .mat-mdc-form-field-outline-thick {
+  color: var(--button-text) !important;
+}
+
+// Buttons
+.mat-mdc-button {
+  color: var(--button-text) !important;
+}
+
+.mat-mdc-raised-button {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.mat-mdc-icon-button {
+  color: var(--icon-color) !important;
+}
+
+.mat-mdc-fab {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+// Icons
+.mat-icon {
+  color: var(--icon-color) !important;
+}
+
+// Card avatar
+.mat-mdc-card-header [mat-card-avatar] {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+// Button improvements
+.mat-mdc-raised-button.mat-primary {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.mat-mdc-button.mat-primary {
+  color: var(--button-text) !important;
+}
+
+// Dividers
+.mat-divider {
+  border-top-color: var(--border-color) !important;
+}
+
+// Tooltips
+.mat-mdc-tooltip {
+  background-color: var(--surface-color) !important;
+  color: var(--primary-text) !important;
+}
+
+// Snackbars
+.mat-mdc-snack-bar-container {
+  background-color: var(--surface-color) !important;
+  color: var(--primary-text) !important;
+}
+
+// Dialogs
+.mat-mdc-dialog-surface {
+  background-color: var(--surface-color) !important;
+  color: var(--primary-text) !important;
+}
+
+// Menu panels
+.mat-mdc-menu-panel {
+  background-color: var(--surface-color) !important;
+}
+
+.mat-mdc-menu-item {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-menu-item:hover {
+  background-color: var(--hover-color) !important;
+}
+
+// Select panels
+.mat-mdc-select-panel {
+  background-color: var(--surface-color) !important;
+}
+
+.mat-mdc-option {
+  color: var(--primary-text) !important;
+}
+
+.mat-mdc-option:hover {
+  background-color: var(--hover-color) !important;
+}
+
+.mat-mdc-option.mat-mdc-option-active {
+  background-color: var(--hover-color) !important;
+}
+
+// Additional dark mode specific styling
+.dark-theme {
+  .mat-mdc-card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  }
 }

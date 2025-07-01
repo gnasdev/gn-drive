@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { Injectable, OnDestroy } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { config, dto, models } from "../../wailsjs/go/models";
 import {
@@ -33,19 +33,24 @@ export enum Action {
 @Injectable({
   providedIn: "root",
 })
-export class AppService {
+export class AppService implements OnDestroy {
   readonly currentId$ = new BehaviorSubject<number>(0);
   readonly currentAction$ = new BehaviorSubject<Action | undefined>(undefined);
   readonly data$ = new BehaviorSubject<string[]>([]);
   readonly configInfo$: BehaviorSubject<models.ConfigInfo>;
   readonly remotes$ = new BehaviorSubject<config.Remote[]>([]);
 
+  private eventCleanup: (() => void) | undefined;
+
   constructor(private tabService: TabService) {
+    console.log("AppService constructor called");
     const configInfo = new models.ConfigInfo();
     configInfo.profiles = [];
     this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
+    console.log("AppService initial configInfo:", configInfo);
 
-    EventsOn("tofe", (data: any) => {
+    // Store cleanup function for event listener
+    this.eventCleanup = EventsOn("tofe", (data: any) => {
       data = <CommandDTO>JSON.parse(data);
 
       // If event has tab_id, route to TabService
@@ -67,15 +72,26 @@ export class AppService {
           this.replaceData(data.error);
           break;
         case dto.Command.error:
-          const dataValue = this.data$.value;
-          dataValue.push(data);
+          // Create new array to avoid mutating current state
+          const dataValue = [...this.data$.value, data];
           this.data$.next(dataValue);
           break;
       }
     });
 
+    console.log("AppService calling getConfigInfo and getRemotes");
     this.getConfigInfo();
     this.getRemotes();
+  }
+
+  ngOnDestroy() {
+    console.log("AppService ngOnDestroy called");
+    // Cleanup event listener
+    if (this.eventCleanup) {
+      console.log("AppService cleaning up event listener");
+      this.eventCleanup();
+      this.eventCleanup = undefined;
+    }
   }
 
   replaceData(str: string) {
@@ -166,12 +182,22 @@ export class AppService {
   }
 
   async getConfigInfo() {
+    console.log("AppService getConfigInfo called");
     try {
       const configInfo = await GetConfigInfo();
+      console.log(
+        "AppService getConfigInfo received from backend:",
+        configInfo
+      );
       configInfo.profiles = configInfo.profiles ?? [];
+      console.log(
+        "AppService getConfigInfo after profiles normalization:",
+        configInfo
+      );
       this.configInfo$.next(configInfo);
+      console.log("AppService getConfigInfo emitted to configInfo$");
     } catch (e) {
-      console.error(e);
+      console.error("AppService getConfigInfo error:", e);
       alert("Error getting config info");
     }
   }
@@ -231,17 +257,35 @@ export class AppService {
     profile.excluded_paths = [];
     profile.parallel = 16; // Default value
     profile.bandwidth = 5; // Default value
-    this.configInfo$.value.profiles.push(profile);
-    this.updateConfigInfo();
+
+    // Create new ConfigInfo instance to avoid mutation
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+    updatedConfig.profiles = [...currentConfig.profiles, profile];
+
+    this.configInfo$.next(updatedConfig);
   }
 
   removeProfile(index: number) {
-    this.configInfo$.value.profiles.splice(index, 1);
-    this.updateConfigInfo();
+    // Create new ConfigInfo instance to avoid mutation
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+    updatedConfig.profiles = currentConfig.profiles.filter(
+      (_, i) => i !== index
+    );
+
+    this.configInfo$.next(updatedConfig);
   }
 
   updateConfigInfo() {
-    this.configInfo$.next(this.configInfo$.value);
+    // This method is deprecated - use specific update methods instead
+    // Keeping for backward compatibility but creating new instance
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+    this.configInfo$.next(updatedConfig);
   }
 
   async saveConfigInfo() {
@@ -256,28 +300,82 @@ export class AppService {
   }
 
   addIncludePath(profileIndex: number) {
-    this.configInfo$.value.profiles[profileIndex].included_paths.push("/**");
-    this.updateConfigInfo();
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+
+    // Deep clone profiles array and update specific profile
+    updatedConfig.profiles = currentConfig.profiles.map((profile, i) => {
+      if (i === profileIndex) {
+        const updatedProfile = new models.Profile();
+        Object.assign(updatedProfile, profile);
+        updatedProfile.included_paths = [...profile.included_paths, "/**"];
+        return updatedProfile;
+      }
+      return profile;
+    });
+
+    this.configInfo$.next(updatedConfig);
   }
 
   removeIncludePath(profileIndex: number, index: number) {
-    this.configInfo$.value.profiles[profileIndex].included_paths.splice(
-      index,
-      1
-    );
-    this.updateConfigInfo();
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+
+    // Deep clone profiles array and update specific profile
+    updatedConfig.profiles = currentConfig.profiles.map((profile, i) => {
+      if (i === profileIndex) {
+        const updatedProfile = new models.Profile();
+        Object.assign(updatedProfile, profile);
+        updatedProfile.included_paths = profile.included_paths.filter(
+          (_, pathIndex) => pathIndex !== index
+        );
+        return updatedProfile;
+      }
+      return profile;
+    });
+
+    this.configInfo$.next(updatedConfig);
   }
 
   addExcludePath(profileIndex: number) {
-    this.configInfo$.value.profiles[profileIndex].excluded_paths.push("/**");
-    this.updateConfigInfo();
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+
+    // Deep clone profiles array and update specific profile
+    updatedConfig.profiles = currentConfig.profiles.map((profile, i) => {
+      if (i === profileIndex) {
+        const updatedProfile = new models.Profile();
+        Object.assign(updatedProfile, profile);
+        updatedProfile.excluded_paths = [...profile.excluded_paths, "/**"];
+        return updatedProfile;
+      }
+      return profile;
+    });
+
+    this.configInfo$.next(updatedConfig);
   }
 
   removeExcludePath(profileIndex: number, index: number) {
-    this.configInfo$.value.profiles[profileIndex].excluded_paths.splice(
-      index,
-      1
-    );
-    this.updateConfigInfo();
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+
+    // Deep clone profiles array and update specific profile
+    updatedConfig.profiles = currentConfig.profiles.map((profile, i) => {
+      if (i === profileIndex) {
+        const updatedProfile = new models.Profile();
+        Object.assign(updatedProfile, profile);
+        updatedProfile.excluded_paths = profile.excluded_paths.filter(
+          (_, pathIndex) => pathIndex !== index
+        );
+        return updatedProfile;
+      }
+      return profile;
+    });
+
+    this.configInfo$.next(updatedConfig);
   }
 }
