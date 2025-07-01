@@ -7,13 +7,14 @@ import {
   OnDestroy,
 } from "@angular/core";
 import { Action, AppService } from "./app.service.js";
-import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
+import { combineLatest, Subscription } from "rxjs";
 import { HomeComponent } from "./home/home.component.js";
 import { models } from "../../wailsjs/go/models.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { NavigationService } from "./navigation.service.js";
+import { ThemeService } from "./theme.service.js";
 
 // Material Design imports
 import { MatToolbarModule } from "@angular/material/toolbar";
@@ -43,32 +44,24 @@ import { MatTabsModule } from "@angular/material/tabs";
 export class AppComponent implements OnInit, OnDestroy {
   Action = Action;
 
-  isDarkMode = false;
-
   private subscriptions = new Subscription();
   private isInitialized = false;
 
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    public readonly navigationService: NavigationService
+    public readonly navigationService: NavigationService,
+    public readonly themeService: ThemeService
   ) {
     console.log("AppComponent constructor called");
     console.log(
       "AppComponent navigationService initial state:",
       this.navigationService.currentState
     );
+  }
 
-    // Initialize dark mode from localStorage or system preference
-    const savedTheme = localStorage.getItem("dark-mode");
-    if (savedTheme !== null) {
-      this.isDarkMode = savedTheme === "true";
-    } else {
-      this.isDarkMode = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-    }
-    this.applyTheme();
+  get isDarkMode(): boolean {
+    return this.themeService.isDarkMode;
   }
 
   ngOnInit() {
@@ -89,6 +82,7 @@ export class AppComponent implements OnInit, OnDestroy {
       combineLatest([
         this.appService.currentAction$,
         this.navigationService.currentState$,
+        this.themeService.isDarkMode$,
       ]).subscribe(() => {
         console.log("AppComponent combineLatest triggered");
         this.cdr.detectChanges();
@@ -164,18 +158,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   toggleDarkMode() {
-    this.isDarkMode = !this.isDarkMode;
-    localStorage.setItem("dark-mode", this.isDarkMode.toString());
-    this.applyTheme();
-    this.cdr.detectChanges();
-  }
-
-  private applyTheme() {
-    const body = document.body;
-    if (this.isDarkMode) {
-      body.classList.add("dark-theme");
-    } else {
-      body.classList.remove("dark-theme");
-    }
+    console.log("Toggle dark mode called, current state:", this.isDarkMode);
+    this.themeService.toggleDarkMode();
+    console.log("Dark mode toggled to:", this.isDarkMode);
   }
 }

@@ -29,9 +29,6 @@ h4 {
 }
 
 /* Dark mode support */
-.dark-theme h4,
-@media (prefers-color-scheme: dark) {
-  h4 {
-    color: rgba(255, 255, 255, 0.6);
-  }
+.dark-theme h4 {
+  color: rgba(255, 255, 255, 0.6);
 }
