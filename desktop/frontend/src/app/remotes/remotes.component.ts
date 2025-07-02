@@ -10,52 +10,39 @@ import { FormsModule } from "@angular/forms";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
 import { AppService } from "../app.service";
 
-// Material Design imports
-import { MatCardModule } from "@angular/material/card";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
-import { MatListModule } from "@angular/material/list";
-import { MatDialogModule, MatDialog } from "@angular/material/dialog";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatSelectModule } from "@angular/material/select";
-import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
-import { MatSnackBarModule, MatSnackBar } from "@angular/material/snack-bar";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
-import { Inject } from "@angular/core";
+// No Material imports needed anymore
 
 // Type imports
 import {
   RemoteFormData,
   RemoteTypeOption,
-  ConfirmDeleteDialogData,
   REMOTE_TYPE_OPTIONS,
 } from "./remotes.types";
+import {
+  LucideAngularModule,
+  Cloud,
+  Plus,
+  Download,
+  X,
+  Trash2,
+} from "lucide-angular";
 
 @Component({
   selector: "app-remotes",
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatListModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatProgressSpinnerModule,
-    MatSnackBarModule,
-    MatTooltipModule,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: "./remotes.component.html",
   styleUrl: "./remotes.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RemotesComponent implements OnInit, OnDestroy {
   Date = Date;
+
+  // Lucide Icons
+  readonly CloudIcon = Cloud;
+  readonly PlusIcon = Plus;
+  readonly DownloadIcon = Download;
+  readonly XIcon = X;
+  readonly Trash2Icon = Trash2;
   private subscriptions = new Subscription();
   readonly isAddingRemote$ = new BehaviorSubject<boolean>(false);
 
@@ -64,11 +51,15 @@ export class RemotesComponent implements OnInit, OnDestroy {
   // Remote type options for the UI
   readonly remoteTypeOptions: RemoteTypeOption[] = REMOTE_TYPE_OPTIONS;
 
+  // Modal state management
+  showAddRemoteModal = false;
+  showDeleteConfirmModal = false;
+  remoteToDelete: any = null;
+  addRemoteData: RemoteFormData = { name: "", type: "drive" };
+
   constructor(
     public readonly appService: AppService,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly dialog: MatDialog,
-    private readonly snackBar: MatSnackBar
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -105,7 +96,6 @@ export class RemotesComponent implements OnInit, OnDestroy {
       parentElement.hidePopover();
     } catch (error) {
       console.error("Error adding remote:", error);
-      this.snackBar.open("Error adding remote", "Close", { duration: 3000 });
     } finally {
       this.isAddingRemote$.next(false);
     }
@@ -115,10 +105,6 @@ export class RemotesComponent implements OnInit, OnDestroy {
     this.appService.stopAddingRemote();
   }
 
-  deleteRemote(name: string): void {
-    this.appService.deleteRemote(name);
-  }
-
   saveConfigInfo(): void {
     this.appService.saveConfigInfo();
     this.saveBtnText$.next("Saved ~");
@@ -126,68 +112,61 @@ export class RemotesComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  // New methods for Material Design interface
-  async openAddRemoteDialog(): Promise<void> {
-    const dialogRef = this.dialog.open(AddRemoteDialogComponent, {
-      width: "400px",
-      data: {} as RemoteFormData,
-      panelClass: "dark-dialog",
-    });
+  // Modal methods
+  openAddRemoteDialog(): void {
+    this.addRemoteData = { name: "", type: "drive" };
+    this.showAddRemoteModal = true;
+  }
 
-    dialogRef
-      .afterClosed()
-      .subscribe(async (result: RemoteFormData | undefined) => {
-        if (result) {
-          this.isAddingRemote$.next(true);
-          try {
-            await this.appService.addRemote({
-              name: result.name,
-              type: result.type,
-            });
-            this.snackBar.open(
-              `Remote "${result.name}" added successfully!`,
-              "Close",
-              {
-                duration: 3000,
-              }
-            );
-          } catch (error) {
-            console.error("Error adding remote:", error);
-            this.snackBar.open("Error adding remote", "Close", {
-              duration: 3000,
-            });
-          } finally {
-            this.isAddingRemote$.next(false);
-          }
-        }
+  closeAddRemoteModal(): void {
+    this.showAddRemoteModal = false;
+    this.addRemoteData = { name: "", type: "drive" };
+  }
+
+  async saveRemote(): Promise<void> {
+    if (!this.addRemoteData.name.trim()) {
+      return;
+    }
+
+    this.isAddingRemote$.next(true);
+    this.cdr.detectChanges();
+
+    try {
+      await this.appService.addRemote({
+        name: this.addRemoteData.name,
+        type: this.addRemoteData.type,
       });
+      console.log(`Remote "${this.addRemoteData.name}" added successfully!`);
+      this.closeAddRemoteModal();
+    } catch (error) {
+      console.error("Error adding remote:", error);
+    } finally {
+      this.isAddingRemote$.next(false);
+      this.cdr.detectChanges();
+    }
   }
 
   confirmDeleteRemote(remote: { name: string; type: string }): void {
-    console.log("Delete button clicked for remote:", remote.name);
-    const dialogRef = this.dialog.open(ConfirmDeleteDialogComponent, {
-      width: "350px",
-      data: { remoteName: remote.name } as ConfirmDeleteDialogData,
-      panelClass: "dark-dialog",
-    });
+    this.remoteToDelete = remote;
+    this.showDeleteConfirmModal = true;
+  }
 
-    dialogRef
-      .afterClosed()
-      .subscribe(async (confirmed: boolean | undefined) => {
-        if (confirmed) {
-          try {
-            await this.appService.deleteRemote(remote.name);
-            this.snackBar.open(`Remote "${remote.name}" deleted`, "Close", {
-              duration: 3000,
-            });
-          } catch (error) {
-            console.error("Error deleting remote:", error);
-            this.snackBar.open("Error deleting remote", "Close", {
-              duration: 3000,
-            });
-          }
-        }
-      });
+  closeDeleteConfirmModal(): void {
+    this.showDeleteConfirmModal = false;
+    this.remoteToDelete = null;
+  }
+
+  async deleteRemote(): Promise<void> {
+    if (!this.remoteToDelete) return;
+
+    try {
+      await this.appService.deleteRemote(this.remoteToDelete.name);
+      console.log(`Remote "${this.remoteToDelete.name}" deleted successfully!`);
+    } catch (error) {
+      console.error("Error deleting remote:", error);
+    } finally {
+      this.closeDeleteConfirmModal();
+    }
   }
 
   getRemoteIcon(type: string): string {
@@ -198,198 +177,5 @@ export class RemotesComponent implements OnInit, OnDestroy {
   getRemoteTypeLabel(type: string): string {
     const option = this.remoteTypeOptions.find((opt) => opt.value === type);
     return option?.label ?? type;
-  }
-}
-
-// Add Remote Dialog Component
-@Component({
-  selector: "app-add-remote-dialog",
-  template: `
-    <div>
-      <h2 mat-dialog-title>Add New Remote</h2>
-      <mat-dialog-content>
-        <form #form="ngForm" (ngSubmit)="onSubmit()">
-          <mat-form-field appearance="outline" class="full-width mt-1">
-            <mat-label>Remote Name</mat-label>
-            <input matInput [(ngModel)]="data.name" name="name" required />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Remote Type</mat-label>
-            <mat-select [(ngModel)]="data.type" name="type" required>
-              <mat-option value="drive">Google Drive</mat-option>
-              <mat-option value="dropbox">Dropbox</mat-option>
-              <mat-option value="onedrive">OneDrive</mat-option>
-              <mat-option value="yandex">Yandex Disk</mat-option>
-              <mat-option value="gphotos">Google Photos</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </form>
-      </mat-dialog-content>
-      <mat-dialog-actions align="end">
-        <button mat-button (click)="onCancel()" color="warn">Cancel</button>
-        <button
-          mat-raised-button
-          color="primary"
-          (click)="onSubmit()"
-          [disabled]="!data.name || !data.type"
-        >
-          Add Remote
-        </button>
-      </mat-dialog-actions>
-    </div>
-  `,
-  styles: [
-    `
-      .full-width {
-        width: 100%;
-      }
-
-      :host {
-        color: #ffffff;
-      }
-
-      .mat-mdc-dialog-title {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-dialog-content {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-form-field {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-form-field .mat-mdc-floating-label {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-form-field .mat-mdc-input-element {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-form-field .mat-mdc-line-ripple {
-        background-color: #ffffff !important;
-      }
-
-      .mat-mdc-form-field .mat-mdc-notched-outline {
-        border-color: rgba(255, 255, 255, 0.3) !important;
-      }
-
-      .mat-mdc-form-field:hover .mat-mdc-notched-outline {
-        border-color: rgba(255, 255, 255, 0.5) !important;
-      }
-
-      .mat-mdc-form-field.mat-focused .mat-mdc-notched-outline {
-        border-color: #ffffff !important;
-      }
-
-      .mat-mdc-select-value {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-select-arrow {
-        color: #ffffff !important;
-      }
-    `,
-  ],
-  standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatButtonModule,
-  ],
-})
-export class AddRemoteDialogComponent {
-  data: RemoteFormData = { name: "", type: "drive" };
-
-  constructor(
-    public dialogRef: MatDialogRef<AddRemoteDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public dialogData: RemoteFormData
-  ) {
-    if (dialogData) {
-      this.data = { ...dialogData };
-    }
-  }
-
-  onSubmit(): void {
-    if (this.data.name && this.data.type) {
-      this.dialogRef.close(this.data);
-    }
-  }
-
-  onCancel(): void {
-    this.dialogRef.close();
-  }
-}
-
-// Confirm Delete Dialog Component
-@Component({
-  selector: "app-confirm-delete-dialog",
-  template: `
-    <h2 mat-dialog-title>Confirm Delete</h2>
-    <mat-dialog-content>
-      <p>
-        Are you sure you want to delete remote
-        <strong>"{{ data.remoteName }}"</strong>?
-      </p>
-      <p class="warning-text">This action cannot be undone.</p>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="onCancel()">Cancel</button>
-      <button mat-raised-button color="warn" (click)="onConfirm()">
-        Delete
-      </button>
-    </mat-dialog-actions>
-  `,
-  styles: [
-    `
-      .warning-text {
-        color: #ff6b6b;
-        font-size: 14px;
-        margin-top: 8px;
-      }
-
-      :host {
-        color: #ffffff;
-      }
-
-      .mat-mdc-dialog-title {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-dialog-content {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-dialog-content p {
-        color: #ffffff !important;
-      }
-
-      .mat-mdc-dialog-content strong {
-        color: #ffffff !important;
-      }
-    `,
-  ],
-  standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule],
-})
-export class ConfirmDeleteDialogComponent {
-  constructor(
-    public dialogRef: MatDialogRef<ConfirmDeleteDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: ConfirmDeleteDialogData
-  ) {}
-
-  onConfirm(): void {
-    this.dialogRef.close(true);
-  }
-
-  onCancel(): void {
-    this.dialogRef.close(false);
   }
 }

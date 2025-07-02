@@ -1,483 +1,120 @@
-// Angular Material Theme - Using prebuilt theme with proper dark mode support
-@import "@angular/material/prebuilt-themes/azure-blue.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-// Force override any theme colors that might interfere with our light text
-.mat-app-background,
-.mat-primary,
-.mat-accent,
-.mat-warn {
-  color: var(--primary-text) !important;
-}
-
-// Dark theme variables (default and only theme)
+// Custom CSS variables for consistent theming
 :root {
-  --background-color: #121212;
-  --surface-color: #1e1e1e;
-  --primary-text: rgba(255, 255, 255, 0.87);
-  --secondary-text: rgba(255, 255, 255, 0.6);
-  --tertiary-text: rgba(255, 255, 255, 0.38);
-  --border-color: rgba(255, 255, 255, 0.12);
-  --hover-color: rgba(255, 255, 255, 0.08);
-  --card-background: #1e1e1e;
-  --toolbar-background: #1976d2;
+  --background-color: #f9fafb;
+  --surface-color: #ffffff;
+  --primary-text: #111827;
+  --secondary-text: #6b7280;
+  --border-color: #e5e7eb;
+  --hover-color: #f3f4f6;
+  --card-background: #ffffff;
+  --toolbar-background: #3b82f6;
   --toolbar-text: #ffffff;
-  --button-text: #64b5f6;
-  --icon-color: rgba(255, 255, 255, 0.6);
+  --button-text: #3b82f6;
+  --icon-color: #6b7280;
 }
 
-// Global styles - minimal setup for Angular Material
+// Dark theme variables
+.dark {
+  --background-color: #111827;
+  --surface-color: #1f2937;
+  --primary-text: #f9fafb;
+  --secondary-text: #d1d5db;
+  --border-color: #374151;
+  --hover-color: #374151;
+  --card-background: #1f2937;
+  --toolbar-background: #1e40af;
+  --toolbar-text: #ffffff;
+  --button-text: #60a5fa;
+  --icon-color: #d1d5db;
+}
+
+// Global styles
 * {
   box-sizing: border-box;
 }
-
 html,
 body {
   height: 100%;
   margin: 0;
   font-family: "Roboto", "Helvetica Neue", sans-serif;
-  background-color: var(--background-color);
+  background: var(--background-color);
   color: var(--primary-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-// Smooth transitions for all elements
-* {
-  transition: background-color 0.3s ease, color 0.3s ease,
-    border-color 0.3s ease;
-}
+// Custom utility classes
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 whitespace-nowrap;
+  }
 
-.spacer {
-  flex: 1 1 auto;
-}
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 font-medium py-2 px-4 rounded-lg transition-colors duration-200 whitespace-nowrap;
+  }
 
-// Spacing utilities for consistent layout
-.page-container {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+  .btn-outline {
+    @apply border border-primary-600 text-primary-600 hover:bg-primary-600 hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 whitespace-nowrap;
+  }
 
-.content-spacing {
-  > * + * {
-    margin-top: 16px;
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+
+  .select-field {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+
+  .tab-button {
+    @apply px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors duration-200;
+  }
+
+  .tab-button-active {
+    @apply px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors duration-200;
+  }
+
+  .bottom-nav-item-active {
+    @apply flex flex-col items-center justify-center py-2 px-3 text-xs font-medium text-primary-600 dark:text-primary-400;
   }
 }
 
-.card-spacing {
-  margin-bottom: 16px;
+// Custom scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-.form-spacing {
-  mat-form-field {
-    width: 100%;
-    margin-bottom: 16px;
-  }
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
 }
 
-.section-spacing {
-  margin: 24px 0;
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
 }
 
-.tight-spacing {
-  > * + * {
-    margin-top: 8px;
-  }
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
 }
 
-// Consistent icon and text spacing
-.mat-mdc-card-title {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
+// Console output styling
+.console-output {
+  @apply font-mono text-sm bg-gray-900 text-green-400 p-4 rounded-lg overflow-auto max-h-96;
 }
 
-.mat-mdc-card-title .mat-icon {
-  margin-right: 0 !important;
+// Animation utilities
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
 }
 
-// List item consistent spacing
-.mat-mdc-list-item {
-  padding: 12px 16px !important;
-  min-height: 64px !important;
-}
-
-.mat-mdc-list-item .mat-mdc-list-item-icon {
-  margin-right: 16px !important;
-  width: 24px !important;
-  height: 24px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.mat-mdc-list-item .mat-mdc-list-item-content {
-  display: flex !important;
-  align-items: center !important;
-  width: 100% !important;
-}
-
-.mat-mdc-list-item .mat-mdc-list-item-meta {
-  margin-left: auto !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-// Card content consistent spacing
-.mat-mdc-card-content {
-  padding: 16px !important;
-}
-
-.mat-mdc-card-header {
-  padding: 16px 16px 0 16px !important;
-}
-
-.mat-mdc-card-actions {
-  padding: 8px 16px 16px 16px !important;
-  gap: 8px !important;
-  display: flex !important;
-  flex-wrap: wrap !important;
-}
-
-// Ensure consistent list styling
-.mat-mdc-list {
-  padding: 0 !important;
-}
-
-.mat-mdc-list-item:not(:last-child) {
-  border-bottom: 1px solid var(--border-color) !important;
-}
-
-// Dark theme styles - Apply to both body and html (permanent dark mode)
-.dark-theme,
-body.dark-theme,
-html.dark-theme,
-body,
-html {
-  background-color: var(--background-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// Global text styling using CSS variables
-body,
-html {
-  color: var(--primary-text) !important;
-}
-
-// All text elements use CSS variables
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: var(--primary-text) !important;
-}
-
-p,
-span,
-div {
-  color: var(--primary-text) !important;
-}
-
-// Material Design Components - Universal styling
-.mat-mdc-card {
-  background-color: var(--card-background) !important;
-  color: var(--primary-text) !important;
-  border: 1px solid var(--border-color) !important;
-}
-
-.mat-mdc-card-title {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-card-subtitle {
-  color: var(--secondary-text) !important;
-}
-
-.mat-mdc-card-content {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-tab-header {
-  background-color: var(--surface-color) !important;
-  border-top: 1px solid var(--border-color);
-}
-
-.mat-mdc-tab-label {
-  color: var(--secondary-text) !important;
-}
-
-.mat-mdc-tab-label.mdc-tab--active {
-  color: var(--primary-text) !important;
-  background-color: var(--surface-color) !important;
-}
-
-.mat-toolbar {
-  background-color: var(--toolbar-background) !important;
-  color: var(--toolbar-text) !important;
-}
-
-.mat-mdc-list-item {
-  color: var(--primary-text) !important;
-  background-color: transparent !important;
-}
-
-.mat-mdc-list-item:hover {
-  background-color: var(--hover-color) !important;
-}
-
-.mat-mdc-list-item .mat-mdc-list-item-icon {
-  color: var(--icon-color) !important;
-}
-
-// Form fields
-.mat-mdc-form-field {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-form-field .mat-mdc-form-field-label {
-  color: var(--secondary-text) !important;
-}
-
-.mat-mdc-form-field.mat-focused .mat-mdc-form-field-label {
-  color: var(--button-text) !important;
-}
-
-.mat-mdc-input-element {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-select-value {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-form-field-outline {
-  color: var(--border-color) !important;
-}
-
-.mat-mdc-form-field.mat-focused .mat-mdc-form-field-outline-thick {
-  color: var(--button-text) !important;
-}
-
-// Buttons
-.mat-mdc-button {
-  color: var(--button-text) !important;
-}
-
-.mat-mdc-raised-button {
-  background-color: #1976d2 !important;
-  color: #ffffff !important;
-}
-
-.mat-mdc-icon-button {
-  color: var(--icon-color) !important;
-}
-
-.mat-mdc-fab {
-  background-color: #1976d2 !important;
-  color: #ffffff !important;
-}
-
-// Icons
-.mat-icon {
-  color: var(--icon-color) !important;
-}
-
-// Card avatar
-.mat-mdc-card-header [mat-card-avatar] {
-  background-color: #1976d2 !important;
-  color: #ffffff !important;
-}
-
-// Button improvements
-.mat-mdc-raised-button.mat-primary {
-  background-color: #1976d2 !important;
-  color: #ffffff !important;
-}
-
-.mat-mdc-button.mat-primary {
-  color: var(--button-text) !important;
-}
-
-// Dividers
-.mat-divider {
-  border-top-color: var(--border-color) !important;
-}
-
-// Tooltips
-.mat-mdc-tooltip {
-  background-color: var(--surface-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// Snackbars
-.mat-mdc-snack-bar-container {
-  background-color: var(--surface-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// Dialogs
-.mat-mdc-dialog-surface {
-  background-color: var(--surface-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// Menu panels
-.mat-mdc-menu-panel {
-  background-color: var(--surface-color) !important;
-}
-
-.mat-mdc-menu-item {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-menu-item:hover {
-  background-color: var(--hover-color) !important;
-}
-
-// Select panels
-.mat-mdc-select-panel {
-  background-color: var(--surface-color) !important;
-}
-
-.mat-mdc-option {
-  color: var(--primary-text) !important;
-}
-
-.mat-mdc-option:hover {
-  background-color: var(--hover-color) !important;
-}
-
-.mat-mdc-option.mat-mdc-option-active {
-  background-color: var(--hover-color) !important;
-}
-
-// Enhanced card styling for dark theme
-.mat-mdc-card {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-}
-
-// Additional comprehensive text styling to ensure ALL text is light
-* {
-  color: var(--primary-text) !important;
-}
-
-// Override any potential dark text from Material theme
-.mat-mdc-form-field-hint,
-.mat-mdc-form-field-error,
-.mat-mdc-form-field-subscript-wrapper,
-.mat-mdc-form-field-bottom-align,
-.mat-mdc-text-field-wrapper,
-.mat-mdc-floating-label,
-.mat-mdc-notched-outline-notch,
-.mat-mdc-line-ripple,
-.mat-mdc-form-field-flex,
-.mat-mdc-form-field-infix {
-  color: var(--primary-text) !important;
-}
-
-// Ensure all list elements have light text
-.mat-mdc-list-item-title,
-.mat-mdc-list-item-line,
-.mat-mdc-list-item-meta,
-.mat-mdc-list-item-content,
-.mat-mdc-list-base {
-  color: var(--primary-text) !important;
-}
-
-// Console and code elements
-pre,
-code,
-.console-output,
-.code-block {
-  color: var(--primary-text) !important;
-}
-
-// Tab content and labels
-.mat-mdc-tab-label-content,
-.mat-mdc-tab-body-content,
-.mat-mdc-tab-body,
-.mat-mdc-tab-group {
-  color: var(--primary-text) !important;
-}
-
-// Ensure all text inputs and selects have light text
-input,
-textarea,
-select,
-.mat-mdc-input,
-.mat-mdc-select-trigger,
-.mat-mdc-select-value-text {
-  color: var(--primary-text) !important;
-}
-
-// Override any remaining Material theme text colors
-.mdc-text-field,
-.mdc-text-field__input,
-.mdc-floating-label,
-.mdc-line-ripple,
-.mdc-notched-outline,
-.mdc-select,
-.mdc-select__selected-text,
-.mdc-list-item,
-.mdc-list-item__text,
-.mdc-tab,
-.mdc-tab__text-label,
-.mdc-card,
-.mdc-card__content,
-.mdc-button,
-.mdc-icon-button {
-  color: var(--primary-text) !important;
-}
-
-// Ensure all Angular Material components have light text
-.mat-mdc-form-field-type-mat-input,
-.mat-mdc-form-field-type-mat-select,
-.mat-mdc-form-field-type-mat-chip-grid,
-.mat-mdc-text-field-wrapper .mat-mdc-form-field-flex .mat-mdc-floating-label,
-.mat-mdc-text-field-wrapper .mat-mdc-form-field-flex .mat-mdc-form-field-infix,
-.mat-mdc-text-field-wrapper
-  .mat-mdc-form-field-flex
-  .mat-mdc-form-field-label-wrapper,
-.mat-mdc-select-arrow-wrapper,
-.mat-mdc-select-trigger,
-.mat-mdc-chip,
-.mat-mdc-chip-set,
-.mat-mdc-standard-chip,
-.mat-mdc-chip-action-label {
-  color: var(--primary-text) !important;
-}
-
-// Force light text on all possible text elements
-label,
-legend,
-fieldset,
-button,
-a,
-strong,
-em,
-small,
-mark,
-del,
-ins,
-sub,
-sup,
-blockquote,
-cite,
-q,
-abbr,
-time,
-address,
-details,
-summary {
-  color: var(--primary-text) !important;
-}
-
-// Ensure placeholder text is also light
-::placeholder,
-::-webkit-input-placeholder,
-::-moz-placeholder,
-:-ms-input-placeholder {
-  color: var(--secondary-text) !important;
-  opacity: 1;
+.slide-up {
+  animation: slideUp 0.3s ease-out;
 }

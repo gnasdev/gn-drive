@@ -1,43 +1,73 @@
-<!-- Modern App Layout with Bottom Tabs -->
-<div class="app-container">
-  <!-- Main Content with Bottom Tabs -->
-  <div class="content-container">
-    <mat-tab-group
-      [selectedIndex]="getSelectedTabIndex()"
-      (selectedIndexChange)="onTabChange($event)"
-      headerPosition="below"
-      animationDuration="300ms"
-    >
+<!-- Modern App Layout with Bottom Navigation -->
+<div class="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+  <!-- Main Content Area -->
+  <div class="flex-1 overflow-hidden">
+    <!-- Operations Tab Content -->
+    <div *ngIf="getSelectedTabIndex() === 0" class="h-full overflow-auto">
+      <app-home></app-home>
+    </div>
+
+    <!-- Profiles Tab Content -->
+    <div *ngIf="getSelectedTabIndex() === 1" class="h-full overflow-auto">
+      <app-profiles
+        *ngIf="(navigationService.currentState$ | async)?.page === 'profiles'"
+      ></app-profiles>
+      <app-profile-edit
+        *ngIf="
+          (navigationService.currentState$ | async)?.page === 'profile-edit'
+        "
+      ></app-profile-edit>
+    </div>
+
+    <!-- Remotes Tab Content -->
+    <div *ngIf="getSelectedTabIndex() === 2" class="h-full overflow-auto">
+      <app-remotes></app-remotes>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav
+    class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2"
+  >
+    <div class="flex justify-around">
       <!-- Operations Tab -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <span>Operations</span>
-        </ng-template>
-        <app-home></app-home>
-      </mat-tab>
+      <button
+        (click)="openHome()"
+        [class]="
+          getSelectedTabIndex() === 0
+            ? 'bottom-nav-item-active'
+            : 'bottom-nav-item'
+        "
+      >
+        <lucide-icon [img]="HomeIcon" class="w-6 h-6 mb-1"></lucide-icon>
+        <span>Operations</span>
+      </button>
 
       <!-- Profiles Tab -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <span>Profiles</span>
-        </ng-template>
-        <app-profiles
-          *ngIf="(navigationService.currentState$ | async)?.page === 'profiles'"
-        ></app-profiles>
-        <app-profile-edit
-          *ngIf="
-            (navigationService.currentState$ | async)?.page === 'profile-edit'
-          "
-        ></app-profile-edit>
-      </mat-tab>
+      <button
+        (click)="openProfiles()"
+        [class]="
+          getSelectedTabIndex() === 1
+            ? 'bottom-nav-item-active'
+            : 'bottom-nav-item'
+        "
+      >
+        <lucide-icon [img]="UsersIcon" class="w-6 h-6 mb-1"></lucide-icon>
+        <span>Profiles</span>
+      </button>
 
       <!-- Remotes Tab -->
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <span>Remotes</span>
-        </ng-template>
-        <app-remotes></app-remotes>
-      </mat-tab>
-    </mat-tab-group>
-  </div>
+      <button
+        (click)="openRemotes()"
+        [class]="
+          getSelectedTabIndex() === 2
+            ? 'bottom-nav-item-active'
+            : 'bottom-nav-item'
+        "
+      >
+        <lucide-icon [img]="CloudIcon" class="w-6 h-6 mb-1"></lucide-icon>
+        <span>Remotes</span>
+      </button>
+    </div>
+  </nav>
 </div>

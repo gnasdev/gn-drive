@@ -10,6 +10,14 @@ import { AppService } from "../app.service";
 import { NavigationService } from "../navigation.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
+import {
+  LucideAngularModule,
+  Users,
+  Plus,
+  FolderOpen,
+  X,
+  Trash2,
+} from "lucide-angular";
 import { models } from "../../../wailsjs/go/models";
 import {
   parseRemotePath,
@@ -22,38 +30,11 @@ import {
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
 
-// Material Design imports
-import { MatCardModule } from "@angular/material/card";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatSelectModule } from "@angular/material/select";
-import { MatExpansionModule } from "@angular/material/expansion";
-import { MatChipsModule } from "@angular/material/chips";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatDividerModule } from "@angular/material/divider";
-import { MatListModule } from "@angular/material/list";
+// No Material imports needed anymore
 
 @Component({
   selector: "app-profiles",
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatExpansionModule,
-    MatChipsModule,
-    MatTooltipModule,
-    MatSnackBarModule,
-    MatDividerModule,
-    MatListModule,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: "./profiles.component.html",
   styleUrl: "./profiles.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +42,13 @@ import { MatListModule } from "@angular/material/list";
 export class ProfilesComponent implements OnInit, OnDestroy {
   Date = Date;
   private subscriptions = new Subscription();
+
+  // Lucide Icons
+  readonly UsersIcon = Users;
+  readonly PlusIcon = Plus;
+  readonly FolderOpenIcon = FolderOpen;
+  readonly XIcon = X;
+  readonly Trash2Icon = Trash2;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
 

@@ -1,29 +1,17 @@
-.spacer {
-  flex: 1 1 auto;
+/* Profile Edit component styles are now handled by Tailwind classes in the template */
+
+/* Custom animations for smooth transitions */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
 }
 
-.content-container {
-  padding: 16px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.content-container mat-card {
-  margin-bottom: 16px;
-}
-
-.content-container mat-form-field {
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-.loading-container {
-  padding: 16px;
-  text-align: center;
-}
-
-h4 {
-  margin: 16px 0 8px 0;
-  color: rgba(255, 255, 255, 0.6); /* Permanent dark mode */
-  font-weight: 500;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

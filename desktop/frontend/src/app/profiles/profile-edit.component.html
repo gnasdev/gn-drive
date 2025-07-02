@@ -1,156 +1,261 @@
 <!-- Header with Back Button -->
-<mat-toolbar>
-  <button mat-icon-button (click)="goBack()" matTooltip="Back to Profiles">
-    <mat-icon>arrow_back</mat-icon>
-  </button>
-  <span>Edit Profile</span>
-  <span class="spacer"></span>
-</mat-toolbar>
+<div
+  class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3"
+>
+  <div class="flex items-center space-x-3">
+    <button
+      (click)="goBack()"
+      class="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+      title="Back to Profiles"
+    >
+      <lucide-icon [img]="ArrowLeftIcon" class="w-6 h-6"></lucide-icon>
+    </button>
+    <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+      Edit Profile
+    </h1>
+  </div>
+</div>
 
-<div class="page-container content-spacing" *ngIf="profile">
+<div class="p-6 max-w-4xl mx-auto space-y-6" *ngIf="profile">
   <!-- Profile Form -->
-  <mat-card class="card-spacing">
-    <mat-card-header>
-      <mat-card-title>Basic Information</mat-card-title>
-    </mat-card-header>
-    <mat-card-content class="form-spacing">
-      <mat-form-field appearance="outline">
-        <mat-label>Profile Name</mat-label>
+  <div class="card">
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        Basic Information
+      </h2>
+    </div>
+    <div>
+      <label
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+      >
+        Profile Name
+      </label>
+      <div class="relative">
         <input
-          matInput
+          type="text"
+          class="input-field pr-10"
           [(ngModel)]="profile.name"
           placeholder="Enter profile name"
         />
-        <mat-icon matSuffix>edit</mat-icon>
-      </mat-form-field>
-    </mat-card-content>
-  </mat-card>
+        <div
+          class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+        >
+          <lucide-icon
+            [img]="EditIcon"
+            class="w-5 h-5 text-gray-400"
+          ></lucide-icon>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Path Configuration -->
-  <mat-card class="card-spacing">
-    <mat-card-header>
-      <mat-card-title>Path Configuration</mat-card-title>
-      <mat-card-subtitle>
+  <div class="card">
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        Path Configuration
+      </h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
         Configure source and destination paths
-      </mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content class="form-spacing">
+      </p>
+    </div>
+    <div class="space-y-8">
       <!-- From Path -->
-      <div class="section-spacing">
-        <h4>Source Path</h4>
-        <mat-form-field appearance="outline">
-          <mat-label>Remote</mat-label>
-          <mat-select
-            [value]="getFromRemote()"
-            (selectionChange)="updateFromPath($event.value, getFromPath())"
-          >
-            <mat-option value="">Local</mat-option>
-            <mat-option
-              *ngFor="let remote of appService.remotes$ | async"
-              [value]="remote.name"
+      <div>
+        <h3 class="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Source Path
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              {{ remote.name }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Path</mat-label>
-          <input
-            matInput
-            [value]="getFromPath()"
-            (input)="updateFromPath(getFromRemote(), $any($event.target).value)"
-            placeholder="/source/path"
-          />
-          <mat-icon matSuffix>folder_open</mat-icon>
-        </mat-form-field>
+              Remote
+            </label>
+            <select
+              class="select-field"
+              [value]="getFromRemote()"
+              (change)="onFromRemoteChange($event)"
+            >
+              <option value="">Local</option>
+              <option
+                *ngFor="let remote of appService.remotes$ | async"
+                [value]="remote.name"
+              >
+                {{ remote.name }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Path
+            </label>
+            <div class="relative">
+              <input
+                type="text"
+                class="input-field pr-10"
+                [value]="getFromPath()"
+                (input)="onFromPathChange($event)"
+                placeholder="/source/path"
+              />
+              <div
+                class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+              >
+                <lucide-icon
+                  [img]="FolderOpenIcon"
+                  class="w-5 h-5 text-gray-400"
+                ></lucide-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- To Path -->
-      <div class="section-spacing">
-        <h4>Destination Path</h4>
-        <mat-form-field appearance="outline">
-          <mat-label>Remote</mat-label>
-          <mat-select
-            [value]="getToRemote()"
-            (selectionChange)="updateToPath($event.value, getToPath())"
-          >
-            <mat-option value="">Local</mat-option>
-            <mat-option
-              *ngFor="let remote of appService.remotes$ | async"
-              [value]="remote.name"
+      <div>
+        <h3 class="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Destination Path
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              {{ remote.name }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Path</mat-label>
-          <input
-            matInput
-            [value]="getToPath()"
-            (input)="updateToPath(getToRemote(), $any($event.target).value)"
-            placeholder="/destination/path"
-          />
-          <mat-icon matSuffix>folder_open</mat-icon>
-        </mat-form-field>
+              Remote
+            </label>
+            <select
+              class="select-field"
+              [value]="getToRemote()"
+              (change)="onToRemoteChange($event)"
+            >
+              <option value="">Local</option>
+              <option
+                *ngFor="let remote of appService.remotes$ | async"
+                [value]="remote.name"
+              >
+                {{ remote.name }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Path
+            </label>
+            <div class="relative">
+              <input
+                type="text"
+                class="input-field pr-10"
+                [value]="getToPath()"
+                (input)="onToPathChange($event)"
+                placeholder="/destination/path"
+              />
+              <div
+                class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+              >
+                <lucide-icon
+                  [img]="FolderOpenIcon"
+                  class="w-5 h-5 text-gray-400"
+                ></lucide-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
   <!-- Performance Settings -->
-  <mat-card class="card-spacing">
-    <mat-card-header>
-      <mat-card-title>Performance Settings</mat-card-title>
-      <mat-card-subtitle>
+  <div class="card">
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        Performance Settings
+      </h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
         Configure parallel transfers and bandwidth limits
-      </mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content class="form-spacing">
-      <mat-form-field appearance="outline">
-        <mat-label>Parallel Transfers</mat-label>
-        <mat-select [(ngModel)]="profile.parallel">
-          <mat-option *ngFor="let num of getNumberRange(1, 32)" [value]="num">
-            {{ num }}
-          </mat-option>
-        </mat-select>
-        <mat-icon matSuffix>speed</mat-icon>
-      </mat-form-field>
+      </p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
+          Parallel Transfers
+        </label>
+        <div class="relative">
+          <select class="select-field pr-10" [(ngModel)]="profile.parallel">
+            <option *ngFor="let num of getNumberRange(1, 32)" [value]="num">
+              {{ num }}
+            </option>
+          </select>
+          <div
+            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+          >
+            <lucide-icon
+              [img]="ZapIcon"
+              class="w-5 h-5 text-gray-400"
+            ></lucide-icon>
+          </div>
+        </div>
+      </div>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Bandwidth Limit (MB/s)</mat-label>
-        <mat-select [(ngModel)]="profile.bandwidth">
-          <mat-option *ngFor="let num of getNumberRange(1, 100)" [value]="num">
-            {{ num }}
-          </mat-option>
-        </mat-select>
-        <mat-icon matSuffix>network_check</mat-icon>
-      </mat-form-field>
-    </mat-card-content>
-  </mat-card>
+      <div>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
+          Bandwidth Limit (MB/s)
+        </label>
+        <div class="relative">
+          <select class="select-field pr-10" [(ngModel)]="profile.bandwidth">
+            <option *ngFor="let num of getNumberRange(1, 100)" [value]="num">
+              {{ num }}
+            </option>
+          </select>
+          <div
+            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+          >
+            <lucide-icon
+              [img]="WifiIcon"
+              class="w-5 h-5 text-gray-400"
+            ></lucide-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Actions -->
-  <mat-card class="card-spacing">
-    <mat-card-actions>
-      <button mat-raised-button color="warn" (click)="deleteProfile()">
-        <mat-icon>delete</mat-icon>
+  <div class="card">
+    <div class="flex flex-col sm:flex-row gap-4 sm:justify-between">
+      <button
+        class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+        (click)="deleteProfile()"
+      >
+        <lucide-icon [img]="Trash2Icon" class="w-5 h-5 mr-2"></lucide-icon>
         Delete Profile
       </button>
-      <span class="spacer"></span>
-      <button mat-raised-button color="accent" (click)="saveProfile()">
-        <mat-icon>save</mat-icon>
+      <button
+        class="btn-primary flex items-center justify-center"
+        (click)="saveProfile()"
+      >
+        <lucide-icon [img]="SaveIcon" class="w-5 h-5 mr-2"></lucide-icon>
         {{ saveBtnText$ | async }}
       </button>
-    </mat-card-actions>
-  </mat-card>
+    </div>
+  </div>
 </div>
 
 <!-- Loading State -->
-<div *ngIf="!profile" class="page-container">
-  <mat-card class="card-spacing">
-    <mat-card-content>
-      <p>Loading profile...</p>
-    </mat-card-content>
-  </mat-card>
+<div *ngIf="!profile" class="p-6 max-w-4xl mx-auto">
+  <div class="card text-center">
+    <div class="flex justify-center mb-4">
+      <div
+        class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+      ></div>
+    </div>
+    <p class="text-gray-600 dark:text-gray-400">Loading profile...</p>
+  </div>
 </div>

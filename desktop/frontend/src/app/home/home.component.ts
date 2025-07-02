@@ -1,11 +1,5 @@
 import { CommonModule } from "@angular/common";
-import {
-  Component,
-  OnDestroy,
-  OnInit,
-  TemplateRef,
-  ViewChild,
-} from "@angular/core";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
@@ -16,45 +10,33 @@ import {
   parseProfileSelection,
   validateTabProfileSelection,
 } from "./home.types";
-import { MatDialog, MatDialogRef } from "@angular/material/dialog";
-
-// Material Design imports
-import { MatCardModule } from "@angular/material/card";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
-import { MatSelectModule } from "@angular/material/select";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatProgressBarModule } from "@angular/material/progress-bar";
-import { MatChipsModule } from "@angular/material/chips";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatMenuModule } from "@angular/material/menu";
-import { MatListModule } from "@angular/material/list";
-import { MatToolbarModule } from "@angular/material/toolbar";
-import { MatTabsModule } from "@angular/material/tabs";
-import { MatDialogModule } from "@angular/material/dialog";
 import { FormsModule } from "@angular/forms";
+import {
+  LucideAngularModule,
+  Settings,
+  Plus,
+  Download,
+  Upload,
+  RefreshCw,
+  RotateCcw,
+  Edit,
+  Trash2,
+  Play,
+  Square,
+  Eraser,
+  FolderOpen,
+  FileText,
+  Cloud,
+  ChevronDown,
+  Terminal,
+  Archive,
+  StopCircle,
+  Clock,
+} from "lucide-angular";
 
 @Component({
   selector: "app-home",
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatSelectModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatProgressBarModule,
-    MatChipsModule,
-    MatTooltipModule,
-    MatMenuModule,
-    MatListModule,
-    MatToolbarModule,
-    MatTabsModule,
-    MatDialogModule,
-    FormsModule,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
   // changeDetection: ChangeDetectionStrategy.OnPush, // Temporarily disable OnPush
@@ -62,12 +44,30 @@ import { FormsModule } from "@angular/forms";
 export class HomeComponent implements OnInit, OnDestroy {
   Action = Action;
 
-  private subscriptions = new Subscription();
-  currentTabIdForMenu = "";
+  // Lucide Icons
+  readonly SettingsIcon = Settings;
+  readonly PlusIcon = Plus;
+  readonly DownloadIcon = Download;
+  readonly UploadIcon = Upload;
+  readonly RefreshCwIcon = RefreshCw;
+  readonly RotateCcwIcon = RotateCcw;
+  readonly EditIcon = Edit;
+  readonly Trash2Icon = Trash2;
+  readonly PlayIcon = Play;
+  readonly SquareIcon = Square;
+  readonly EraserIcon = Eraser;
+  readonly FolderOpenIcon = FolderOpen;
+  readonly FileTextIcon = FileText;
+  readonly CloudIcon = Cloud;
+  readonly ChevronDownIcon = ChevronDown;
+  readonly TerminalIcon = Terminal;
+  readonly ArchiveIcon = Archive;
+  readonly StopCircleIcon = StopCircle;
+  readonly ClockIcon = Clock;
 
-  // Dialog properties
-  @ViewChild("renameDialog") renameDialog!: TemplateRef<any>;
-  private dialogRef: MatDialogRef<any> | null = null;
+  private subscriptions = new Subscription();
+  showRenameDialog: boolean = false;
+
   renameDialogData = {
     tabId: "",
     newName: "",
@@ -76,8 +76,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(
     public readonly appService: AppService,
-    public readonly tabService: TabService,
-    private dialog: MatDialog
+    public readonly tabService: TabService
   ) {}
 
   ngOnInit(): void {
@@ -370,15 +369,12 @@ export class HomeComponent implements OnInit, OnDestroy {
       newName: tab.name,
     };
 
-    this.dialogRef = this.dialog.open(this.renameDialog, {
-      width: "400px",
-      disableClose: false,
-    });
+    this.showRenameDialog = true;
 
-    // Auto-focus the input field after dialog opens
+    // Focus the input after dialog opens
     setTimeout(() => {
       const input = document.querySelector(
-        "#renameDialogInput"
+        'input[type="text"]'
       ) as HTMLInputElement;
       if (input) {
         input.focus();
@@ -394,13 +390,11 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.renameDialogData.newName.trim()
       );
     }
-    this.dialogRef?.close();
-    this.dialogRef = null;
+    this.showRenameDialog = false;
   }
 
   cancelRename(): void {
-    this.dialogRef?.close();
-    this.dialogRef = null;
+    this.showRenameDialog = false;
   }
 
   finishRenameTab(tabId: string, newName: string): void {
@@ -437,9 +431,32 @@ export class HomeComponent implements OnInit, OnDestroy {
     return config.color;
   }
 
-  getActionIcon(action: Action): string {
-    const config = getActionConfig(action);
-    return config.icon;
+  getActionIcon(action: Action): any {
+    switch (action) {
+      case Action.Pull:
+        return this.DownloadIcon;
+      case Action.Push:
+        return this.UploadIcon;
+      case Action.Bi:
+      case Action.BiResync:
+        return this.RefreshCwIcon;
+      default:
+        return this.RefreshCwIcon;
+    }
+  }
+
+  getActionIconPath(action: Action): string {
+    switch (action) {
+      case Action.Pull:
+        return "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10";
+      case Action.Push:
+        return "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12";
+      case Action.Bi:
+      case Action.BiResync:
+        return "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15";
+      default:
+        return "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15";
+    }
   }
 
   getActionLabel(action: Action): string {
@@ -451,8 +468,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.tabService.updateTab(tabId, { data: [] });
   }
 
-  setCurrentTabForMenu(tabId: string): void {
-    this.currentTabIdForMenu = tabId;
+  onProfileChange(event: Event, tabId: string | undefined): void {
+    const target = event.target as HTMLSelectElement;
+    const value = target.value === "null" ? null : +target.value;
+    this.changeProfileTab(value, tabId);
   }
 
   trackByTabId(index: number, tab: Tab): string {

@@ -14,13 +14,13 @@ import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { NavigationService } from "./navigation.service.js";
-
-// Material Design imports
-import { MatToolbarModule } from "@angular/material/toolbar";
-import { MatIconModule } from "@angular/material/icon";
-import { MatButtonModule } from "@angular/material/button";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatTabsModule } from "@angular/material/tabs";
+import {
+  LucideAngularModule,
+  Home,
+  Users,
+  Cloud,
+  Settings,
+} from "lucide-angular";
 
 @Component({
   selector: "app-root",
@@ -30,11 +30,7 @@ import { MatTabsModule } from "@angular/material/tabs";
     ProfilesComponent,
     ProfileEditComponent,
     RemotesComponent,
-    MatToolbarModule,
-    MatIconModule,
-    MatButtonModule,
-    MatTooltipModule,
-    MatTabsModule,
+    LucideAngularModule,
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
@@ -42,6 +38,12 @@ import { MatTabsModule } from "@angular/material/tabs";
 })
 export class AppComponent implements OnInit, OnDestroy {
   Action = Action;
+
+  // Lucide Icons
+  readonly HomeIcon = Home;
+  readonly UsersIcon = Users;
+  readonly CloudIcon = Cloud;
+  readonly SettingsIcon = Settings;
 
   private subscriptions = new Subscription();
   private isInitialized = false;

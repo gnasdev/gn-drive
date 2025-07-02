@@ -18,41 +18,22 @@ import {
   DEFAULT_BANDWIDTH_OPTIONS,
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
+import {
+  LucideAngularModule,
+  ArrowLeft,
+  Edit,
+  FolderOpen,
+  Zap,
+  Wifi,
+  Trash2,
+  Save,
+} from "lucide-angular";
 
-// Material Design imports
-import { MatCardModule } from "@angular/material/card";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
-import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatSelectModule } from "@angular/material/select";
-import { MatExpansionModule } from "@angular/material/expansion";
-import { MatChipsModule } from "@angular/material/chips";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { MatDividerModule } from "@angular/material/divider";
-import { MatListModule } from "@angular/material/list";
-import { MatToolbarModule } from "@angular/material/toolbar";
+// No Material imports needed anymore
 
 @Component({
   selector: "app-profile-edit",
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatExpansionModule,
-    MatChipsModule,
-    MatTooltipModule,
-    MatSnackBarModule,
-    MatDividerModule,
-    MatListModule,
-    MatToolbarModule,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: "./profile-edit.component.html",
   styleUrl: "./profile-edit.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +41,15 @@ import { MatToolbarModule } from "@angular/material/toolbar";
 export class ProfileEditComponent implements OnInit, OnDestroy {
   Date = Date;
   private subscriptions = new Subscription();
+
+  // Lucide Icons
+  readonly ArrowLeftIcon = ArrowLeft;
+  readonly EditIcon = Edit;
+  readonly FolderOpenIcon = FolderOpen;
+  readonly ZapIcon = Zap;
+  readonly WifiIcon = Wifi;
+  readonly Trash2Icon = Trash2;
+  readonly SaveIcon = Save;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
   profileIndex = 0; // Will be set from navigation
@@ -166,5 +156,26 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     if (!this.profile) return;
     this.profile.to = buildRemotePath(remote, path);
     this.cdr.detectChanges();
+  }
+
+  // Event handlers for new Tailwind form elements
+  onFromRemoteChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.updateFromPath(target.value, this.getFromPath());
+  }
+
+  onFromPathChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.updateFromPath(this.getFromRemote(), target.value);
+  }
+
+  onToRemoteChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.updateToPath(target.value, this.getToPath());
+  }
+
+  onToPathChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.updateToPath(this.getToRemote(), target.value);
   }
 }
