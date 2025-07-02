@@ -5,7 +5,10 @@
     class="card-spacing"
   >
     <mat-card-header>
-      <mat-card-title>Connected Remotes</mat-card-title>
+      <mat-card-title>
+        <mat-icon>cloud_queue</mat-icon>
+        <span>Connected Remotes</span>
+      </mat-card-title>
       <mat-card-subtitle>
         {{ (appService.remotes$ | async)?.length }} remote(s) configured
       </mat-card-subtitle>

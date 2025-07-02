@@ -1,19 +1,75 @@
-/* Home component specific styles */
+/* Home component specific styles (permanent dark mode) */
 
 .mat-mdc-list-item .mat-icon[color="primary"] {
-  color: #1976d2 !important;
-}
-
-/* Dark mode support for home component */
-.dark-theme .mat-mdc-list-item .mat-icon[color="primary"] {
   color: #64b5f6 !important; /* Lighter blue for dark mode */
 }
 
 /* Card avatar icon */
 .mat-mdc-card-header .mat-icon {
-  color: #1976d2 !important;
+  color: #64b5f6 !important;
 }
 
-.dark-theme .mat-mdc-card-header .mat-icon {
-  color: #64b5f6 !important;
+/* Consistent spacing for operation controls */
+.page-container {
+  padding: 16px;
+}
+
+.card-spacing {
+  margin-bottom: 16px;
+}
+
+/* Form field spacing */
+.form-spacing {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+/* Action buttons layout */
+.mat-mdc-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px 16px 16px;
+}
+
+/* Console output styling */
+pre {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 4px;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Tab content spacing */
+.mat-mdc-tab-body-content {
+  padding: 0;
+}
+
+/* Vertical tab layout improvements */
+.mat-mdc-tab-group.mat-mdc-tab-group-vertical {
+  display: flex;
+  flex-direction: row;
+}
+
+.mat-mdc-tab-group.mat-mdc-tab-group-vertical .mat-mdc-tab-header {
+  width: 200px;
+  min-width: 200px;
+}
+
+.mat-mdc-tab-group.mat-mdc-tab-group-vertical .mat-mdc-tab-body-wrapper {
+  flex: 1;
+}
+
+/* Floating Action Button */
+.fab-button {
+  position: fixed;
+  bottom: 80px; /* Above bottom tabs */
+  right: 16px;
+  z-index: 1000;
 }

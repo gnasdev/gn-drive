@@ -1,11 +1,11 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable } from "@angular/core";
+import { BehaviorSubject } from "rxjs";
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class ThemeService {
-  private isDarkModeSubject = new BehaviorSubject<boolean>(false);
+  private isDarkModeSubject = new BehaviorSubject<boolean>(true);
   public isDarkMode$ = this.isDarkModeSubject.asObservable();
 
   constructor() {
@@ -13,65 +13,31 @@ export class ThemeService {
   }
 
   private initializeTheme(): void {
-    // Check localStorage first
-    const savedTheme = localStorage.getItem('dark-mode');
-    let isDarkMode: boolean;
-
-    if (savedTheme !== null) {
-      isDarkMode = savedTheme === 'true';
-    } else {
-      // Check system preference
-      isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-
-    this.setDarkMode(isDarkMode);
-  }
-
-  public toggleDarkMode(): void {
-    const newMode = !this.isDarkModeSubject.value;
-    this.setDarkMode(newMode);
-  }
-
-  public setDarkMode(isDarkMode: boolean): void {
-    console.log('ThemeService: Setting dark mode to', isDarkMode);
-    
-    // Update the subject
-    this.isDarkModeSubject.next(isDarkMode);
-    
-    // Save to localStorage
-    localStorage.setItem('dark-mode', isDarkMode.toString());
-    
-    // Apply theme to DOM
-    this.applyTheme(isDarkMode);
+    // Always use dark mode
+    this.applyTheme();
   }
 
   public get isDarkMode(): boolean {
-    return this.isDarkModeSubject.value;
+    return true; // Always dark mode
   }
 
-  private applyTheme(isDarkMode: boolean): void {
+  private applyTheme(): void {
     const body = document.body;
     const html = document.documentElement;
-    
-    // Remove existing theme classes
-    body.classList.remove('dark-theme', 'light-theme');
-    html.classList.remove('dark-theme', 'light-theme');
-    
-    if (isDarkMode) {
-      body.classList.add('dark-theme');
-      html.classList.add('dark-theme');
-      console.log('ThemeService: Applied dark theme');
-    } else {
-      body.classList.add('light-theme');
-      html.classList.add('light-theme');
-      console.log('ThemeService: Applied light theme');
-    }
+
+    // Remove any existing theme classes and apply dark theme
+    body.classList.remove("light-theme");
+    html.classList.remove("light-theme");
+    body.classList.add("dark-theme");
+    html.classList.add("dark-theme");
+
+    console.log("ThemeService: Applied dark theme (permanent)");
 
     // Force repaint to ensure styles are applied
     setTimeout(() => {
-      body.style.display = 'none';
+      body.style.display = "none";
       body.offsetHeight; // trigger reflow
-      body.style.display = '';
+      body.style.display = "";
     }, 0);
   }
 }

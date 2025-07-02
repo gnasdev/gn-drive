@@ -5,10 +5,6 @@
   </button>
   <span>Edit Profile</span>
   <span class="spacer"></span>
-  <button mat-raised-button color="accent" (click)="saveProfile()">
-    <mat-icon>save</mat-icon>
-    {{ saveBtnText$ | async }}
-  </button>
 </mat-toolbar>
 
 <div class="page-container content-spacing" *ngIf="profile">
@@ -140,6 +136,11 @@
       <button mat-raised-button color="warn" (click)="deleteProfile()">
         <mat-icon>delete</mat-icon>
         Delete Profile
+      </button>
+      <span class="spacer"></span>
+      <button mat-raised-button color="accent" (click)="saveProfile()">
+        <mat-icon>save</mat-icon>
+        {{ saveBtnText$ | async }}
       </button>
     </mat-card-actions>
   </mat-card>

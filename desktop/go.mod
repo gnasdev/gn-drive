@@ -5,7 +5,7 @@ go 1.23.4
 require (
 	github.com/rclone/rclone v1.70.1
 	github.com/spf13/viper v1.19.0
-	github.com/wailsapp/wails/v2 v2.9.2
+	github.com/wailsapp/wails/v2 v2.10.1
 )
 
 require (

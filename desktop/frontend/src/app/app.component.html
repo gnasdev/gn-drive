@@ -1,26 +1,5 @@
 <!-- Modern App Layout with Bottom Tabs -->
 <div class="app-container">
-  <!-- App Bar -->
-  <mat-toolbar color="primary">
-    <mat-icon>storage</mat-icon>
-    <span>NS Drive</span>
-
-    <span class="spacer"></span>
-
-    <!-- Action Buttons -->
-    <button
-      mat-icon-button
-      (click)="toggleDarkMode()"
-      [matTooltip]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-    >
-      <mat-icon>{{ isDarkMode ? "light_mode" : "dark_mode" }}</mat-icon>
-    </button>
-
-    <button mat-icon-button matTooltip="Help">
-      <mat-icon>help</mat-icon>
-    </button>
-  </mat-toolbar>
-
   <!-- Main Content with Bottom Tabs -->
   <div class="content-container">
     <mat-tab-group

@@ -51,12 +51,12 @@
   font-weight: 500;
 }
 
-/* Dark mode support */
-.dark-theme ::ng-deep .mat-mdc-tab-header {
+/* Tab styling (permanent dark mode) */
+::ng-deep .mat-mdc-tab-header {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background-color: var(--surface-color);
 }
 
-.dark-theme ::ng-deep .mat-mdc-tab-body-wrapper {
+::ng-deep .mat-mdc-tab-body-wrapper {
   background-color: var(--background-color);
 }

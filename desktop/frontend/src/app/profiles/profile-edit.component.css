@@ -24,11 +24,6 @@
 
 h4 {
   margin: 16px 0 8px 0;
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.6); /* Permanent dark mode */
   font-weight: 500;
-}
-
-/* Dark mode support */
-.dark-theme h4 {
-  color: rgba(255, 255, 255, 0.6);
 }

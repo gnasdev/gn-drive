@@ -14,7 +14,6 @@ import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { NavigationService } from "./navigation.service.js";
-import { ThemeService } from "./theme.service.js";
 
 // Material Design imports
 import { MatToolbarModule } from "@angular/material/toolbar";
@@ -50,18 +49,13 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    public readonly navigationService: NavigationService,
-    public readonly themeService: ThemeService
+    public readonly navigationService: NavigationService
   ) {
     console.log("AppComponent constructor called");
     console.log(
       "AppComponent navigationService initial state:",
       this.navigationService.currentState
     );
-  }
-
-  get isDarkMode(): boolean {
-    return this.themeService.isDarkMode;
   }
 
   ngOnInit() {
@@ -82,7 +76,6 @@ export class AppComponent implements OnInit, OnDestroy {
       combineLatest([
         this.appService.currentAction$,
         this.navigationService.currentState$,
-        this.themeService.isDarkMode$,
       ]).subscribe(() => {
         console.log("AppComponent combineLatest triggered");
         this.cdr.detectChanges();
@@ -155,11 +148,5 @@ export class AppComponent implements OnInit, OnDestroy {
         this.navigationService.navigateToRemotes();
         break;
     }
-  }
-
-  toggleDarkMode() {
-    console.log("Toggle dark mode called, current state:", this.isDarkMode);
-    this.themeService.toggleDarkMode();
-    console.log("Dark mode toggled to:", this.isDarkMode);
   }
 }

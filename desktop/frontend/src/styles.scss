@@ -1,20 +1,20 @@
 // Angular Material Theme - Using prebuilt theme with proper dark mode support
 @import "@angular/material/prebuilt-themes/azure-blue.css";
 
-// Light theme variables (default)
+// Dark theme variables (default and only theme)
 :root {
-  --background-color: #fafafa;
-  --surface-color: #ffffff;
-  --primary-text: rgba(0, 0, 0, 0.87);
-  --secondary-text: rgba(0, 0, 0, 0.6);
-  --tertiary-text: rgba(0, 0, 0, 0.38);
-  --border-color: rgba(0, 0, 0, 0.12);
-  --hover-color: rgba(0, 0, 0, 0.04);
-  --card-background: #ffffff;
+  --background-color: #121212;
+  --surface-color: #1e1e1e;
+  --primary-text: rgba(255, 255, 255, 0.87);
+  --secondary-text: rgba(255, 255, 255, 0.6);
+  --tertiary-text: rgba(255, 255, 255, 0.38);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --hover-color: rgba(255, 255, 255, 0.08);
+  --card-background: #1e1e1e;
   --toolbar-background: #1976d2;
   --toolbar-text: #ffffff;
-  --button-text: #1976d2;
-  --icon-color: rgba(0, 0, 0, 0.54);
+  --button-text: #64b5f6;
+  --icon-color: rgba(255, 255, 255, 0.6);
 }
 
 // Global styles - minimal setup for Angular Material
@@ -76,73 +76,77 @@ body {
   }
 }
 
-// Dark theme variables - Apply to both body and html
+// Consistent icon and text spacing
+.mat-mdc-card-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.mat-mdc-card-title .mat-icon {
+  margin-right: 0 !important;
+}
+
+// List item consistent spacing
+.mat-mdc-list-item {
+  padding: 12px 16px !important;
+  min-height: 64px !important;
+}
+
+.mat-mdc-list-item .mat-mdc-list-item-icon {
+  margin-right: 16px !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.mat-mdc-list-item .mat-mdc-list-item-content {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.mat-mdc-list-item .mat-mdc-list-item-meta {
+  margin-left: auto !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+// Card content consistent spacing
+.mat-mdc-card-content {
+  padding: 16px !important;
+}
+
+.mat-mdc-card-header {
+  padding: 16px 16px 0 16px !important;
+}
+
+.mat-mdc-card-actions {
+  padding: 8px 16px 16px 16px !important;
+  gap: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+}
+
+// Ensure consistent list styling
+.mat-mdc-list {
+  padding: 0 !important;
+}
+
+.mat-mdc-list-item:not(:last-child) {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+// Dark theme styles - Apply to both body and html (permanent dark mode)
 .dark-theme,
 body.dark-theme,
-html.dark-theme {
-  --background-color: #121212;
-  --surface-color: #1e1e1e;
-  --primary-text: rgba(255, 255, 255, 0.87);
-  --secondary-text: rgba(255, 255, 255, 0.6);
-  --tertiary-text: rgba(255, 255, 255, 0.38);
-  --border-color: rgba(255, 255, 255, 0.12);
-  --hover-color: rgba(255, 255, 255, 0.08);
-  --card-background: #1e1e1e;
-  --toolbar-background: #1976d2;
-  --toolbar-text: #ffffff;
-  --button-text: #64b5f6;
-  --icon-color: rgba(255, 255, 255, 0.6);
-}
-
-// Force dark theme styles
-.dark-theme {
+html.dark-theme,
+body,
+html {
   background-color: var(--background-color) !important;
   color: var(--primary-text) !important;
-}
-
-body.dark-theme,
-html.dark-theme {
-  background-color: var(--background-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// Light theme explicit styles
-.light-theme,
-body.light-theme,
-html.light-theme {
-  --background-color: #fafafa;
-  --surface-color: #ffffff;
-  --primary-text: rgba(0, 0, 0, 0.87);
-  --secondary-text: rgba(0, 0, 0, 0.6);
-  --tertiary-text: rgba(0, 0, 0, 0.38);
-  --border-color: rgba(0, 0, 0, 0.12);
-  --hover-color: rgba(0, 0, 0, 0.04);
-  --card-background: #ffffff;
-  --toolbar-background: #1976d2;
-  --toolbar-text: #ffffff;
-  --button-text: #1976d2;
-  --icon-color: rgba(0, 0, 0, 0.54);
-
-  background-color: var(--background-color) !important;
-  color: var(--primary-text) !important;
-}
-
-// System dark mode preference
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background-color: #121212;
-    --surface-color: #1e1e1e;
-    --primary-text: rgba(255, 255, 255, 0.87);
-    --secondary-text: rgba(255, 255, 255, 0.6);
-    --tertiary-text: rgba(255, 255, 255, 0.38);
-    --border-color: rgba(255, 255, 255, 0.12);
-    --hover-color: rgba(255, 255, 255, 0.08);
-    --card-background: #1e1e1e;
-    --toolbar-background: #1976d2;
-    --toolbar-text: #ffffff;
-    --button-text: #64b5f6;
-    --icon-color: rgba(255, 255, 255, 0.6);
-  }
 }
 
 // Global text styling using CSS variables
@@ -186,33 +190,6 @@ div {
   color: var(--primary-text) !important;
 }
 
-// Dark theme specific overrides for Material components
-.dark-theme .mat-mdc-card,
-body.dark-theme .mat-mdc-card,
-html.dark-theme .mat-mdc-card {
-  background-color: var(--card-background) !important;
-  color: var(--primary-text) !important;
-  border: 1px solid var(--border-color) !important;
-}
-
-.dark-theme .mat-mdc-card-title,
-body.dark-theme .mat-mdc-card-title,
-html.dark-theme .mat-mdc-card-title {
-  color: var(--primary-text) !important;
-}
-
-.dark-theme .mat-mdc-card-subtitle,
-body.dark-theme .mat-mdc-card-subtitle,
-html.dark-theme .mat-mdc-card-subtitle {
-  color: var(--secondary-text) !important;
-}
-
-.dark-theme .mat-mdc-card-content,
-body.dark-theme .mat-mdc-card-content,
-html.dark-theme .mat-mdc-card-content {
-  color: var(--primary-text) !important;
-}
-
 .mat-mdc-tab-header {
   background-color: var(--surface-color) !important;
   border-top: 1px solid var(--border-color);
@@ -224,40 +201,6 @@ html.dark-theme .mat-mdc-card-content {
 
 .mat-mdc-tab-label.mdc-tab--active {
   color: var(--primary-text) !important;
-}
-
-// Dark theme specific overrides for tabs
-.dark-theme .mat-mdc-tab-header,
-body.dark-theme .mat-mdc-tab-header,
-html.dark-theme .mat-mdc-tab-header {
-  background-color: var(--surface-color) !important;
-  border-top: 1px solid var(--border-color) !important;
-}
-
-.dark-theme .mat-mdc-tab-label,
-body.dark-theme .mat-mdc-tab-label,
-html.dark-theme .mat-mdc-tab-label {
-  color: var(--secondary-text) !important;
-}
-
-.dark-theme .mat-mdc-tab-label.mdc-tab--active,
-body.dark-theme .mat-mdc-tab-label.mdc-tab--active,
-html.dark-theme .mat-mdc-tab-label.mdc-tab--active {
-  color: var(--primary-text) !important;
-}
-
-// Toolbar dark theme
-.dark-theme .mat-toolbar,
-body.dark-theme .mat-toolbar,
-html.dark-theme .mat-toolbar {
-  background-color: var(--toolbar-background) !important;
-  color: var(--toolbar-text) !important;
-}
-
-.dark-theme .mat-toolbar .mat-icon,
-body.dark-theme .mat-toolbar .mat-icon,
-html.dark-theme .mat-toolbar .mat-icon {
-  color: var(--toolbar-text) !important;
 }
 
 .mat-toolbar {
@@ -400,9 +343,7 @@ html.dark-theme .mat-toolbar .mat-icon {
   background-color: var(--hover-color) !important;
 }
 
-// Additional dark mode specific styling
-.dark-theme {
-  .mat-mdc-card {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-  }
+// Enhanced card styling for dark theme
+.mat-mdc-card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }

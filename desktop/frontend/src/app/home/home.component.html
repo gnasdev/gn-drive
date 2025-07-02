@@ -6,9 +6,6 @@
   <!-- Welcome State -->
   <mat-card class="card-spacing">
     <mat-card-header>
-      <div mat-card-avatar>
-        <mat-icon>dashboard</mat-icon>
-      </div>
       <mat-card-title>Welcome to NS Drive Dashboard</mat-card-title>
       <mat-card-subtitle>
         Start by creating your first sync operation
@@ -54,14 +51,6 @@
     <mat-icon>sync</mat-icon>
     <span>Sync Operations</span>
     <span class="spacer"></span>
-    <button
-      mat-fab
-      color="primary"
-      (click)="createTab()"
-      matTooltip="Add new operation"
-    >
-      <mat-icon>add</mat-icon>
-    </button>
   </mat-toolbar>
 
   <!-- Tab Navigation -->
@@ -92,41 +81,43 @@
       </ng-template>
 
       <!-- Tab Content -->
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            <mat-icon>settings</mat-icon>
-            Operation Controls
-          </mat-card-title>
-          <mat-card-subtitle>
-            Configure and execute sync operations
-          </mat-card-subtitle>
-        </mat-card-header>
+      <div class="page-container">
+        <mat-card class="card-spacing">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>settings</mat-icon>
+              <span>Operation Controls</span>
+            </mat-card-title>
+            <mat-card-subtitle>
+              Configure and execute sync operations
+            </mat-card-subtitle>
+          </mat-card-header>
 
-        <mat-card-content>
-          <!-- Profile Selection -->
-          <mat-form-field appearance="outline">
-            <mat-label>Sync Profile</mat-label>
-            <mat-select
-              [value]="tab?.selectedProfileIndex"
-              (selectionChange)="changeProfileTab($event.value, tab?.id)"
-              [disabled]="!tab || !tab.id"
-            >
-              <mat-option [value]="null">
-                <em>No profile selected</em>
-              </mat-option>
-              <mat-option
-                *ngFor="
-                  let profile of appService.configInfo$.value.profiles;
-                  let idx = index
-                "
-                [value]="idx"
+          <mat-card-content>
+            <!-- Profile Selection -->
+            <mat-form-field appearance="outline" class="form-spacing">
+              <mat-label>Sync Profile</mat-label>
+              <mat-select
+                [value]="tab?.selectedProfileIndex"
+                (selectionChange)="changeProfileTab($event.value, tab?.id)"
+                [disabled]="!tab || !tab.id"
               >
-                {{ profile.name }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matSuffix>folder_shared</mat-icon>
-          </mat-form-field>
+                <mat-option [value]="null">
+                  <em>No profile selected</em>
+                </mat-option>
+                <mat-option
+                  *ngFor="
+                    let profile of appService.configInfo$.value.profiles;
+                    let idx = index
+                  "
+                  [value]="idx"
+                >
+                  {{ profile.name }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>folder_shared</mat-icon>
+            </mat-form-field>
+          </mat-card-content>
 
           <!-- Action Buttons -->
           <mat-card-actions *ngIf="validateTabProfileIndex(tab)">
@@ -220,7 +211,7 @@
           </mat-card-actions>
 
           <!-- Status Display -->
-          <div *ngIf="tab.currentAction">
+          <mat-card-content *ngIf="tab.currentAction">
             <mat-progress-bar mode="indeterminate"></mat-progress-bar>
             <mat-chip-set>
               <mat-chip>
@@ -230,43 +221,43 @@
                 {{ getActionLabel(tab.currentAction) }}
               </mat-chip>
             </mat-chip-set>
-          </div>
-        </mat-card-content>
-      </mat-card>
+          </mat-card-content>
+        </mat-card>
 
-      <!-- Info Cards -->
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            <mat-icon>folder</mat-icon>
-            Working Directory
-          </mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <code>{{ (appService.configInfo$ | async)?.working_dir }}</code>
-        </mat-card-content>
-      </mat-card>
+        <!-- Info Cards -->
+        <mat-card class="card-spacing">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>folder</mat-icon>
+              <span>Working Directory</span>
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <code>{{ (appService.configInfo$ | async)?.working_dir }}</code>
+          </mat-card-content>
+        </mat-card>
 
-      <!-- Console Output -->
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            <mat-icon>terminal</mat-icon>
-            Console Output
-          </mat-card-title>
-          <span class="spacer"></span>
-          <button
-            mat-icon-button
-            (click)="clearTabOutput(tab.id)"
-            matTooltip="Clear output"
-          >
-            <mat-icon>clear</mat-icon>
-          </button>
-        </mat-card-header>
-        <mat-card-content>
-          <pre>{{ tab.data.join("\n") || "No output yet..." }}</pre>
-        </mat-card-content>
-      </mat-card>
+        <!-- Console Output -->
+        <mat-card class="card-spacing">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>terminal</mat-icon>
+              <span>Console Output</span>
+            </mat-card-title>
+            <span class="spacer"></span>
+            <button
+              mat-icon-button
+              (click)="clearTabOutput(tab.id)"
+              matTooltip="Clear output"
+            >
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-card-header>
+          <mat-card-content>
+            <pre>{{ tab.data.join("\n") || "No output yet..." }}</pre>
+          </mat-card-content>
+        </mat-card>
+      </div>
     </mat-tab>
   </mat-tab-group>
 
@@ -281,4 +272,15 @@
       <span>Delete</span>
     </button>
   </mat-menu>
+
+  <!-- Floating Action Button for Create Tab -->
+  <button
+    mat-fab
+    color="primary"
+    (click)="createTab()"
+    class="fab-button"
+    matTooltip="Add new operation"
+  >
+    <mat-icon>add</mat-icon>
+  </button>
 </div>
