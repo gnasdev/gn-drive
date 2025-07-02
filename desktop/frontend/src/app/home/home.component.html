@@ -66,10 +66,7 @@
       "
     >
       <ng-template mat-tab-label>
-        <mat-icon>{{
-          tab?.currentAction ? getActionIcon(tab.currentAction!) : "folder"
-        }}</mat-icon>
-        {{ tab?.name || "Operation " + (i + 1) }}
+        <span>{{ tab?.name || "Operation " + (i + 1) }}</span>
         <button
           mat-icon-button
           [matMenuTriggerFor]="tabMenu"
@@ -117,6 +114,44 @@
               </mat-select>
               <mat-icon matSuffix>folder_shared</mat-icon>
             </mat-form-field>
+
+            <!-- Profile Information Display -->
+            <div
+              *ngIf="getSelectedProfile(tab) as selectedProfile"
+              class="profile-info-section"
+            >
+              <h4>Profile Details</h4>
+              <mat-list>
+                <mat-list-item>
+                  <mat-icon matListItemIcon>sync_alt</mat-icon>
+                  <div matListItemTitle>From</div>
+                  <div matListItemLine>
+                    {{ selectedProfile.from || "Not configured" }}
+                  </div>
+                </mat-list-item>
+                <mat-list-item>
+                  <mat-icon matListItemIcon>sync_alt</mat-icon>
+                  <div matListItemTitle>To</div>
+                  <div matListItemLine>
+                    {{ selectedProfile.to || "Not configured" }}
+                  </div>
+                </mat-list-item>
+                <mat-list-item>
+                  <mat-icon matListItemIcon>speed</mat-icon>
+                  <div matListItemTitle>Bandwidth</div>
+                  <div matListItemLine>
+                    {{ selectedProfile.bandwidth || "Unlimited" }}MB/s
+                  </div>
+                </mat-list-item>
+                <mat-list-item>
+                  <mat-icon matListItemIcon>settings</mat-icon>
+                  <div matListItemTitle>Parallel</div>
+                  <div matListItemLine>
+                    {{ selectedProfile.parallel || 1 }} connections
+                  </div>
+                </mat-list-item>
+              </mat-list>
+            </div>
           </mat-card-content>
 
           <!-- Action Buttons -->
@@ -250,7 +285,7 @@
               (click)="clearTabOutput(tab.id)"
               matTooltip="Clear output"
             >
-              <mat-icon>clear</mat-icon>
+              <mat-icon>auto_delete</mat-icon>
             </button>
           </mat-card-header>
           <mat-card-content>
@@ -284,3 +319,26 @@
     <mat-icon>add</mat-icon>
   </button>
 </div>
+
+<!-- Rename Tab Dialog -->
+<ng-template #renameDialog>
+  <h2 mat-dialog-title>Rename Tab</h2>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" style="width: 100%">
+      <mat-label>Tab Name</mat-label>
+      <input
+        matInput
+        [(ngModel)]="renameDialogData.newName"
+        (keydown.enter)="confirmRename()"
+        id="renameDialogInput"
+        #renameDialogInput
+      />
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancelRename()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="confirmRename()">
+      Rename
+    </button>
+  </mat-dialog-actions>
+</ng-template>

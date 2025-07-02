@@ -60,3 +60,43 @@
 ::ng-deep .mat-mdc-tab-body-wrapper {
   background-color: var(--background-color);
 }
+
+/* Active tab background for bottom navigation - More specific selectors */
+::ng-deep
+  .mat-mdc-tab-group
+  .mat-mdc-tab-header
+  .mat-mdc-tab-label-container
+  .mat-mdc-tab-label.mdc-tab--active {
+  background-color: var(--surface-color) !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+::ng-deep
+  .mat-mdc-tab-group
+  .mat-mdc-tab-header
+  .mat-mdc-tab-label-container
+  .mat-mdc-tab-label:not(.mdc-tab--active) {
+  background-color: transparent !important;
+}
+
+::ng-deep
+  .mat-mdc-tab-group
+  .mat-mdc-tab-header
+  .mat-mdc-tab-label-container
+  .mat-mdc-tab-label {
+  transition: background-color 0.3s ease !important;
+  margin: 0 2px !important;
+}
+
+/* Alternative approach using pseudo-elements */
+::ng-deep .mat-mdc-tab-label.mdc-tab--active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-color);
+  border-radius: 8px 8px 0 0;
+  z-index: -1;
+}

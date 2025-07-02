@@ -17,7 +17,6 @@
     <mat-card-content>
       <mat-list>
         <mat-list-item *ngFor="let remote of appService.remotes$ | async">
-          <mat-icon matListItemIcon>{{ getRemoteIcon(remote.type) }}</mat-icon>
           <div matListItemTitle>{{ remote.name }}</div>
           <div matListItemLine>{{ getRemoteTypeLabel(remote.type) }}</div>
           <div matListItemMeta>

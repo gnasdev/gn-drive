@@ -1,5 +1,11 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnDestroy, OnInit } from "@angular/core";
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  TemplateRef,
+  ViewChild,
+} from "@angular/core";
 import { map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
@@ -10,6 +16,7 @@ import {
   parseProfileSelection,
   validateTabProfileSelection,
 } from "./home.types";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 
 // Material Design imports
 import { MatCardModule } from "@angular/material/card";
@@ -25,6 +32,7 @@ import { MatMenuModule } from "@angular/material/menu";
 import { MatListModule } from "@angular/material/list";
 import { MatToolbarModule } from "@angular/material/toolbar";
 import { MatTabsModule } from "@angular/material/tabs";
+import { MatDialogModule } from "@angular/material/dialog";
 import { FormsModule } from "@angular/forms";
 
 @Component({
@@ -44,6 +52,7 @@ import { FormsModule } from "@angular/forms";
     MatListModule,
     MatToolbarModule,
     MatTabsModule,
+    MatDialogModule,
     FormsModule,
   ],
   templateUrl: "./home.component.html",
@@ -55,11 +64,20 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private subscriptions = new Subscription();
   currentTabIdForMenu = "";
+
+  // Dialog properties
+  @ViewChild("renameDialog") renameDialog!: TemplateRef<any>;
+  private dialogRef: MatDialogRef<any> | null = null;
+  renameDialogData = {
+    tabId: "",
+    newName: "",
+  };
   isCurrentProfileValid: models.Profile | undefined;
 
   constructor(
     public readonly appService: AppService,
-    public readonly tabService: TabService
+    public readonly tabService: TabService,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -344,7 +362,45 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // Tab rename methods
   startRenameTab(tabId: string): void {
-    this.tabService.startRenameTab(tabId);
+    const tab = this.tabService.getTab(tabId);
+    if (!tab) return;
+
+    this.renameDialogData = {
+      tabId: tabId,
+      newName: tab.name,
+    };
+
+    this.dialogRef = this.dialog.open(this.renameDialog, {
+      width: "400px",
+      disableClose: false,
+    });
+
+    // Auto-focus the input field after dialog opens
+    setTimeout(() => {
+      const input = document.querySelector(
+        "#renameDialogInput"
+      ) as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 100);
+  }
+
+  confirmRename(): void {
+    if (this.renameDialogData.newName.trim()) {
+      this.tabService.finishRenameTab(
+        this.renameDialogData.tabId,
+        this.renameDialogData.newName.trim()
+      );
+    }
+    this.dialogRef?.close();
+    this.dialogRef = null;
+  }
+
+  cancelRename(): void {
+    this.dialogRef?.close();
+    this.dialogRef = null;
   }
 
   finishRenameTab(tabId: string, newName: string): void {
@@ -401,5 +457,25 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   trackByTabId(index: number, tab: Tab): string {
     return tab?.id || index.toString();
+  }
+
+  getSelectedProfile(tab: Tab | undefined): models.Profile | null {
+    if (
+      !tab ||
+      tab.selectedProfileIndex === null ||
+      tab.selectedProfileIndex === undefined
+    ) {
+      return null;
+    }
+    const configInfo = this.appService.configInfo$.value;
+    if (
+      !configInfo ||
+      !configInfo.profiles ||
+      tab.selectedProfileIndex >= configInfo.profiles.length ||
+      tab.selectedProfileIndex < 0
+    ) {
+      return null;
+    }
+    return configInfo.profiles[tab.selectedProfileIndex];
   }
 }

@@ -1,6 +1,14 @@
 // Angular Material Theme - Using prebuilt theme with proper dark mode support
 @import "@angular/material/prebuilt-themes/azure-blue.css";
 
+// Force override any theme colors that might interfere with our light text
+.mat-app-background,
+.mat-primary,
+.mat-accent,
+.mat-warn {
+  color: var(--primary-text) !important;
+}
+
 // Dark theme variables (default and only theme)
 :root {
   --background-color: #121212;
@@ -201,6 +209,7 @@ div {
 
 .mat-mdc-tab-label.mdc-tab--active {
   color: var(--primary-text) !important;
+  background-color: var(--surface-color) !important;
 }
 
 .mat-toolbar {
@@ -346,4 +355,129 @@ div {
 // Enhanced card styling for dark theme
 .mat-mdc-card {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+// Additional comprehensive text styling to ensure ALL text is light
+* {
+  color: var(--primary-text) !important;
+}
+
+// Override any potential dark text from Material theme
+.mat-mdc-form-field-hint,
+.mat-mdc-form-field-error,
+.mat-mdc-form-field-subscript-wrapper,
+.mat-mdc-form-field-bottom-align,
+.mat-mdc-text-field-wrapper,
+.mat-mdc-floating-label,
+.mat-mdc-notched-outline-notch,
+.mat-mdc-line-ripple,
+.mat-mdc-form-field-flex,
+.mat-mdc-form-field-infix {
+  color: var(--primary-text) !important;
+}
+
+// Ensure all list elements have light text
+.mat-mdc-list-item-title,
+.mat-mdc-list-item-line,
+.mat-mdc-list-item-meta,
+.mat-mdc-list-item-content,
+.mat-mdc-list-base {
+  color: var(--primary-text) !important;
+}
+
+// Console and code elements
+pre,
+code,
+.console-output,
+.code-block {
+  color: var(--primary-text) !important;
+}
+
+// Tab content and labels
+.mat-mdc-tab-label-content,
+.mat-mdc-tab-body-content,
+.mat-mdc-tab-body,
+.mat-mdc-tab-group {
+  color: var(--primary-text) !important;
+}
+
+// Ensure all text inputs and selects have light text
+input,
+textarea,
+select,
+.mat-mdc-input,
+.mat-mdc-select-trigger,
+.mat-mdc-select-value-text {
+  color: var(--primary-text) !important;
+}
+
+// Override any remaining Material theme text colors
+.mdc-text-field,
+.mdc-text-field__input,
+.mdc-floating-label,
+.mdc-line-ripple,
+.mdc-notched-outline,
+.mdc-select,
+.mdc-select__selected-text,
+.mdc-list-item,
+.mdc-list-item__text,
+.mdc-tab,
+.mdc-tab__text-label,
+.mdc-card,
+.mdc-card__content,
+.mdc-button,
+.mdc-icon-button {
+  color: var(--primary-text) !important;
+}
+
+// Ensure all Angular Material components have light text
+.mat-mdc-form-field-type-mat-input,
+.mat-mdc-form-field-type-mat-select,
+.mat-mdc-form-field-type-mat-chip-grid,
+.mat-mdc-text-field-wrapper .mat-mdc-form-field-flex .mat-mdc-floating-label,
+.mat-mdc-text-field-wrapper .mat-mdc-form-field-flex .mat-mdc-form-field-infix,
+.mat-mdc-text-field-wrapper
+  .mat-mdc-form-field-flex
+  .mat-mdc-form-field-label-wrapper,
+.mat-mdc-select-arrow-wrapper,
+.mat-mdc-select-trigger,
+.mat-mdc-chip,
+.mat-mdc-chip-set,
+.mat-mdc-standard-chip,
+.mat-mdc-chip-action-label {
+  color: var(--primary-text) !important;
+}
+
+// Force light text on all possible text elements
+label,
+legend,
+fieldset,
+button,
+a,
+strong,
+em,
+small,
+mark,
+del,
+ins,
+sub,
+sup,
+blockquote,
+cite,
+q,
+abbr,
+time,
+address,
+details,
+summary {
+  color: var(--primary-text) !important;
+}
+
+// Ensure placeholder text is also light
+::placeholder,
+::-webkit-input-placeholder,
+::-moz-placeholder,
+:-ms-input-placeholder {
+  color: var(--secondary-text) !important;
+  opacity: 1;
 }
