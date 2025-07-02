@@ -242,9 +242,21 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   deleteTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (tab && tab.currentTaskId) {
+
+    // Check if tab has an active operation
+    if (tab && tab.currentTaskId && tab.currentAction) {
+      const confirmed = confirm(
+        `This operation is currently running (${tab.currentAction}). ` +
+          "Deleting this tab will stop the operation. Are you sure you want to continue?"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
       this.appService.stopCommandForTab(tabId);
     }
+
     this.tabService.deleteTab(tabId);
   }
 
