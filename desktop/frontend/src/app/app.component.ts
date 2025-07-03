@@ -14,6 +14,8 @@ import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { NavigationService } from "./navigation.service.js";
+import { ErrorDisplayComponent } from "./components/error-display/error-display.component.js";
+import { ToastComponent } from "./components/toast/toast.component.js";
 import {
   LucideAngularModule,
   Home,
@@ -30,6 +32,8 @@ import {
     ProfilesComponent,
     ProfileEditComponent,
     RemotesComponent,
+    ErrorDisplayComponent,
+    ToastComponent,
     LucideAngularModule,
   ],
   templateUrl: "./app.component.html",

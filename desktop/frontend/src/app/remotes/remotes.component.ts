@@ -9,6 +9,7 @@ import {
 import { FormsModule } from "@angular/forms";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
 import { AppService } from "../app.service";
+import { ErrorService } from "../services/error.service";
 
 // No Material imports needed anymore
 
@@ -61,7 +62,8 @@ export class RemotesComponent implements OnInit, OnDestroy {
 
   constructor(
     public readonly appService: AppService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly errorService: ErrorService
   ) {}
 
   ngOnInit(): void {
@@ -98,6 +100,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       parentElement.hidePopover();
     } catch (error) {
       console.error("Error adding remote:", error);
+      this.errorService.handleApiError(error, "add_remote_form");
     } finally {
       this.isAddingRemote$.next(false);
     }
@@ -139,23 +142,13 @@ export class RemotesComponent implements OnInit, OnDestroy {
         type: this.addRemoteData.type,
       });
       console.log(`Remote "${this.addRemoteData.name}" added successfully!`);
+      this.errorService.showSuccess(
+        `Remote "${this.addRemoteData.name}" added successfully!`
+      );
       this.closeAddRemoteModal();
     } catch (error: any) {
       console.error("Error adding remote:", error);
-
-      // Show user-friendly error message
-      const errorMessage = error?.message || "Unknown error occurred";
-
-      // For iCloud setup instructions, show in a more prominent way
-      if (
-        errorMessage.includes(
-          "iCloud Drive setup requires interactive configuration"
-        )
-      ) {
-        alert(errorMessage);
-      } else {
-        alert(`Failed to add remote: ${errorMessage}`);
-      }
+      this.errorService.handleApiError(error, "add_remote_modal");
     } finally {
       this.isAddingRemote$.next(false);
       this.cdr.detectChanges();
@@ -178,8 +171,12 @@ export class RemotesComponent implements OnInit, OnDestroy {
     try {
       await this.appService.deleteRemote(this.remoteToDelete.name);
       console.log(`Remote "${this.remoteToDelete.name}" deleted successfully!`);
+      this.errorService.showSuccess(
+        `Remote "${this.remoteToDelete.name}" deleted successfully!`
+      );
     } catch (error) {
       console.error("Error deleting remote:", error);
+      this.errorService.handleApiError(error, "delete_remote");
     } finally {
       this.closeDeleteConfirmModal();
     }
@@ -198,20 +195,20 @@ export class RemotesComponent implements OnInit, OnDestroy {
   async exportRemotes(): Promise<void> {
     try {
       await this.appService.exportRemotes();
+      this.errorService.showSuccess("Remotes exported successfully!");
     } catch (error) {
       console.error("Error exporting remotes:", error);
-      alert("Failed to export remotes. Please try again.");
+      this.errorService.handleApiError(error, "export_remotes");
     }
   }
 
   async importRemotes(): Promise<void> {
     try {
       await this.appService.importRemotes();
+      this.errorService.showSuccess("Remotes imported successfully!");
     } catch (error) {
       console.error("Error importing remotes:", error);
-      alert(
-        "Failed to import remotes. Please check the file format and try again."
-      );
+      this.errorService.handleApiError(error, "import_remotes");
     }
   }
 }

@@ -41,12 +41,12 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	a.oc <- j
 
 	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
-	if utils.HandleError(err, "", nil, nil) != nil {
+	if err != nil {
 		var j []byte
 		if tabId != "" {
-			j, _ = utils.NewCommandErrorDTOWithTab(id, err, tabId).ToJSON()
+			j, _ = a.errorHandler.HandleErrorWithTab(err, tabId, "sync", "init_config").ToJSON()
 		} else {
-			j, _ = utils.NewCommandErrorDTO(id, err).ToJSON()
+			j, _ = a.errorHandler.HandleError(err, "sync", "init_config").ToJSON()
 		}
 		a.oc <- j
 		cancel()
@@ -100,12 +100,12 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 			err = rclone.BiSync(ctx, config, profile, true, outLog)
 		}
 
-		if utils.HandleError(err, "", nil, nil) != nil {
+		if err != nil {
 			var j []byte
 			if tabId != "" {
-				j, _ = utils.NewCommandErrorDTOWithTab(0, err, tabId).ToJSON()
+				j, _ = a.errorHandler.HandleErrorWithTab(err, tabId, "sync", task).ToJSON()
 			} else {
-				j, _ = utils.NewCommandErrorDTO(0, err).ToJSON()
+				j, _ = a.errorHandler.HandleError(err, "sync", task).ToJSON()
 			}
 			a.oc <- j
 		}
@@ -161,11 +161,13 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 
 	profilesJson, err := profiles.ToJSON()
 	if err != nil {
+		a.errorHandler.HandleError(err, "update_profiles", "json_marshal")
 		return dto.NewAppError(err)
 	}
 
 	err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0644)
 	if err != nil {
+		a.errorHandler.HandleError(err, "update_profiles", "write_file", a.ConfigInfo.EnvConfig.ProfileFilePath)
 		return dto.NewAppError(err)
 	}
 
@@ -187,6 +189,7 @@ func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[s
 		// Standard OAuth flow for other providers
 		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, rc.Params{}, fsConfig.UpdateRemoteOpt{})
 		if err != nil {
+			a.errorHandler.HandleError(err, "add_remote", remoteType, remoteName)
 			a.DeleteRemote(remoteName)
 		}
 		return dto.NewAppError(err)

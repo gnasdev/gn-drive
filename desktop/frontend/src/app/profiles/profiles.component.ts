@@ -8,6 +8,7 @@ import {
 } from "@angular/core";
 import { AppService } from "../app.service";
 import { NavigationService } from "../navigation.service";
+import { ErrorService } from "../services/error.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 import {
@@ -63,7 +64,8 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly navigationService: NavigationService
+    private readonly navigationService: NavigationService,
+    private readonly errorService: ErrorService
   ) {}
 
   ngOnInit(): void {
@@ -84,7 +86,7 @@ export class ProfilesComponent implements OnInit, OnDestroy {
       this.navigationService.navigateToProfileEdit(newProfileIndex);
     } catch (error) {
       console.error("Error creating profile:", error);
-      alert("Failed to create profile. Please try again.");
+      this.errorService.handleApiError(error, "create_profile");
     }
   }
 
@@ -101,7 +103,7 @@ export class ProfilesComponent implements OnInit, OnDestroy {
       await this.appService.removeProfile(idx);
     } catch (error) {
       console.error("Error removing profile:", error);
-      alert("Failed to remove profile. Please try again.");
+      this.errorService.handleApiError(error, "remove_profile");
     }
   }
 
@@ -115,20 +117,20 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   async exportProfiles(): Promise<void> {
     try {
       await this.appService.exportProfiles();
+      this.errorService.showSuccess("Profiles exported successfully!");
     } catch (error) {
       console.error("Error exporting profiles:", error);
-      alert("Failed to export profiles. Please try again.");
+      this.errorService.handleApiError(error, "export_profiles");
     }
   }
 
   async importProfiles(): Promise<void> {
     try {
       await this.appService.importProfiles();
+      this.errorService.showSuccess("Profiles imported successfully!");
     } catch (error) {
       console.error("Error importing profiles:", error);
-      alert(
-        "Failed to import profiles. Please check the file format and try again."
-      );
+      this.errorService.handleApiError(error, "import_profiles");
     }
   }
 

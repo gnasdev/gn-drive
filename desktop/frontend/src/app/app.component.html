@@ -4,39 +4,35 @@
   <div class="flex-1 overflow-hidden">
     <!-- Operations Tab Content -->
     @if (getSelectedTabIndex() === 0) {
-      <div class="h-full overflow-auto">
-        <app-home></app-home>
-      </div>
+    <div class="h-full overflow-auto">
+      <app-home></app-home>
+    </div>
     }
 
     <!-- Profiles Tab Content -->
     @if (getSelectedTabIndex() === 1) {
-      <div class="h-full overflow-auto">
-        @if ((navigationService.currentState$ | async)?.page === 'profiles') {
-          <app-profiles
-          ></app-profiles>
-        }
-        @if (
-          (navigationService.currentState$ | async)?.page === 'profile-edit'
-          ) {
-          <app-profile-edit
-          ></app-profile-edit>
-        }
-      </div>
+    <div class="h-full overflow-auto">
+      @if ((navigationService.currentState$ | async)?.page === 'profiles') {
+      <app-profiles></app-profiles>
+      } @if ( (navigationService.currentState$ | async)?.page === 'profile-edit'
+      ) {
+      <app-profile-edit></app-profile-edit>
+      }
+    </div>
     }
 
     <!-- Remotes Tab Content -->
     @if (getSelectedTabIndex() === 2) {
-      <div class="h-full overflow-auto">
-        <app-remotes></app-remotes>
-      </div>
+    <div class="h-full overflow-auto">
+      <app-remotes></app-remotes>
+    </div>
     }
   </div>
 
   <!-- Bottom Navigation -->
   <nav
     class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2"
-    >
+  >
     <div class="flex justify-around">
       <!-- Operations Tab -->
       <button
@@ -46,7 +42,7 @@
             ? 'bottom-nav-item-active'
             : 'bottom-nav-item'
         "
-        >
+      >
         <lucide-icon [img]="HomeIcon" class="w-6 h-6 mb-1"></lucide-icon>
         <span>Operations</span>
       </button>
@@ -59,7 +55,7 @@
             ? 'bottom-nav-item-active'
             : 'bottom-nav-item'
         "
-        >
+      >
         <lucide-icon [img]="UsersIcon" class="w-6 h-6 mb-1"></lucide-icon>
         <span>Profiles</span>
       </button>
@@ -72,10 +68,16 @@
             ? 'bottom-nav-item-active'
             : 'bottom-nav-item'
         "
-        >
+      >
         <lucide-icon [img]="CloudIcon" class="w-6 h-6 mb-1"></lucide-icon>
         <span>Remotes</span>
       </button>
     </div>
   </nav>
 </div>
+
+<!-- Error Display Component -->
+<app-error-display></app-error-display>
+
+<!-- Toast Notifications -->
+<app-toast></app-toast>

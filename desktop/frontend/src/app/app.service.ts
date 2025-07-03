@@ -18,6 +18,7 @@ import {
 } from "../../wailsjs/go/backend/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { TabService } from "./tab.service";
+import { ErrorService } from "./services/error.service";
 import {
   SyncStatus,
   SyncStatusEvent,
@@ -52,7 +53,10 @@ export class AppService implements OnDestroy {
 
   private eventCleanup: (() => void) | undefined;
 
-  constructor(private tabService: TabService) {
+  constructor(
+    private tabService: TabService,
+    private errorService: ErrorService
+  ) {
     console.log("AppService constructor called");
     const configInfo = new models.ConfigInfo();
     configInfo.profiles = [];
@@ -244,7 +248,7 @@ export class AppService implements OnDestroy {
       console.log("AppService getConfigInfo emitted to configInfo$");
     } catch (e) {
       console.error("AppService getConfigInfo error:", e);
-      alert("Error getting config info");
+      this.errorService.handleApiError(e, "get_config_info");
     }
   }
 
@@ -254,6 +258,7 @@ export class AppService implements OnDestroy {
       this.remotes$.next(remotes ?? []);
     } catch (error) {
       console.error("Error getting remotes:", error);
+      this.errorService.handleApiError(error, "get_remotes");
       throw new Error("Failed to get remotes");
     }
   }
@@ -269,6 +274,7 @@ export class AppService implements OnDestroy {
       await this.getRemotes();
     } catch (error) {
       console.error("Error adding remote:", error);
+      this.errorService.handleApiError(error, "add_remote");
       throw error;
     }
   }
@@ -279,6 +285,7 @@ export class AppService implements OnDestroy {
       if (err) throw new Error(err.message);
     } catch (error) {
       console.error("Error stopping add remote:", error);
+      this.errorService.handleApiError(error, "stop_adding_remote");
       throw error;
     }
   }
@@ -293,6 +300,7 @@ export class AppService implements OnDestroy {
       await this.getRemotes();
     } catch (error) {
       console.error("Error deleting remote:", error);
+      this.errorService.handleApiError(error, "delete_remote");
       throw new Error("Failed to delete remote");
     }
   }
@@ -374,6 +382,7 @@ export class AppService implements OnDestroy {
       }
     } catch (e) {
       console.error(e);
+      this.errorService.handleApiError(e, "save_config_info");
     }
   }
 
@@ -463,6 +472,7 @@ export class AppService implements OnDestroy {
       await ExportProfiles();
     } catch (error) {
       console.error("Error exporting profiles:", error);
+      this.errorService.handleApiError(error, "export_profiles");
       throw new Error("Failed to export profiles");
     }
   }
@@ -473,6 +483,7 @@ export class AppService implements OnDestroy {
       await this.getConfigInfo(); // Refresh the profiles list
     } catch (error) {
       console.error("Error importing profiles:", error);
+      this.errorService.handleApiError(error, "import_profiles");
       throw new Error("Failed to import profiles");
     }
   }
@@ -482,6 +493,7 @@ export class AppService implements OnDestroy {
       await ExportRemotes();
     } catch (error) {
       console.error("Error exporting remotes:", error);
+      this.errorService.handleApiError(error, "export_remotes");
       throw new Error("Failed to export remotes");
     }
   }
@@ -492,6 +504,7 @@ export class AppService implements OnDestroy {
       await this.getRemotes(); // Refresh the remotes list
     } catch (error) {
       console.error("Error importing remotes:", error);
+      this.errorService.handleApiError(error, "import_remotes");
       throw new Error("Failed to import remotes");
     }
   }

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"desktop/backend/errors"
 	"desktop/backend/models"
 	"desktop/backend/utils"
 	_ "embed"
@@ -14,14 +15,17 @@ import (
 
 // App struct
 type App struct {
-	ctx        context.Context
-	oc         chan []byte
-	ConfigInfo models.ConfigInfo
+	ctx          context.Context
+	oc           chan []byte
+	ConfigInfo   models.ConfigInfo
+	errorHandler *errors.Middleware
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{
+		errorHandler: errors.NewMiddleware(true), // Enable debug mode for development
+	}
 }
 
 //go:embed .env
@@ -33,6 +37,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 
 	if err := utils.CdToNormalizeWorkingDir(a.ctx); err != nil {
+		a.errorHandler.HandleError(err, "startup", "working_directory")
 		utils.LogErrorAndExit(err)
 	}
 
@@ -41,6 +46,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Load working directory
 	wd, err := os.Getwd()
 	if err != nil {
+		a.errorHandler.HandleError(err, "startup", "get_working_directory")
 		utils.LogErrorAndExit(err)
 	}
 	a.ConfigInfo.WorkingDir = wd
@@ -48,6 +54,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Load profiles
 	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
+		a.errorHandler.HandleError(err, "startup", "load_profiles")
 		utils.LogErrorAndExit(err)
 	}
 
