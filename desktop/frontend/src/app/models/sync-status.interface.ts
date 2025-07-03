@@ -2,7 +2,7 @@ export interface SyncStatus {
   command: string;
   pid?: number;
   tab_id?: string;
-  status: 'running' | 'completed' | 'error' | 'stopped';
+  status: "running" | "completed" | "error" | "stopped";
   progress: number; // 0-100 percentage
   speed: string; // e.g., "1.2 MB/s"
   eta: string; // estimated time remaining
@@ -17,7 +17,7 @@ export interface SyncStatus {
   renames: number;
   timestamp: string;
   elapsed_time: string;
-  action: 'pull' | 'push' | 'bi' | 'bi-resync';
+  action: "pull" | "push" | "bi" | "bi-resync";
 }
 
 export interface SyncStatusEvent {
@@ -43,21 +43,34 @@ export interface SyncStatusEvent {
 }
 
 export const DEFAULT_SYNC_STATUS: SyncStatus = {
-  command: 'sync_status',
-  status: 'running',
+  command: "sync_status",
+  status: "running",
   progress: 0,
-  speed: '0 B/s',
-  eta: '--',
+  speed: "0 B/s",
+  eta: "--",
   files_transferred: 0,
   total_files: 0,
   bytes_transferred: 0,
   total_bytes: 0,
-  current_file: '',
+  current_file: "",
   errors: 0,
   checks: 0,
   deletes: 0,
   renames: 0,
   timestamp: new Date().toISOString(),
-  elapsed_time: '0s',
-  action: 'pull'
+  elapsed_time: "0s",
+  action: "pull",
 };
+
+// Type guards
+export function isValidSyncStatus(
+  status: string
+): status is SyncStatus["status"] {
+  return ["running", "completed", "error", "stopped"].includes(status);
+}
+
+export function isValidSyncAction(
+  action: string
+): action is SyncStatus["action"] {
+  return ["pull", "push", "bi", "bi-resync"].includes(action);
+}

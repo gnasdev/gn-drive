@@ -17,6 +17,7 @@ import { ErrorService } from "../services/error.service";
 import {
   RemoteFormData,
   RemoteTypeOption,
+  RemoteInfo,
   REMOTE_TYPE_OPTIONS,
 } from "./remotes.types";
 import {
@@ -57,7 +58,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
   // Modal state management
   showAddRemoteModal = false;
   showDeleteConfirmModal = false;
-  remoteToDelete: any = null;
+  remoteToDelete: RemoteInfo | null = null;
   addRemoteData: RemoteFormData = { name: "", type: "drive" };
 
   constructor(
@@ -146,7 +147,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
         `Remote "${this.addRemoteData.name}" added successfully!`
       );
       this.closeAddRemoteModal();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding remote:", error);
       this.errorService.handleApiError(error, "add_remote_modal");
     } finally {

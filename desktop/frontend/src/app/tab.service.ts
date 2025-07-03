@@ -5,6 +5,8 @@ import {
   SyncStatus,
   SyncStatusEvent,
   DEFAULT_SYNC_STATUS,
+  isValidSyncStatus,
+  isValidSyncAction,
 } from "./models/sync-status.interface";
 
 export interface Tab {
@@ -214,7 +216,10 @@ export class TabService {
       ...currentStatus,
       ...statusEvent,
       // Ensure required fields have defaults
-      status: (statusEvent.status as any) || currentStatus.status,
+      status:
+        statusEvent.status && isValidSyncStatus(statusEvent.status)
+          ? statusEvent.status
+          : currentStatus.status,
       progress: statusEvent.progress ?? currentStatus.progress,
       speed: statusEvent.speed || currentStatus.speed,
       eta: statusEvent.eta || currentStatus.eta,
@@ -230,7 +235,10 @@ export class TabService {
       deletes: statusEvent.deletes ?? currentStatus.deletes,
       renames: statusEvent.renames ?? currentStatus.renames,
       elapsed_time: statusEvent.elapsed_time || currentStatus.elapsed_time,
-      action: (statusEvent.action as any) || currentStatus.action,
+      action:
+        statusEvent.action && isValidSyncAction(statusEvent.action)
+          ? statusEvent.action
+          : currentStatus.action,
     };
 
     this.updateTab(tabId, { syncStatus: updatedStatus });

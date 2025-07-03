@@ -186,7 +186,7 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
     return this.expandedDetails.has(errorId);
   }
 
-  getErrorIcon(severity: ErrorSeverity): any {
+  getErrorIcon(severity: ErrorSeverity): typeof this.InfoIcon {
     switch (severity) {
       case ErrorSeverity.INFO:
         return this.InfoIcon;

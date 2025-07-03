@@ -31,7 +31,7 @@ import { SyncStatus } from "../../models/sync-status.interface";
 })
 export class SyncStatusComponent {
   @Input() syncStatus: SyncStatus | null = null;
-  @Input() showTitle: boolean = true;
+  @Input() showTitle = true;
 
   // Lucide icons
   readonly DownloadIcon = Download;

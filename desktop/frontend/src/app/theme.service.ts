@@ -17,9 +17,7 @@ export class ThemeService {
     this.applyTheme();
   }
 
-  public get isDarkMode(): boolean {
-    return true; // Always dark mode
-  }
+  public readonly isDarkMode = true; // Always dark mode
 
   private applyTheme(): void {
     const body = document.body;
@@ -36,7 +34,7 @@ export class ThemeService {
     // Force repaint to ensure styles are applied
     setTimeout(() => {
       body.style.display = "none";
-      body.offsetHeight; // trigger reflow
+      void body.offsetHeight; // trigger reflow
       body.style.display = "";
     }, 0);
   }

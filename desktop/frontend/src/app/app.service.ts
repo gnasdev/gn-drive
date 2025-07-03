@@ -23,6 +23,8 @@ import {
   SyncStatus,
   SyncStatusEvent,
   DEFAULT_SYNC_STATUS,
+  isValidSyncStatus,
+  isValidSyncAction,
 } from "./models/sync-status.interface";
 
 interface CommandDTO {
@@ -64,8 +66,8 @@ export class AppService implements OnDestroy {
     console.log("AppService initial configInfo:", configInfo);
 
     // Store cleanup function for event listener
-    this.eventCleanup = EventsOn("tofe", (data: any) => {
-      data = <CommandDTO>JSON.parse(data);
+    this.eventCleanup = EventsOn("tofe", (rawData: unknown) => {
+      const data = JSON.parse(rawData as string) as CommandDTO;
 
       // If event has tab_id, route to TabService
       if (data.tab_id) {
@@ -85,13 +87,17 @@ export class AppService implements OnDestroy {
           this.syncStatus$.next(null); // Clear sync status
           break;
         case dto.Command.command_output:
-          this.replaceData(data.error);
+          this.replaceData(data.error || "");
           break;
-        case dto.Command.error:
+        case dto.Command.error: {
           // Create new array to avoid mutating current state
-          const dataValue = [...this.data$.value, data];
+          const dataValue = [
+            ...this.data$.value,
+            data.error || "Unknown error",
+          ];
           this.data$.next(dataValue);
           break;
+        }
         case "sync_status":
           // Handle sync status updates
           this.handleSyncStatusUpdate(data as SyncStatusEvent);
@@ -126,7 +132,10 @@ export class AppService implements OnDestroy {
       ...currentStatus,
       ...statusEvent,
       // Ensure required fields have defaults
-      status: (statusEvent.status as any) || currentStatus.status,
+      status:
+        statusEvent.status && isValidSyncStatus(statusEvent.status)
+          ? statusEvent.status
+          : currentStatus.status,
       progress: statusEvent.progress ?? currentStatus.progress,
       speed: statusEvent.speed || currentStatus.speed,
       eta: statusEvent.eta || currentStatus.eta,
@@ -142,7 +151,10 @@ export class AppService implements OnDestroy {
       deletes: statusEvent.deletes ?? currentStatus.deletes,
       renames: statusEvent.renames ?? currentStatus.renames,
       elapsed_time: statusEvent.elapsed_time || currentStatus.elapsed_time,
-      action: (statusEvent.action as any) || currentStatus.action,
+      action:
+        statusEvent.action && isValidSyncAction(statusEvent.action)
+          ? statusEvent.action
+          : currentStatus.action,
     };
 
     this.syncStatus$.next(updatedStatus);
@@ -152,7 +164,7 @@ export class AppService implements OnDestroy {
     if (this.currentAction$.value === Action.Pull) return;
 
     this.replaceData("Pulling...");
-    this.currentId$.next(await Sync(<Action>"pull", profile));
+    this.currentId$.next(await Sync(Action.Pull, profile));
     if (this.currentId$.value) this.currentAction$.next(Action.Pull);
   }
 
@@ -161,7 +173,7 @@ export class AppService implements OnDestroy {
     if (!tab || tab.currentAction === Action.Pull) return;
 
     this.tabService.updateTab(tabId, { data: ["Pulling..."] });
-    const taskId = await SyncWithTabId(<Action>"pull", profile, tabId);
+    const taskId = await SyncWithTabId(Action.Pull, profile, tabId);
     if (taskId) {
       this.tabService.updateTab(tabId, {
         currentAction: Action.Pull,
@@ -174,7 +186,7 @@ export class AppService implements OnDestroy {
     if (this.currentAction$.value === Action.Push) return;
 
     this.replaceData("Pushing...");
-    this.currentId$.next(await Sync(<Action>"push", profile));
+    this.currentId$.next(await Sync(Action.Push, profile));
     if (this.currentId$.value) this.currentAction$.next(Action.Push);
   }
 
@@ -183,7 +195,7 @@ export class AppService implements OnDestroy {
     if (!tab || tab.currentAction === Action.Push) return;
 
     this.tabService.updateTab(tabId, { data: ["Pushing..."] });
-    const taskId = await SyncWithTabId(<Action>"push", profile, tabId);
+    const taskId = await SyncWithTabId(Action.Push, profile, tabId);
     if (taskId) {
       this.tabService.updateTab(tabId, {
         currentAction: Action.Push,
@@ -197,7 +209,7 @@ export class AppService implements OnDestroy {
 
     this.replaceData("Bi...");
     this.currentId$.next(
-      await Sync(resync ? <Action>"bi-resync" : <Action>"bi", profile)
+      await Sync(resync ? Action.BiResync : Action.Bi, profile)
     );
     if (this.currentId$.value) this.currentAction$.next(Action.Bi);
   }
@@ -208,7 +220,7 @@ export class AppService implements OnDestroy {
 
     this.tabService.updateTab(tabId, { data: ["Bi..."] });
     const taskId = await SyncWithTabId(
-      resync ? <Action>"bi-resync" : <Action>"bi",
+      resync ? Action.BiResync : Action.Bi,
       profile,
       tabId
     );

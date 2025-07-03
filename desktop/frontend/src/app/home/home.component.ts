@@ -78,7 +78,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly ClockIcon = Clock;
 
   private subscriptions = new Subscription();
-  showRenameDialog: boolean = false;
+  showRenameDialog = false;
 
   renameDialogData = {
     tabId: "",
@@ -479,7 +479,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return config.color;
   }
 
-  getActionIcon(action: Action): any {
+  getActionIcon(action: Action): typeof this.DownloadIcon {
     switch (action) {
       case Action.Pull:
         return this.DownloadIcon;

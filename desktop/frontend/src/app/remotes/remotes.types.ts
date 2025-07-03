@@ -54,11 +54,15 @@ export function isValidRemoteType(type: string): type is RemoteType {
   ].includes(type);
 }
 
-export function isRemoteFormData(data: any): data is RemoteFormData {
+export function isRemoteFormData(data: unknown): data is RemoteFormData {
   return (
-    data &&
-    typeof data.name === "string" &&
-    typeof data.type === "string" &&
-    isValidRemoteType(data.type)
+    data !== null &&
+    typeof data === "object" &&
+    data !== undefined &&
+    "name" in data &&
+    "type" in data &&
+    typeof (data as RemoteFormData).name === "string" &&
+    typeof (data as RemoteFormData).type === "string" &&
+    isValidRemoteType((data as RemoteFormData).type)
   );
 }

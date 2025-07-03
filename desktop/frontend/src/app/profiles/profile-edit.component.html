@@ -40,12 +40,14 @@
     </div>
     <div>
       <label
+        for="profile-name-input"
         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
       >
         Profile Name
       </label>
       <div class="relative">
         <input
+          id="profile-name-input"
           type="text"
           class="input-field pr-10"
           [(ngModel)]="profile.name"
@@ -82,11 +84,13 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label
+              for="from-remote-select"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Remote
             </label>
             <select
+              id="from-remote-select"
               class="select-field"
               [ngModel]="getFromRemote()"
               (ngModelChange)="updateFromPath($event, getFromPath())"
@@ -101,12 +105,14 @@
           </div>
           <div>
             <label
+              for="from-path-input"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Path
             </label>
             <div class="relative">
               <input
+                id="from-path-input"
                 type="text"
                 class="input-field pr-10"
                 [ngModel]="getFromPath()"
@@ -133,11 +139,13 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label
+              for="to-remote-select"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Remote
             </label>
             <select
+              id="to-remote-select"
               class="select-field"
               [ngModel]="getToRemote()"
               (ngModelChange)="updateToPath($event, getToPath())"
@@ -152,12 +160,14 @@
           </div>
           <div>
             <label
+              for="to-path-input"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Path
             </label>
             <div class="relative">
               <input
+                id="to-path-input"
                 type="text"
                 class="input-field pr-10"
                 [ngModel]="getToPath()"
@@ -357,12 +367,14 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
         <label
+          for="parallel-select"
           class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
           Parallel Transfers
         </label>
         <div class="relative">
           <select
+            id="parallel-select"
             class="select-field pr-10"
             [(ngModel)]="profile.parallel"
             (ngModelChange)="onProfileFieldChange()"
@@ -385,12 +397,14 @@
       </div>
       <div>
         <label
+          for="bandwidth-select"
           class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
           Bandwidth Limit (MB/s)
         </label>
         <div class="relative">
           <select
+            id="bandwidth-select"
             class="select-field pr-10"
             [(ngModel)]="profile.bandwidth"
             (ngModelChange)="onProfileFieldChange()"

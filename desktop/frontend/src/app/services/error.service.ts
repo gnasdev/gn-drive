@@ -41,12 +41,14 @@ export class ErrorService {
 
   private errorCounter = 0;
 
-  constructor() {}
+  constructor() {
+    // Initialize service
+  }
 
   /**
    * Handle API errors from backend
    */
-  handleApiError(error: any, context?: string): void {
+  handleApiError(error: unknown, context?: string): void {
     console.error("API Error:", error, "Context:", context);
 
     let errorNotification: ErrorNotification;
@@ -57,20 +59,27 @@ export class ErrorService {
         error.error,
         context
       );
-    } else if (error?.error?.message) {
+    } else if (
+      error &&
+      typeof error === "object" &&
+      "error" in error &&
+      error.error &&
+      typeof error.error === "object" &&
+      "message" in error.error
+    ) {
       // Standard HTTP error with message
       errorNotification = this.createNotification(
         ErrorSeverity.ERROR,
         "API Error",
-        error.error.message,
+        String((error.error as { message: unknown }).message),
         context
       );
-    } else if (error?.message) {
+    } else if (error && typeof error === "object" && "message" in error) {
       // JavaScript Error object
       errorNotification = this.createNotification(
         ErrorSeverity.ERROR,
         "Application Error",
-        error.message,
+        String((error as { message: unknown }).message),
         context
       );
     } else if (typeof error === "string") {
@@ -111,7 +120,7 @@ export class ErrorService {
   /**
    * Handle network errors
    */
-  handleNetworkError(_error: any): void {
+  handleNetworkError(): void {
     const errorNotification = this.createNotification(
       ErrorSeverity.ERROR,
       "Network Error",
@@ -139,7 +148,7 @@ export class ErrorService {
   /**
    * Show success message
    */
-  showSuccess(message: string, duration: number = 3000): void {
+  showSuccess(message: string, duration = 3000): void {
     const notification = this.createNotification(
       ErrorSeverity.INFO,
       "Success",
@@ -153,7 +162,7 @@ export class ErrorService {
   /**
    * Show info message
    */
-  showInfo(message: string, duration: number = 5000): void {
+  showInfo(message: string, duration = 5000): void {
     const notification = this.createNotification(
       ErrorSeverity.INFO,
       "Information",
@@ -167,7 +176,7 @@ export class ErrorService {
   /**
    * Show warning message
    */
-  showWarning(message: string, duration: number = 7000): void {
+  showWarning(message: string, duration = 7000): void {
     const notification = this.createNotification(
       ErrorSeverity.WARNING,
       "Warning",
@@ -203,12 +212,18 @@ export class ErrorService {
     return this.errorsSubject.value.filter((error) => !error.dismissed);
   }
 
-  private isErrorResponse(error: any): error is ErrorResponse {
+  private isErrorResponse(error: unknown): error is ErrorResponse {
     return (
-      error &&
-      error.error &&
-      typeof error.error.code === "string" &&
-      typeof error.error.message === "string"
+      error !== null &&
+      typeof error === "object" &&
+      error !== undefined &&
+      "error" in error &&
+      typeof (error as ErrorResponse).error === "object" &&
+      (error as ErrorResponse).error !== null &&
+      "code" in (error as ErrorResponse).error &&
+      "message" in (error as ErrorResponse).error &&
+      typeof (error as ErrorResponse).error.code === "string" &&
+      typeof (error as ErrorResponse).error.message === "string"
     );
   }
 
