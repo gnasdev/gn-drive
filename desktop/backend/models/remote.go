@@ -3,9 +3,9 @@ package models
 import "encoding/json"
 
 type Remote struct {
-	Name  string                 `json:"name"`
-	Type  string                 `json:"type"`
-	Token map[string]interface{} `json:"token"`
+	Name  string         `json:"name"`
+	Type  string         `json:"type"`
+	Token map[string]any `json:"token"`
 }
 
 type Remotes []Remote

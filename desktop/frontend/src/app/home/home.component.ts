@@ -1,5 +1,11 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnDestroy, OnInit } from "@angular/core";
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  ChangeDetectorRef,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 import { map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
@@ -39,7 +45,7 @@ import {
   imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
-  // changeDetection: ChangeDetectionStrategy.OnPush, // Temporarily disable OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent implements OnInit, OnDestroy {
   Action = Action;
@@ -76,7 +82,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(
     public readonly appService: AppService,
-    public readonly tabService: TabService
+    public readonly tabService: TabService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -120,6 +127,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             next: (profile) => {
               console.log("HomeComponent profile validation result:", profile);
               this.isCurrentProfileValid = profile;
+              this.cdr.detectChanges();
             },
             error: (error) => {
               console.error(
@@ -128,13 +136,28 @@ export class HomeComponent implements OnInit, OnDestroy {
               );
               // Reset to safe state on error
               this.isCurrentProfileValid = undefined;
+              this.cdr.detectChanges();
             },
           })
+      );
+
+      // Subscribe to tab changes for console output updates
+      this.subscriptions.add(
+        this.tabService.tabs.subscribe({
+          next: (tabs) => {
+            console.log("HomeComponent tabs updated:", tabs);
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            console.error("HomeComponent tabs subscription error:", error);
+          },
+        })
       );
     } catch (error) {
       console.error("HomeComponent ngOnInit error:", error);
       // Reset to safe state on error
       this.isCurrentProfileValid = undefined;
+      this.cdr.detectChanges();
     }
   }
 
@@ -280,6 +303,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.pullWithTab(profile, tabId);
+    this.cdr.detectChanges();
   }
 
   pushTab(tabId: string): void {
@@ -297,6 +321,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.pushWithTab(profile, tabId);
+    this.cdr.detectChanges();
   }
 
   biTab(tabId: string): void {
@@ -314,6 +339,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.biWithTab(profile, tabId);
+    this.cdr.detectChanges();
   }
 
   biResyncTab(tabId: string): void {
@@ -331,6 +357,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.biWithTab(profile, tabId, true);
+    this.cdr.detectChanges();
   }
 
   stopCommandTab(tabId: string): void {
@@ -352,6 +379,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
 
       this.appService.stopCommandForTab(tabId);
+      this.cdr.detectChanges();
     }
   }
 
@@ -478,6 +506,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   clearTabOutput(tabId: string): void {
     this.tabService.updateTab(tabId, { data: [] });
+    this.cdr.detectChanges();
   }
 
   onProfileChange(event: Event, tabId: string | undefined): void {

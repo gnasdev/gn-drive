@@ -23,6 +23,7 @@ import {
   Cloud,
   Plus,
   Download,
+  Upload,
   X,
   Trash2,
 } from "lucide-angular";
@@ -41,6 +42,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
   readonly CloudIcon = Cloud;
   readonly PlusIcon = Plus;
   readonly DownloadIcon = Download;
+  readonly UploadIcon = Upload;
   readonly XIcon = X;
   readonly Trash2Icon = Trash2;
   private subscriptions = new Subscription();
@@ -177,5 +179,25 @@ export class RemotesComponent implements OnInit, OnDestroy {
   getRemoteTypeLabel(type: string): string {
     const option = this.remoteTypeOptions.find((opt) => opt.value === type);
     return option?.label ?? type;
+  }
+
+  async exportRemotes(): Promise<void> {
+    try {
+      await this.appService.exportRemotes();
+    } catch (error) {
+      console.error("Error exporting remotes:", error);
+      alert("Failed to export remotes. Please try again.");
+    }
+  }
+
+  async importRemotes(): Promise<void> {
+    try {
+      await this.appService.importRemotes();
+    } catch (error) {
+      console.error("Error importing remotes:", error);
+      alert(
+        "Failed to import remotes. Please check the file format and try again."
+      );
+    }
   }
 }

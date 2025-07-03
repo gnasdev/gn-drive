@@ -17,6 +17,8 @@ import {
   FolderOpen,
   X,
   Trash2,
+  Download,
+  Upload,
 } from "lucide-angular";
 import { models } from "../../../wailsjs/go/models";
 import {
@@ -49,6 +51,8 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   readonly FolderOpenIcon = FolderOpen;
   readonly XIcon = X;
   readonly Trash2Icon = Trash2;
+  readonly DownloadIcon = Download;
+  readonly UploadIcon = Upload;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
 
@@ -73,20 +77,32 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     this.subscriptions.unsubscribe();
   }
 
-  addProfile(): void {
-    this.appService.addProfile();
+  async addProfile(): Promise<void> {
+    try {
+      const newProfileIndex = await this.appService.addProfile();
+      // Navigate to edit the newly created profile
+      this.navigationService.navigateToProfileEdit(newProfileIndex);
+    } catch (error) {
+      console.error("Error creating profile:", error);
+      alert("Failed to create profile. Please try again.");
+    }
   }
 
   editProfile(index: number): void {
     this.navigationService.navigateToProfileEdit(index);
   }
 
-  removeProfile(idx: number): void {
+  async removeProfile(idx: number): Promise<void> {
     if (!isValidProfileIndex(this.appService.configInfo$.value.profiles, idx)) {
       console.error("Invalid profile index:", idx);
       return;
     }
-    this.appService.removeProfile(idx);
+    try {
+      await this.appService.removeProfile(idx);
+    } catch (error) {
+      console.error("Error removing profile:", error);
+      alert("Failed to remove profile. Please try again.");
+    }
   }
 
   saveConfigInfo(): void {
@@ -94,6 +110,26 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
     this.cdr.detectChanges();
+  }
+
+  async exportProfiles(): Promise<void> {
+    try {
+      await this.appService.exportProfiles();
+    } catch (error) {
+      console.error("Error exporting profiles:", error);
+      alert("Failed to export profiles. Please try again.");
+    }
+  }
+
+  async importProfiles(): Promise<void> {
+    try {
+      await this.appService.importProfiles();
+    } catch (error) {
+      console.error("Error importing profiles:", error);
+      alert(
+        "Failed to import profiles. Please check the file format and try again."
+      );
+    }
   }
 
   addIncludePath(profileIndex: number): void {

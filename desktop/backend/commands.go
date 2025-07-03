@@ -6,6 +6,7 @@ import (
 	"desktop/backend/models"
 	"desktop/backend/rclone"
 	"desktop/backend/utils"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -16,6 +17,7 @@ import (
 	fsConfig "github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/rc"
 	"github.com/rclone/rclone/lib/oauthutil"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func (a *App) Sync(task string, profile models.Profile) int {
@@ -187,4 +189,268 @@ func (a *App) DeleteRemote(remoteName string) {
 
 func (a *App) SyncWithTabId(task string, profile models.Profile, tabId string) int {
 	return a.SyncWithTab(task, profile, tabId)
+}
+
+// File dialog functions
+func (a *App) OpenFileDialog(title string, filters []string) (string, *dto.AppError) {
+	filePath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: title,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "JSON Files",
+				Pattern:     "*.json",
+			},
+		},
+	})
+	if err != nil {
+		return "", dto.NewAppError(err)
+	}
+	return filePath, nil
+}
+
+func (a *App) SaveFileDialog(title string, defaultFilename string, filters []string) (string, *dto.AppError) {
+	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           title,
+		DefaultFilename: defaultFilename,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "JSON Files",
+				Pattern:     "*.json",
+			},
+		},
+	})
+	if err != nil {
+		return "", dto.NewAppError(err)
+	}
+	return filePath, nil
+}
+
+// Profile import/export functions
+func (a *App) ExportProfiles() *dto.AppError {
+	filePath, appErr := a.SaveFileDialog("Export Profiles", "profiles.json", []string{"*.json"})
+	if appErr != nil {
+		return appErr
+	}
+
+	if filePath == "" {
+		// User cancelled the dialog
+		return nil
+	}
+
+	profilesJson, err := a.ConfigInfo.Profiles.ToJSON()
+	if err != nil {
+		return dto.NewAppError(err)
+	}
+
+	err = os.WriteFile(filePath, profilesJson, 0644)
+	if err != nil {
+		return dto.NewAppError(err)
+	}
+
+	return nil
+}
+
+func (a *App) ImportProfiles() *dto.AppError {
+	filePath, appErr := a.OpenFileDialog("Import Profiles", []string{"*.json"})
+	if appErr != nil {
+		return appErr
+	}
+
+	if filePath == "" {
+		// User cancelled the dialog
+		return nil
+	}
+
+	// Read the file
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return dto.NewAppError(fmt.Errorf("failed to read file: %w", err))
+	}
+
+	// Parse the JSON
+	var importedProfiles models.Profiles
+	err = json.Unmarshal(fileData, &importedProfiles)
+	if err != nil {
+		return dto.NewAppError(fmt.Errorf("invalid JSON format: %w", err))
+	}
+
+	// Validate profiles
+	for i, profile := range importedProfiles {
+		if profile.Name == "" {
+			return dto.NewAppError(fmt.Errorf("profile %d has no name", i+1))
+		}
+		if profile.From == "" {
+			return dto.NewAppError(fmt.Errorf("profile '%s' has no source path", profile.Name))
+		}
+		if profile.To == "" {
+			return dto.NewAppError(fmt.Errorf("profile '%s' has no destination path", profile.Name))
+		}
+	}
+
+	// Merge with existing profiles (append imported profiles)
+	a.ConfigInfo.Profiles = append(a.ConfigInfo.Profiles, importedProfiles...)
+
+	// Save to file
+	return a.UpdateProfiles(a.ConfigInfo.Profiles)
+}
+
+// Remote import/export functions
+func (a *App) ExportRemotes() *dto.AppError {
+	filePath, appErr := a.SaveFileDialog("Export Remotes", "remotes.json", []string{"*.json"})
+	if appErr != nil {
+		return appErr
+	}
+
+	if filePath == "" {
+		// User cancelled the dialog
+		return nil
+	}
+
+	// Get current remotes
+	remotes := fsConfig.GetRemotes()
+
+	// Get the config storage to access all configuration data
+	configData := fsConfig.Data()
+
+	// Convert to our models.Remotes format for export
+	var exportRemotes models.Remotes
+	for _, remote := range remotes {
+		exportRemote := models.Remote{
+			Name:  remote.Name,
+			Type:  remote.Type,
+			Token: make(map[string]any),
+		}
+
+		// Export ALL configuration data for this remote
+		if configData.HasSection(remote.Name) {
+			keyList := configData.GetKeyList(remote.Name)
+			for _, key := range keyList {
+				if value, found := configData.GetValue(remote.Name, key); found {
+					exportRemote.Token[key] = value
+				}
+			}
+		}
+
+		// Add basic remote info to Token field for export
+		exportRemote.Token["source"] = remote.Source
+		exportRemote.Token["description"] = remote.Description
+
+		exportRemotes = append(exportRemotes, exportRemote)
+	}
+
+	remotesJson, err := exportRemotes.ToJSON()
+	if err != nil {
+		return dto.NewAppError(err)
+	}
+
+	err = os.WriteFile(filePath, remotesJson, 0644)
+	if err != nil {
+		return dto.NewAppError(err)
+	}
+
+	return nil
+}
+
+func (a *App) ImportRemotes() *dto.AppError {
+	filePath, appErr := a.OpenFileDialog("Import Remotes", []string{"*.json"})
+	if appErr != nil {
+		return appErr
+	}
+
+	if filePath == "" {
+		// User cancelled the dialog
+		return nil
+	}
+
+	// Read the file
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return dto.NewAppError(fmt.Errorf("failed to read file: %w", err))
+	}
+
+	// Parse the JSON
+	var importedRemotes models.Remotes
+	err = json.Unmarshal(fileData, &importedRemotes)
+	if err != nil {
+		return dto.NewAppError(fmt.Errorf("invalid JSON format: %w", err))
+	}
+
+	if len(importedRemotes) == 0 {
+		return dto.NewAppError(fmt.Errorf("no remotes found in the import file"))
+	}
+
+	// Get existing remotes once to avoid repeated calls
+	existingRemotes := fsConfig.GetRemotes()
+	existingNames := make(map[string]bool)
+	for _, existing := range existingRemotes {
+		existingNames[existing.Name] = true
+	}
+
+	// Validate all remotes first before creating any
+	var errors []string
+	for _, remote := range importedRemotes {
+		if remote.Name == "" {
+			errors = append(errors, "found remote with no name")
+			continue
+		}
+		if remote.Type == "" {
+			errors = append(errors, fmt.Sprintf("remote '%s' has no type", remote.Name))
+			continue
+		}
+		if existingNames[remote.Name] {
+			errors = append(errors, fmt.Sprintf("remote '%s' already exists", remote.Name))
+			continue
+		}
+	}
+
+	if len(errors) > 0 {
+		return dto.NewAppError(fmt.Errorf("validation errors: %v", errors))
+	}
+
+	// Create remotes one by one
+	var createdRemotes []string
+	var failedRemotes []string
+
+	// Get the config storage to set configuration data
+	configData := fsConfig.Data()
+
+	for _, remote := range importedRemotes {
+		// First, set all the configuration data for this remote
+		for key, value := range remote.Token {
+			// Skip metadata fields that aren't actual config
+			if key == "source" || key == "description" {
+				continue
+			}
+			// Convert value to string for storage
+			if strValue, ok := value.(string); ok {
+				configData.SetValue(remote.Name, key, strValue)
+			}
+		}
+
+		// Set the type
+		configData.SetValue(remote.Name, "type", remote.Type)
+
+		// Save the configuration
+		err := configData.Save()
+		if err != nil {
+			// If saving fails, clean up and track the failure
+			configData.DeleteSection(remote.Name)
+			failedRemotes = append(failedRemotes, fmt.Sprintf("%s (config save failed: %s)", remote.Name, err.Error()))
+			continue
+		}
+
+		createdRemotes = append(createdRemotes, remote.Name)
+	}
+
+	// Report results
+	if len(failedRemotes) > 0 {
+		if len(createdRemotes) > 0 {
+			return dto.NewAppError(fmt.Errorf("partially successful: created %d remotes (%v), failed %d remotes (%v)",
+				len(createdRemotes), createdRemotes, len(failedRemotes), failedRemotes))
+		} else {
+			return dto.NewAppError(fmt.Errorf("failed to create any remotes: %v", failedRemotes))
+		}
+	}
+
+	return nil
 }

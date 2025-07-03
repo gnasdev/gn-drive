@@ -25,6 +25,7 @@ import {
   Zap,
   Wifi,
   Save,
+  Trash,
 } from "lucide-angular";
 
 // No Material imports needed anymore
@@ -47,6 +48,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   readonly ZapIcon = Zap;
   readonly WifiIcon = Wifi;
   readonly SaveIcon = Save;
+  readonly TrashIcon = Trash;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
   profileIndex = 0; // Will be set from navigation
@@ -88,10 +90,42 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   }
 
   saveProfile(): void {
+    if (this.profile) {
+      // Ensure the profile is updated in the service before saving
+      this.appService.updateProfile(this.profileIndex, this.profile);
+    }
     this.appService.saveConfigInfo();
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
     this.cdr.detectChanges();
+  }
+
+  // Method to handle profile field changes
+  onProfileFieldChange(): void {
+    if (this.profile) {
+      this.appService.updateProfile(this.profileIndex, this.profile);
+    }
+  }
+
+  async deleteProfile(): Promise<void> {
+    if (!this.profile) return;
+
+    const confirmDelete = confirm(
+      `Are you sure you want to delete the profile "${this.profile.name}"? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await this.appService.removeProfile(this.profileIndex);
+      console.log("Profile deleted successfully, navigating to profiles page");
+      // Navigate back to profiles list
+      this.navigationService.navigateToProfiles();
+      // Force change detection to ensure navigation happens
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error("Error deleting profile:", error);
+      alert("Failed to delete profile. Please try again.");
+    }
   }
 
   goBack(): void {
@@ -119,6 +153,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   updateFromPath(remote: string, path: string): void {
     if (!this.profile) return;
     this.profile.from = buildRemotePath(remote, path);
+    this.appService.updateProfile(this.profileIndex, this.profile);
     this.cdr.detectChanges();
   }
 
@@ -138,6 +173,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   updateToPath(remote: string, path: string): void {
     if (!this.profile) return;
     this.profile.to = buildRemotePath(remote, path);
+    this.appService.updateProfile(this.profileIndex, this.profile);
     this.cdr.detectChanges();
   }
 

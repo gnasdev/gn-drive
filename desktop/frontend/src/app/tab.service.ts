@@ -160,6 +160,7 @@ export class TabService {
 
     switch (data.command) {
       case "command_started":
+        // Clear previous data when a new command starts
         this.updateTab(data.tab_id, {
           data: ["Command started..."],
         });
@@ -172,11 +173,13 @@ export class TabService {
         });
         break;
       case "command_output":
+        // Accumulate output during command execution
         this.updateTab(data.tab_id, {
           data: [data.error || ""],
         });
         break;
       case "error":
+        // Append errors to existing data
         this.updateTab(data.tab_id, {
           data: [...tab.data, data.error || ""],
         });

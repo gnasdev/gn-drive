@@ -1,11 +1,9 @@
 <!-- Remotes List -->
 <div class="p-6 max-w-4xl mx-auto">
-  <div
-    *ngIf="(appService.remotes$ | async)?.length; else noRemotes"
-    class="card"
-  >
-    <div class="mb-6">
-      <div class="flex items-center space-x-3 mb-2">
+  <!-- Header with import/export buttons - always visible -->
+  <div class="mb-6">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center space-x-3">
         <lucide-icon
           [img]="CloudIcon"
           class="w-6 h-6 text-primary-600"
@@ -14,11 +12,35 @@
           Connected Remotes
         </h1>
       </div>
-      <p class="text-gray-600 dark:text-gray-400">
-        {{ (appService.remotes$ | async)?.length }} remote(s) configured
-      </p>
+      <div class="flex items-center space-x-2">
+        <button
+          (click)="importRemotes()"
+          class="btn-secondary flex items-center space-x-2"
+          title="Import Remotes"
+        >
+          <lucide-icon [img]="UploadIcon" class="w-4 h-4"></lucide-icon>
+          <span>Import</span>
+        </button>
+        <button
+          (click)="exportRemotes()"
+          class="btn-secondary flex items-center space-x-2"
+          title="Export Remotes"
+        >
+          <lucide-icon [img]="DownloadIcon" class="w-4 h-4"></lucide-icon>
+          <span>Export</span>
+        </button>
+      </div>
     </div>
+    <p class="text-gray-600 dark:text-gray-400">
+      {{ (appService.remotes$ | async)?.length || 0 }} remote(s) configured
+    </p>
+  </div>
 
+  <!-- Remotes content -->
+  <div
+    *ngIf="(appService.remotes$ | async)?.length; else noRemotes"
+    class="card"
+  >
     <div class="space-y-3">
       <div
         *ngFor="let remote of appService.remotes$ | async"
@@ -88,8 +110,10 @@
           Google Drive, Dropbox, OneDrive, and more.
         </p>
         <button class="btn-primary" (click)="openAddRemoteDialog()">
-          <lucide-icon [img]="PlusIcon" class="w-5 h-5 mr-2"></lucide-icon>
-          Add First Remote
+          <div class="flex items-center space-x-2">
+            <lucide-icon [img]="PlusIcon" class="w-5 h-5 mr-2"></lucide-icon>
+            Add First Remote
+          </div>
         </button>
       </div>
     </div>

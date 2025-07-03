@@ -11,6 +11,10 @@ import {
   DeleteRemote,
   AddRemote,
   StopAddingRemote,
+  ExportProfiles,
+  ImportProfiles,
+  ExportRemotes,
+  ImportRemotes,
 } from "../../wailsjs/go/backend/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { TabService } from "./tab.service";
@@ -251,8 +255,11 @@ export class AppService implements OnDestroy {
     }
   }
 
-  addProfile() {
+  async addProfile(): Promise<number> {
     const profile = new models.Profile();
+    profile.name = ""; // Start with empty name
+    profile.from = "";
+    profile.to = "";
     profile.included_paths = [];
     profile.excluded_paths = [];
     profile.parallel = 16; // Default value
@@ -265,9 +272,15 @@ export class AppService implements OnDestroy {
     updatedConfig.profiles = [...currentConfig.profiles, profile];
 
     this.configInfo$.next(updatedConfig);
+
+    // Save the new profile to the backend
+    await this.saveConfigInfo();
+
+    // Return the index of the newly created profile
+    return updatedConfig.profiles.length - 1;
   }
 
-  removeProfile(index: number) {
+  async removeProfile(index: number) {
     // Create new ConfigInfo instance to avoid mutation
     const currentConfig = this.configInfo$.value;
     const updatedConfig = new models.ConfigInfo();
@@ -275,6 +288,29 @@ export class AppService implements OnDestroy {
     updatedConfig.profiles = currentConfig.profiles.filter(
       (_, i) => i !== index
     );
+
+    this.configInfo$.next(updatedConfig);
+
+    // Save the changes to the backend
+    await this.saveConfigInfo();
+  }
+
+  updateProfile(index: number, updatedProfile: models.Profile) {
+    // Create new ConfigInfo instance to avoid mutation
+    const currentConfig = this.configInfo$.value;
+    const updatedConfig = new models.ConfigInfo();
+    Object.assign(updatedConfig, currentConfig);
+
+    // Deep clone profiles array and update specific profile
+    updatedConfig.profiles = currentConfig.profiles.map((profile, i) => {
+      if (i === index) {
+        // Create a new Profile instance to avoid mutation
+        const newProfile = new models.Profile();
+        Object.assign(newProfile, updatedProfile);
+        return newProfile;
+      }
+      return profile;
+    });
 
     this.configInfo$.next(updatedConfig);
   }
@@ -377,5 +413,44 @@ export class AppService implements OnDestroy {
     });
 
     this.configInfo$.next(updatedConfig);
+  }
+
+  // Import/Export methods
+  async exportProfiles(): Promise<void> {
+    try {
+      await ExportProfiles();
+    } catch (error) {
+      console.error("Error exporting profiles:", error);
+      throw new Error("Failed to export profiles");
+    }
+  }
+
+  async importProfiles(): Promise<void> {
+    try {
+      await ImportProfiles();
+      await this.getConfigInfo(); // Refresh the profiles list
+    } catch (error) {
+      console.error("Error importing profiles:", error);
+      throw new Error("Failed to import profiles");
+    }
+  }
+
+  async exportRemotes(): Promise<void> {
+    try {
+      await ExportRemotes();
+    } catch (error) {
+      console.error("Error exporting remotes:", error);
+      throw new Error("Failed to export remotes");
+    }
+  }
+
+  async importRemotes(): Promise<void> {
+    try {
+      await ImportRemotes();
+      await this.getRemotes(); // Refresh the remotes list
+    } catch (error) {
+      console.error("Error importing remotes:", error);
+      throw new Error("Failed to import remotes");
+    }
   }
 }

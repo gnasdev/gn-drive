@@ -22,6 +22,10 @@
         <lucide-icon [img]="SaveIcon" class="w-5 h-5 mr-2"></lucide-icon>
         {{ saveBtnText$ | async }}
       </button>
+      <button class="btn-danger flex items-center" (click)="deleteProfile()">
+        <lucide-icon [img]="TrashIcon" class="w-5 h-5 mr-2"></lucide-icon>
+        Delete
+      </button>
     </div>
   </div>
 </div>
@@ -46,6 +50,7 @@
           type="text"
           class="input-field pr-10"
           [(ngModel)]="profile.name"
+          (ngModelChange)="onProfileFieldChange()"
           placeholder="Enter profile name"
         />
         <div
@@ -197,7 +202,11 @@
           Parallel Transfers
         </label>
         <div class="relative">
-          <select class="select-field pr-10" [(ngModel)]="profile.parallel">
+          <select
+            class="select-field pr-10"
+            [(ngModel)]="profile.parallel"
+            (ngModelChange)="onProfileFieldChange()"
+          >
             <option *ngFor="let num of getNumberRange(1, 32)" [value]="num">
               {{ num }}
             </option>
@@ -220,7 +229,11 @@
           Bandwidth Limit (MB/s)
         </label>
         <div class="relative">
-          <select class="select-field pr-10" [(ngModel)]="profile.bandwidth">
+          <select
+            class="select-field pr-10"
+            [(ngModel)]="profile.bandwidth"
+            (ngModelChange)="onProfileFieldChange()"
+          >
             <option *ngFor="let num of getNumberRange(1, 100)" [value]="num">
               {{ num }}
             </option>
