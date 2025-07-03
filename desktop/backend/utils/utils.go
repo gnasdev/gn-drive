@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"desktop/backend/constants"
@@ -17,6 +18,11 @@ func GetPlatform(ctx context.Context) string {
 }
 
 func GetCurrentEnvName(ctx context.Context) string {
+	// Check for Wails dev mode environment variable
+	if os.Getenv("WAILS_DEV_MODE") == "true" {
+		return constants.Development.String()
+	}
+
 	// Check if we're in development mode by looking for debug info
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, setting := range info.Settings {
@@ -25,6 +31,14 @@ func GetCurrentEnvName(ctx context.Context) string {
 			}
 		}
 	}
+
+	// Check if we're running from a development directory structure
+	// In dev mode, the working directory typically contains "desktop" in the path
+	wd, err := os.Getwd()
+	if err == nil && strings.Contains(wd, "/desktop") {
+		return constants.Development.String()
+	}
+
 	return constants.Production.String()
 }
 

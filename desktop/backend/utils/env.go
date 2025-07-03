@@ -50,13 +50,16 @@ func LoadEnvFile(filename string) error {
 
 func LoadEnvConfigFromEnvStr(envConfigStr string) beConfig.Config {
 	viper.SetConfigType("env")
-	viper.ReadConfig(bytes.NewBuffer([]byte(envConfigStr)))
+	err := viper.ReadConfig(bytes.NewBuffer([]byte(envConfigStr)))
+	if err != nil {
+		log.Printf("Error reading config: %v", err)
+	}
 
 	// Create a Config struct
 	var cfg beConfig.Config
 
 	// Parse environment variables
-	err := viper.Unmarshal(&cfg)
+	err = viper.Unmarshal(&cfg)
 	if err != nil {
 		log.Fatalf("Error parsing configuration: %s", err)
 	}

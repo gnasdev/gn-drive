@@ -6,6 +6,7 @@ import (
 	"desktop/backend/models"
 	"desktop/backend/utils"
 	_ "embed"
+	"log"
 	"os"
 
 	fsConfig "github.com/rclone/rclone/fs/config"
@@ -19,6 +20,7 @@ type App struct {
 	oc           chan []byte
 	ConfigInfo   models.ConfigInfo
 	errorHandler *errors.Middleware
+	initialized  bool
 }
 
 // NewApp creates a new App application struct
@@ -49,12 +51,21 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	// Note: In Wails v3, we don't have direct access to the application instance from ServiceOptions
 	// We'll need to handle events differently or get the app reference another way
 
+	// Debug: Log initial working directory
+	initialWd, _ := os.Getwd()
+	log.Printf("DEBUG: Initial working directory: %s", initialWd)
+
 	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
 		a.errorHandler.HandleError(err, "startup", "working_directory")
 		utils.LogErrorAndExit(err)
 	}
 
+	// Debug: Log working directory after normalization
+	normalizedWd, _ := os.Getwd()
+	log.Printf("DEBUG: Working directory after normalization: %s", normalizedWd)
+
 	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
+	log.Printf("DEBUG: Loaded env config: %+v", a.ConfigInfo.EnvConfig)
 
 	// Load working directory
 	wd, err := os.Getwd()
@@ -67,9 +78,11 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	// Load profiles
 	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
+		log.Printf("DEBUG: Error loading profiles: %v", err)
 		a.errorHandler.HandleError(err, "startup", "load_profiles")
 		utils.LogErrorAndExit(err)
 	}
+	log.Printf("DEBUG: Loaded %d profiles", len(a.ConfigInfo.Profiles))
 
 	// Setup event channel for sending messages to the frontend
 	a.oc = make(chan []byte)
@@ -85,4 +98,43 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	configfile.Install()
 
 	return nil
+}
+
+// initializeConfig initializes the configuration if it hasn't been done yet
+func (a *App) initializeConfig() {
+	// Check if already initialized
+	if a.initialized {
+		return
+	}
+
+	ctx := context.Background()
+
+	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
+		a.errorHandler.HandleError(err, "init_config", "working_directory")
+		return
+	}
+
+	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
+
+	// Load working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		a.errorHandler.HandleError(err, "init_config", "get_working_directory")
+		return
+	}
+	a.ConfigInfo.WorkingDir = wd
+
+	// Load profiles
+	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
+	if err != nil {
+		a.errorHandler.HandleError(err, "init_config", "load_profiles")
+		return
+	}
+
+	// Load Rclone config
+	fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath)
+	configfile.Install()
+
+	// Mark as initialized
+	a.initialized = true
 }

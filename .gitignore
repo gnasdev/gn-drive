@@ -7,3 +7,8 @@
 /desktop/build
 bin
 .task
+*.log
+
+!appicon.png
+!config.yml
+!Taskfile.yml

@@ -16,9 +16,9 @@ tasks:
       - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
     dir: desktop
     env:
-      CGO_CFLAGS: "-mmacosx-version-min=12.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=12.0"
-      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      CGO_CFLAGS: "-mmacosx-version-min=14.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=14.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
 
   package:
     summary: Packages a production build of the application
@@ -38,10 +38,13 @@ tasks:
   dev:
     summary: Starts both frontend and backend dev servers (experimental)
     cmds:
+      - echo "Checking for processes on port {{.VITE_PORT}}..."
+      - lsof -ti:{{.VITE_PORT}} | xargs -r kill -9 || true
       - echo "Starting Angular dev server..."
-      - cd frontend && yarn start &
-      - sleep 8
+      - cd frontend && yarn start --port {{.VITE_PORT}} &
+      - sleep 10
       - echo "Starting Wails v3 dev server..."
+      - cd ..
       - $(go env GOPATH)/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
     dir: desktop
 
@@ -64,12 +67,6 @@ tasks:
       - tsconfig.json
     generates:
       - dist/browser/**/*
-
-  dev:frontend:
-    summary: Build frontend for development with watch
-    dir: desktop/frontend
-    cmds:
-      - yarn start
 
   # Development utilities
   generate:bindings:

@@ -152,6 +152,11 @@ func (a *App) StopCommand(id int) {
 }
 
 func (a *App) GetConfigInfo() models.ConfigInfo {
+	// Initialize configuration if not already done
+	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+		a.initializeConfig()
+	}
+
 	return a.ConfigInfo
 }
 
@@ -174,6 +179,11 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 }
 
 func (a *App) GetRemotes() []fsConfig.Remote {
+	// Initialize configuration if not already done
+	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+		a.initializeConfig()
+	}
+
 	return fsConfig.GetRemotes()
 }
 
