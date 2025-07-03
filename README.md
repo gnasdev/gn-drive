@@ -22,7 +22,7 @@ task build-mac
 
 ## Execution
 
-Execute the `./desktop.exe` file located in the project's root directory after building.
+Execute the `./desktop.exe` or `./desktop.app` file located in the project's root directory after building.
 
 ## Screenshots
 

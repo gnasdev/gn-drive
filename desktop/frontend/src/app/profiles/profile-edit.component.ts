@@ -14,7 +14,6 @@ import { models } from "../../../wailsjs/go/models";
 import {
   parseRemotePath,
   buildRemotePath,
-  isValidProfileIndex,
   DEFAULT_BANDWIDTH_OPTIONS,
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
@@ -25,7 +24,6 @@ import {
   FolderOpen,
   Zap,
   Wifi,
-  Trash2,
   Save,
 } from "lucide-angular";
 
@@ -48,7 +46,6 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   readonly FolderOpenIcon = FolderOpen;
   readonly ZapIcon = Zap;
   readonly WifiIcon = Wifi;
-  readonly Trash2Icon = Trash2;
   readonly SaveIcon = Save;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
@@ -95,20 +92,6 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
     this.cdr.detectChanges();
-  }
-
-  deleteProfile(): void {
-    if (
-      !isValidProfileIndex(
-        this.appService.configInfo$.value.profiles,
-        this.profileIndex
-      )
-    ) {
-      console.error("Invalid profile index:", this.profileIndex);
-      return;
-    }
-    this.appService.removeProfile(this.profileIndex);
-    this.navigationService.navigateToProfiles();
   }
 
   goBack(): void {
