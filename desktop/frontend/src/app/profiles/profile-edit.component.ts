@@ -107,27 +107,6 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     }
   }
 
-  async deleteProfile(): Promise<void> {
-    if (!this.profile) return;
-
-    const confirmDelete = confirm(
-      `Are you sure you want to delete the profile "${this.profile.name}"? This action cannot be undone.`
-    );
-    if (!confirmDelete) return;
-
-    try {
-      await this.appService.removeProfile(this.profileIndex);
-      console.log("Profile deleted successfully, navigating to profiles page");
-      // Navigate back to profiles list
-      this.navigationService.navigateToProfiles();
-      // Force change detection to ensure navigation happens
-      this.cdr.detectChanges();
-    } catch (error) {
-      console.error("Error deleting profile:", error);
-      alert("Failed to delete profile. Please try again.");
-    }
-  }
-
   goBack(): void {
     this.navigationService.navigateToProfiles();
   }

@@ -31,6 +31,15 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 
 	config := a.ConfigInfo.EnvConfig
 
+	// Send command started event to clear previous output
+	var j []byte
+	if tabId != "" {
+		j, _ = utils.NewCommandStartedDTOWithTab(id, task, tabId).ToJSON()
+	} else {
+		j, _ = utils.NewCommandStartedDTO(id, task).ToJSON()
+	}
+	a.oc <- j
+
 	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
 	if utils.HandleError(err, "", nil, nil) != nil {
 		var j []byte

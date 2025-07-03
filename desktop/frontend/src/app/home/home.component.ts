@@ -261,6 +261,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Tab management methods
   createTab(): void {
     this.tabService.createTab();
+    // Force change detection to ensure UI updates
+    this.cdr.detectChanges();
   }
 
   deleteTab(tabId: string): void {

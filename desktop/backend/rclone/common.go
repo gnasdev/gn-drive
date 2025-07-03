@@ -32,9 +32,10 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 	// config.SetConfigPath(filepath.Join(dir, "rclone.conf"))
 	configfile.Install()
 
-	// Start accounting
+	// Start accounting and ensure clean state
 	stats := accounting.Stats(ctx)
 	stats.ResetCounters()
+	stats.ResetErrors()
 	accounting.Start(ctx)
 
 	// Initialize the global config
