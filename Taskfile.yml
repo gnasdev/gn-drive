@@ -16,9 +16,9 @@ tasks:
       - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
     dir: desktop
     env:
-      CGO_CFLAGS: "-mmacosx-version-min=10.13"
-      CGO_LDFLAGS: "-mmacosx-version-min=10.13"
-      MACOSX_DEPLOYMENT_TARGET: "10.13"
+      CGO_CFLAGS: "-mmacosx-version-min=12.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=12.0"
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
 
   package:
     summary: Packages a production build of the application
@@ -36,21 +36,6 @@ tasks:
       - build
 
   dev:
-    summary: Runs the application in development mode
-    cmds:
-      - go build -o bin/ns-drive
-      - ./bin/ns-drive
-    dir: desktop
-
-  devs:
-    summary: Runs the application with Wails v3 dev server (requires frontend dev server)
-    cmds:
-      - echo "⚠️  Make sure to run 'task dev:frontend' in another terminal first!"
-      - echo "Starting Wails v3 dev server..."
-      - $(go env GOPATH)/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
-    dir: desktop
-
-  dev:full:
     summary: Starts both frontend and backend dev servers (experimental)
     cmds:
       - echo "Starting Angular dev server..."

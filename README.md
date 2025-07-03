@@ -298,10 +298,10 @@ task install:frontend:deps
 5. **Linker warnings about macOS version**
 
    ```
-   ld: warning: object file was built for newer 'macOS' version (16.0) than being linked (11.0)
+   ld: warning: object file was built for newer 'macOS' version (16.0) than being linked (12.0)
    ```
 
-   These warnings are harmless and don't affect functionality. They occur because the Go compiler targets a newer macOS version than the minimum deployment target.
+   These warnings are harmless and don't affect functionality. They occur because the Go compiler targets a newer macOS version than the minimum deployment target (macOS 12.0 Monterey). The warnings should be minimal with the current deployment target.
 
 For more detailed troubleshooting, see [RULES.md](RULES.md).
 
