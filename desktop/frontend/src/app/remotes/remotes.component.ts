@@ -140,8 +140,22 @@ export class RemotesComponent implements OnInit, OnDestroy {
       });
       console.log(`Remote "${this.addRemoteData.name}" added successfully!`);
       this.closeAddRemoteModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding remote:", error);
+
+      // Show user-friendly error message
+      const errorMessage = error?.message || "Unknown error occurred";
+
+      // For iCloud setup instructions, show in a more prominent way
+      if (
+        errorMessage.includes(
+          "iCloud Drive setup requires interactive configuration"
+        )
+      ) {
+        alert(errorMessage);
+      } else {
+        alert(`Failed to add remote: ${errorMessage}`);
+      }
     } finally {
       this.isAddingRemote$.next(false);
       this.cdr.detectChanges();

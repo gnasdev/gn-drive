@@ -17,7 +17,7 @@
           (click)="importRemotes()"
           class="btn-secondary flex items-center space-x-2"
           title="Import Remotes"
-          >
+        >
           <lucide-icon [img]="UploadIcon" class="w-4 h-4"></lucide-icon>
           <span>Import</span>
         </button>
@@ -25,7 +25,7 @@
           (click)="exportRemotes()"
           class="btn-secondary flex items-center space-x-2"
           title="Export Remotes"
-          >
+        >
           <lucide-icon [img]="DownloadIcon" class="w-4 h-4"></lucide-icon>
           <span>Export</span>
         </button>
@@ -38,84 +38,82 @@
 
   <!-- Remotes content -->
   @if ((appService.remotes$ | async)?.length) {
-    <div
-      class="card"
+  <div class="card">
+    <div class="space-y-3">
+      @for (remote of appService.remotes$ | async; track remote) {
+      <div
+        class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 group"
       >
-      <div class="space-y-3">
-        @for (remote of appService.remotes$ | async; track remote) {
-          <div
-            class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 group"
-            >
-            <div class="flex-shrink-0 mr-4">
-              <lucide-icon
-                [img]="DownloadIcon"
-                class="w-8 h-8 text-gray-600 dark:text-gray-400"
-              ></lucide-icon>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h3
-                class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate"
-                >
-                {{ remote.name }}
-              </h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {{ getRemoteTypeLabel(remote.type) }}
-              </p>
-            </div>
-            <div class="flex-shrink-0 ml-4">
-              <button
-                (click)="confirmDeleteRemote(remote)"
-                class="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100"
-                title="Delete remote"
-                >
-                <lucide-icon [img]="Trash2Icon" class="w-5 h-5"></lucide-icon>
-              </button>
-            </div>
-          </div>
-        }
-      </div>
-    </div>
-  } @else {
-    <div class="p-6 max-w-4xl mx-auto">
-      <div class="card text-center">
-        <div class="mb-6">
-          <div class="flex justify-center mb-4">
-            <div
-              class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
-              >
-              <div class="relative">
-                <lucide-icon
-                  [img]="CloudIcon"
-                  class="w-8 h-8 text-gray-400"
-                ></lucide-icon>
-                <lucide-icon
-                  [img]="XIcon"
-                  class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
-                ></lucide-icon>
-              </div>
-            </div>
-          </div>
-          <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            No Remotes Configured
-          </h2>
-          <p class="text-gray-600 dark:text-gray-400 mb-6">
-            Add your first cloud storage connection
+        <div class="flex-shrink-0 mr-4">
+          <lucide-icon
+            [img]="DownloadIcon"
+            class="w-8 h-8 text-gray-600 dark:text-gray-400"
+          ></lucide-icon>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3
+            class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate"
+          >
+            {{ remote.name }}
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {{ getRemoteTypeLabel(remote.type) }}
           </p>
         </div>
-        <div>
-          <p class="text-gray-700 dark:text-gray-300 mb-6">
-            Remotes allow you to sync files with cloud storage services like
-            Google Drive, Dropbox, OneDrive, and more.
-          </p>
-          <button class="btn-primary" (click)="openAddRemoteDialog()">
-            <div class="flex items-center space-x-2">
-              <lucide-icon [img]="PlusIcon" class="w-5 h-5 mr-2"></lucide-icon>
-              Add First Remote
-            </div>
+        <div class="flex-shrink-0 ml-4">
+          <button
+            (click)="confirmDeleteRemote(remote)"
+            class="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100"
+            title="Delete remote"
+          >
+            <lucide-icon [img]="Trash2Icon" class="w-5 h-5"></lucide-icon>
           </button>
         </div>
       </div>
+      }
     </div>
+  </div>
+  } @else {
+  <div class="p-6 max-w-4xl mx-auto">
+    <div class="card text-center">
+      <div class="mb-6">
+        <div class="flex justify-center mb-4">
+          <div
+            class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
+          >
+            <div class="relative">
+              <lucide-icon
+                [img]="CloudIcon"
+                class="w-8 h-8 text-gray-400"
+              ></lucide-icon>
+              <lucide-icon
+                [img]="XIcon"
+                class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
+              ></lucide-icon>
+            </div>
+          </div>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          No Remotes Configured
+        </h2>
+        <p class="text-gray-600 dark:text-gray-400 mb-6">
+          Add your first cloud storage connection
+        </p>
+      </div>
+      <div>
+        <p class="text-gray-700 dark:text-gray-300 mb-6">
+          Remotes allow you to sync files with cloud storage services like
+          Google Drive, Dropbox, OneDrive, and more.
+        </p>
+        <button class="btn-primary" (click)="openAddRemoteDialog()">
+          <div class="flex items-center space-x-2">
+            <lucide-icon [img]="PlusIcon" class="w-5 h-5 mr-2"></lucide-icon>
+            Add First Remote
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
   }
 </div>
 
@@ -126,128 +124,128 @@
   (click)="openAddRemoteDialog()"
   class="fixed bottom-24 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
   title="Add Remote"
-  >
+>
   <lucide-icon [img]="PlusIcon" class="w-6 h-6"></lucide-icon>
 </button>
 
 <!-- Add Remote Modal -->
 @if (showAddRemoteModal) {
+<div
+  class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+  (click)="closeAddRemoteModal()"
+>
   <div
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-    (click)="closeAddRemoteModal()"
-    >
-    <div
-      class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4"
-      (click)="$event.stopPropagation()"
-      >
-      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-        Add New Remote
-      </h2>
-      <form (ngSubmit)="saveRemote()" class="space-y-4">
-        <div>
-          <label
-            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-            Remote Name
-          </label>
-          <input
-            type="text"
-            class="input-field"
-            [(ngModel)]="addRemoteData.name"
-            name="name"
-            placeholder="Enter remote name"
-            required
-            />
-        </div>
-        <div>
-          <label
-            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-            Remote Type
-          </label>
-          <select
-            class="select-field"
-            [(ngModel)]="addRemoteData.type"
-            name="type"
-            required
-            >
-            <option value="drive">Google Drive</option>
-            <option value="dropbox">Dropbox</option>
-            <option value="onedrive">OneDrive</option>
-            <option value="yandex">Yandex Disk</option>
-            <option value="gphotos">Google Photos</option>
-          </select>
-        </div>
-        <div class="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            class="btn-secondary"
-            (click)="closeAddRemoteModal()"
-            >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="btn-primary"
+    class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+      Add New Remote
+    </h2>
+    <form (ngSubmit)="saveRemote()" class="space-y-4">
+      <div>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
+          Remote Name
+        </label>
+        <input
+          type="text"
+          class="input-field"
+          [(ngModel)]="addRemoteData.name"
+          name="name"
+          placeholder="Enter remote name"
+          required
+        />
+      </div>
+      <div>
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
+          Remote Type
+        </label>
+        <select
+          class="select-field"
+          [(ngModel)]="addRemoteData.type"
+          name="type"
+          required
+        >
+          <option value="drive">Google Drive</option>
+          <option value="dropbox">Dropbox</option>
+          <option value="onedrive">OneDrive</option>
+          <option value="yandex">Yandex Disk</option>
+          <option value="gphotos">Google Photos</option>
+          <option value="iclouddrive">Icloud</option>
+        </select>
+      </div>
+      <div class="flex justify-end space-x-3 pt-4">
+        <button
+          type="button"
+          class="btn-secondary"
+          (click)="closeAddRemoteModal()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="btn-primary"
           [disabled]="
             !addRemoteData.name ||
             !addRemoteData.type ||
             (isAddingRemote$ | async)
           "
-            >
-            @if (!(isAddingRemote$ | async)) {
-              <span>Add Remote</span>
-            }
-            @if (isAddingRemote$ | async) {
-              <span class="flex items-center">
-                <div
-                  class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
-                ></div>
-                Adding...
-              </span>
-            }
-          </button>
-        </div>
-      </form>
-    </div>
+        >
+          @if (!(isAddingRemote$ | async)) {
+          <span>Add Remote</span>
+          } @if (isAddingRemote$ | async) {
+          <span class="flex items-center">
+            <div
+              class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+            ></div>
+            Adding...
+          </span>
+          }
+        </button>
+      </div>
+    </form>
   </div>
+</div>
 }
 
 <!-- Delete Confirmation Modal -->
 @if (showDeleteConfirmModal) {
+<div
+  class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+  (click)="closeDeleteConfirmModal()"
+>
   <div
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-    (click)="closeDeleteConfirmModal()"
-    >
-    <div
-      class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4"
-      (click)="$event.stopPropagation()"
-      >
-      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-        Confirm Delete
-      </h2>
-      <div class="mb-6">
-        <p class="text-gray-700 dark:text-gray-300">
-          Are you sure you want to delete remote
-          <strong class="text-gray-900 dark:text-gray-100"
-            >"{{ remoteToDelete?.name }}"</strong
-            >?
-          </p>
-          <p class="text-red-600 dark:text-red-400 text-sm mt-2">
-            This action cannot be undone.
-          </p>
-        </div>
-        <div class="flex justify-end space-x-3">
-          <button class="btn-secondary" (click)="closeDeleteConfirmModal()">
-            Cancel
-          </button>
-          <button
-            class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-            (click)="deleteRemote()"
-            >
-            Delete
-          </button>
-        </div>
-      </div>
+    class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+      Confirm Delete
+    </h2>
+    <div class="mb-6">
+      <p class="text-gray-700 dark:text-gray-300">
+        Are you sure you want to delete remote
+        <strong class="text-gray-900 dark:text-gray-100"
+          >"{{ remoteToDelete?.name }}"</strong
+        >?
+      </p>
+      <p class="text-red-600 dark:text-red-400 text-sm mt-2">
+        This action cannot be undone.
+      </p>
     </div>
-  }
+    <div class="flex justify-end space-x-3">
+      <button class="btn-secondary" (click)="closeDeleteConfirmModal()">
+        Cancel
+      </button>
+      <button
+        class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+        (click)="deleteRemote()"
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+</div>
+}

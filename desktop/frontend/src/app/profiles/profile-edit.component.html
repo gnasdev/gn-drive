@@ -88,8 +88,8 @@
             </label>
             <select
               class="select-field"
-              [value]="getFromRemote()"
-              (change)="onFromRemoteChange($event)"
+              [ngModel]="getFromRemote()"
+              (ngModelChange)="updateFromPath($event, getFromPath())"
             >
               <option value="">Local</option>
               @for (remote of appService.remotes$ | async; track remote) {
@@ -109,8 +109,8 @@
               <input
                 type="text"
                 class="input-field pr-10"
-                [value]="getFromPath()"
-                (input)="onFromPathChange($event)"
+                [ngModel]="getFromPath()"
+                (ngModelChange)="updateFromPath(getFromRemote(), $event)"
                 placeholder="/source/path"
               />
               <div
@@ -139,8 +139,8 @@
             </label>
             <select
               class="select-field"
-              [value]="getToRemote()"
-              (change)="onToRemoteChange($event)"
+              [ngModel]="getToRemote()"
+              (ngModelChange)="updateToPath($event, getToPath())"
             >
               <option value="">Local</option>
               @for (remote of appService.remotes$ | async; track remote) {
@@ -160,8 +160,8 @@
               <input
                 type="text"
                 class="input-field pr-10"
-                [value]="getToPath()"
-                (input)="onToPathChange($event)"
+                [ngModel]="getToPath()"
+                (ngModelChange)="updateToPath(getToRemote(), $event)"
                 placeholder="/destination/path"
               />
               <div

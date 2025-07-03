@@ -22,6 +22,8 @@ import (
 	_ "github.com/rclone/rclone/backend/local"
 
 	_ "github.com/rclone/rclone/backend/dropbox"
+	_ "github.com/rclone/rclone/backend/googlephotos"
+	_ "github.com/rclone/rclone/backend/iclouddrive"
 	_ "github.com/rclone/rclone/backend/onedrive"
 	_ "github.com/rclone/rclone/backend/yandex"
 )

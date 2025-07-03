@@ -2,12 +2,13 @@
  * Type definitions for the remotes component
  */
 
-export type RemoteType = 
-  | 'drive' 
-  | 'dropbox' 
-  | 'onedrive' 
-  | 'yandex' 
-  | 'gphotos';
+export type RemoteType =
+  | "drive"
+  | "dropbox"
+  | "onedrive"
+  | "yandex"
+  | "gphotos"
+  | "iclouddrive";
 
 export interface RemoteFormData {
   name: string;
@@ -33,21 +34,31 @@ export interface RemoteInfo {
 
 // Constants for remote type options
 export const REMOTE_TYPE_OPTIONS: RemoteTypeOption[] = [
-  { value: 'drive', label: 'Google Drive', icon: 'cloud' },
-  { value: 'dropbox', label: 'Dropbox', icon: 'cloud_queue' },
-  { value: 'onedrive', label: 'OneDrive', icon: 'cloud_circle' },
-  { value: 'yandex', label: 'Yandex Disk', icon: 'cloud_sync' },
-  { value: 'gphotos', label: 'Google Photos', icon: 'photo_library' },
+  { value: "drive", label: "Google Drive", icon: "cloud" },
+  { value: "dropbox", label: "Dropbox", icon: "cloud_queue" },
+  { value: "onedrive", label: "OneDrive", icon: "cloud_circle" },
+  { value: "yandex", label: "Yandex Disk", icon: "cloud_sync" },
+  { value: "gphotos", label: "Google Photos", icon: "photo_library" },
+  { value: "iclouddrive", label: "iCloud Drive", icon: "cloud_upload" },
 ];
 
 // Type guards
 export function isValidRemoteType(type: string): type is RemoteType {
-  return ['drive', 'dropbox', 'onedrive', 'yandex', 'gphotos'].includes(type);
+  return [
+    "drive",
+    "dropbox",
+    "onedrive",
+    "yandex",
+    "gphotos",
+    "iclouddrive",
+  ].includes(type);
 }
 
 export function isRemoteFormData(data: any): data is RemoteFormData {
-  return data && 
-         typeof data.name === 'string' && 
-         typeof data.type === 'string' && 
-         isValidRemoteType(data.type);
+  return (
+    data &&
+    typeof data.name === "string" &&
+    typeof data.type === "string" &&
+    isValidRemoteType(data.type)
+  );
 }

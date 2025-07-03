@@ -1,11 +1,30 @@
 import { Component, Input, ChangeDetectionStrategy } from "@angular/core";
 import { CommonModule } from "@angular/common";
+import {
+  LucideAngularModule,
+  Download,
+  Upload,
+  RotateCw,
+  CheckCircle,
+  XCircle,
+  StopCircle,
+  FileText,
+  HardDrive,
+  Check,
+  Trash2,
+  AlertCircle,
+  FolderOpen,
+  Moon,
+  Zap,
+  Clock,
+  Timer,
+} from "lucide-angular";
 import { SyncStatus } from "../../models/sync-status.interface";
 
 @Component({
   selector: "app-sync-status",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
   templateUrl: "./sync-status.component.html",
   styleUrl: "./sync-status.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -13,6 +32,24 @@ import { SyncStatus } from "../../models/sync-status.interface";
 export class SyncStatusComponent {
   @Input() syncStatus: SyncStatus | null = null;
   @Input() showTitle: boolean = true;
+
+  // Lucide icons
+  readonly DownloadIcon = Download;
+  readonly UploadIcon = Upload;
+  readonly RotateCwIcon = RotateCw;
+  readonly CheckCircleIcon = CheckCircle;
+  readonly XCircleIcon = XCircle;
+  readonly StopCircleIcon = StopCircle;
+  readonly FileTextIcon = FileText;
+  readonly HardDriveIcon = HardDrive;
+  readonly CheckIcon = Check;
+  readonly Trash2Icon = Trash2;
+  readonly AlertCircleIcon = AlertCircle;
+  readonly FolderOpenIcon = FolderOpen;
+  readonly MoonIcon = Moon;
+  readonly ZapIcon = Zap;
+  readonly ClockIcon = Clock;
+  readonly TimerIcon = Timer;
 
   getStatusColor(): string {
     if (!this.syncStatus) return "primary";
@@ -31,36 +68,36 @@ export class SyncStatusComponent {
     }
   }
 
-  getStatusIcon(): string {
-    if (!this.syncStatus) return "🔄";
+  getStatusIcon() {
+    if (!this.syncStatus) return this.RotateCwIcon;
 
     switch (this.syncStatus.status) {
       case "running":
-        return "🔄";
+        return this.RotateCwIcon;
       case "completed":
-        return "✅";
+        return this.CheckCircleIcon;
       case "error":
-        return "❌";
+        return this.XCircleIcon;
       case "stopped":
-        return "⏹️";
+        return this.StopCircleIcon;
       default:
-        return "🔄";
+        return this.RotateCwIcon;
     }
   }
 
-  getActionIcon(): string {
-    if (!this.syncStatus) return "🔄";
+  getActionIcon() {
+    if (!this.syncStatus) return this.RotateCwIcon;
 
     switch (this.syncStatus.action) {
       case "pull":
-        return "⬇️";
+        return this.DownloadIcon;
       case "push":
-        return "⬆️";
+        return this.UploadIcon;
       case "bi":
       case "bi-resync":
-        return "🔄";
+        return this.RotateCwIcon;
       default:
-        return "🔄";
+        return this.RotateCwIcon;
     }
   }
 

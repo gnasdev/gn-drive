@@ -171,26 +171,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  // Event handlers for new Tailwind form elements
-  onFromRemoteChange(event: Event): void {
-    const target = event.target as HTMLSelectElement;
-    this.updateFromPath(target.value, this.getFromPath());
-  }
-
-  onFromPathChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.updateFromPath(this.getFromRemote(), target.value);
-  }
-
-  onToRemoteChange(event: Event): void {
-    const target = event.target as HTMLSelectElement;
-    this.updateToPath(target.value, this.getToPath());
-  }
-
-  onToPathChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.updateToPath(this.getToRemote(), target.value);
-  }
+  // Event handlers for new Tailwind form elements - removed as we now use ngModel
 
   // Include path methods
   addIncludePath(): void {

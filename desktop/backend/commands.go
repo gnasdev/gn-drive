@@ -178,12 +178,49 @@ func (a *App) GetRemotes() []fsConfig.Remote {
 
 func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
 	ctx := context.Background()
-	_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, rc.Params{}, fsConfig.UpdateRemoteOpt{})
-	if err != nil {
-		a.DeleteRemote(remoteName)
-	}
 
-	return dto.NewAppError(err)
+	// Handle special cases for providers that need interactive setup
+	switch remoteType {
+	case "iclouddrive":
+		return a.addICloudRemote(ctx, remoteName, remoteConfig)
+	default:
+		// Standard OAuth flow for other providers
+		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, rc.Params{}, fsConfig.UpdateRemoteOpt{})
+		if err != nil {
+			a.DeleteRemote(remoteName)
+		}
+		return dto.NewAppError(err)
+	}
+}
+
+func (a *App) addICloudRemote(ctx context.Context, remoteName string, remoteConfig map[string]string) *dto.AppError {
+	// iCloud Drive requires interactive setup with Apple ID, password, and 2FA
+	// For now, we'll return an error with instructions for manual setup
+	errorMsg := fmt.Sprintf(`iCloud Drive setup requires interactive configuration.
+
+Please use the following steps to set up your iCloud remote:
+
+1. Open Terminal/Command Prompt
+2. Run: rclone config
+3. Choose 'n' for new remote
+4. Enter name: %s
+5. Choose 'iclouddrive' as storage type
+6. Enter your Apple ID
+7. Enter your regular iCloud password (NOT app-specific password)
+8. Enter the 2FA code from your Apple device
+9. Complete the setup process
+
+After setup, restart NS-Drive to see your iCloud remote.
+
+Note: Advanced Data Protection must be disabled in iCloud settings.`, remoteName)
+
+	return dto.NewAppError(errors.New(errorMsg))
+}
+
+func (a *App) OpenICloudSetup(remoteName string) *dto.AppError {
+	// This method can be called from frontend to open terminal with rclone config
+	// For now, just return instructions
+	return a.addICloudRemote(context.Background(), remoteName, nil)
 }
 
 func (a *App) StopAddingRemote() *dto.AppError {

@@ -512,11 +512,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return config.label;
   }
 
-  clearTabOutput(tabId: string): void {
-    this.tabService.updateTab(tabId, { data: [] });
-    this.cdr.detectChanges();
-  }
-
   onProfileChange(event: Event, tabId: string | undefined): void {
     const target = event.target as HTMLSelectElement;
     const value = target.value === "null" ? null : +target.value;

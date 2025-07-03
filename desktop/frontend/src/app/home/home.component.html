@@ -180,28 +180,6 @@
             }}</code>
           </div>
         </div>
-        <!-- Status Display -->
-        @if (tab.currentAction) {
-        <div>
-          <div
-            class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4"
-          >
-            <div
-              class="bg-primary-600 h-2 rounded-full animate-pulse"
-              style="width: 100%"
-            ></div>
-          </div>
-          <div
-            class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200"
-          >
-            <lucide-icon
-              [img]="getActionIcon(tab.currentAction)"
-              class="w-4 h-4 mr-2"
-            ></lucide-icon>
-            {{ getActionLabel(tab.currentAction) }}
-          </div>
-        </div>
-        }
         <!-- Sync Status Display -->
         <div>
           <app-sync-status
@@ -209,33 +187,6 @@
             [showTitle]="true"
           >
           </app-sync-status>
-
-          <!-- Console Output (Fallback/Debug) -->
-          @if (tab.data && tab.data.length > 0 && tab.data[0] !== '') {
-          <div class="mt-4">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center space-x-2">
-                <lucide-icon
-                  [img]="TerminalIcon"
-                  class="w-5 h-5 text-gray-600 dark:text-gray-400"
-                ></lucide-icon>
-                <span class="font-medium text-gray-700 dark:text-gray-300"
-                  >Console Output</span
-                >
-              </div>
-              <button
-                class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap"
-                (click)="clearTabOutput(tab.id)"
-                title="Clear output"
-              >
-                <lucide-icon [img]="EraserIcon" class="w-5 h-5"></lucide-icon>
-              </button>
-            </div>
-            <pre class="console-output">{{
-              tab.data.join("\n") || "No output yet..."
-            }}</pre>
-          </div>
-          }
         </div>
         <!-- Action Buttons -->
         @if (validateTabProfileIndex(tab)) {

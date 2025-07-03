@@ -62,7 +62,7 @@ NS-Drive is a desktop application built with **Wails v2** that provides a GUI fo
 
 ### 4. Remote Management
 
-- Support for multiple cloud providers (Google Drive, Dropbox, OneDrive, etc.)
+- Support for multiple cloud providers (Google Drive, Dropbox, OneDrive, Yandex Disk, Google Photos, iCloud Drive, etc.)
 - **OAuth integration** for authentication
 - **Add/Delete remotes** with confirmation dialogs
 - **Real-time remote list** updates
