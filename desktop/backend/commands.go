@@ -54,7 +54,12 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	}
 
 	outLog := make(chan string)
+
+	// Start sync status reporting
+	stopSyncStatus := utils.StartSyncStatusReporting(a.oc, id, task, tabId)
+
 	utils.AddCmd(id, func() {
+		stopSyncStatus()
 		close(outLog)
 		cancel()
 	})

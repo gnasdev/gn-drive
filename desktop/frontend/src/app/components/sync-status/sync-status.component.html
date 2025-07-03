@@ -1,0 +1,139 @@
+@if (syncStatus) {
+<div class="sync-status-container" [attr.data-status]="syncStatus.status">
+  @if (showTitle) {
+  <div class="sync-status-header">
+    <div class="flex items-center space-x-2">
+      <div class="status-icon">{{ getStatusIcon() }}</div>
+      <h3 class="text-lg font-semibold">Sync Status</h3>
+    </div>
+    <div class="status-chip">
+      <div class="action-icon">{{ getActionIcon() }}</div>
+      <span>{{ getActionLabel() }}</span>
+    </div>
+  </div>
+  }
+
+  <!-- Progress Section -->
+  <div class="sync-status-section">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-medium">Progress</span>
+      <span class="text-sm font-semibold"
+        >{{ getProgressValue().toFixed(1) }}%</span
+      >
+    </div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" [style.width.%]="getProgressValue()"></div>
+    </div>
+    <div class="flex items-center justify-between text-xs">
+      <div class="flex items-center space-x-1">
+        <span>🚀</span>
+        <span>{{ syncStatus.speed }}</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span>⏱️</span>
+        <span>{{ syncStatus.eta }}</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span>⏰</span>
+        <span>{{ syncStatus.elapsed_time }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Statistics -->
+  @if (hasTransferData()) {
+  <div class="sync-status-section">
+    <h4 class="text-sm font-medium mb-3">Transfer Statistics</h4>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="stat-item">
+        <div class="flex items-center space-x-2">
+          <div class="icon text-blue-500">📄</div>
+          <div>
+            <div class="text-sm font-medium">Files</div>
+            <div class="text-xs text-gray-500">
+              {{ syncStatus.files_transferred }}
+              @if (syncStatus.total_files > 0) { /
+              {{ syncStatus.total_files }} }
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="flex items-center space-x-2">
+          <div class="icon text-green-500">💾</div>
+          <div>
+            <div class="text-sm font-medium">Data</div>
+            <div class="text-xs text-gray-500">
+              {{ formatBytes(syncStatus.bytes_transferred) }}
+              @if (syncStatus.total_bytes > 0) { /
+              {{ formatBytes(syncStatus.total_bytes) }} }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Activity Statistics -->
+  @if (hasActivityData()) {
+  <div class="sync-status-section">
+    <h4 class="text-sm font-medium mb-3">Activity</h4>
+    <div class="grid grid-cols-2 gap-4">
+      @if (syncStatus.checks > 0) {
+      <div class="stat-item">
+        <div class="flex items-center space-x-2">
+          <div class="icon text-blue-500">✓</div>
+          <div>
+            <div class="text-sm font-medium">Checks</div>
+            <div class="text-xs text-gray-500">{{ syncStatus.checks }}</div>
+          </div>
+        </div>
+      </div>
+      } @if (syncStatus.deletes > 0) {
+      <div class="stat-item">
+        <div class="flex items-center space-x-2">
+          <div class="icon text-red-500">🗑️</div>
+          <div>
+            <div class="text-sm font-medium">Deletes</div>
+            <div class="text-xs text-gray-500">{{ syncStatus.deletes }}</div>
+          </div>
+        </div>
+      </div>
+      } @if (syncStatus.errors > 0) {
+      <div class="stat-item">
+        <div class="flex items-center space-x-2">
+          <div class="icon text-red-500">❌</div>
+          <div>
+            <div class="text-sm font-medium">Errors</div>
+            <div class="text-xs text-gray-500">{{ syncStatus.errors }}</div>
+          </div>
+        </div>
+      </div>
+      }
+    </div>
+  </div>
+  }
+
+  <!-- Current File -->
+  @if (syncStatus.current_file) {
+  <div class="sync-status-section">
+    <h4 class="text-sm font-medium mb-2">Current File</h4>
+    <div class="flex items-center space-x-2 p-2 rounded">
+      <div class="icon">📁</div>
+      <span class="text-sm truncate">{{ syncStatus.current_file }}</span>
+    </div>
+  </div>
+  }
+</div>
+} @else {
+<div class="sync-status-container">
+  <div class="text-center py-8">
+    <div class="icon text-4xl mb-4" style="font-size: 3rem">💤</div>
+    <h3 class="text-lg font-semibold mb-2">Ready to Sync</h3>
+    <p class="text-sm" style="color: rgba(255, 255, 255, 0.8)">
+      No sync operation running
+    </p>
+  </div>
+</div>
+}

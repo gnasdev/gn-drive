@@ -18,6 +18,11 @@ import {
 } from "../../wailsjs/go/backend/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { TabService } from "./tab.service";
+import {
+  SyncStatus,
+  SyncStatusEvent,
+  DEFAULT_SYNC_STATUS,
+} from "./models/sync-status.interface";
 
 interface CommandDTO {
   command: string;
@@ -43,6 +48,7 @@ export class AppService implements OnDestroy {
   readonly data$ = new BehaviorSubject<string[]>([]);
   readonly configInfo$: BehaviorSubject<models.ConfigInfo>;
   readonly remotes$ = new BehaviorSubject<config.Remote[]>([]);
+  readonly syncStatus$ = new BehaviorSubject<SyncStatus | null>(null);
 
   private eventCleanup: (() => void) | undefined;
 
@@ -67,10 +73,12 @@ export class AppService implements OnDestroy {
       switch (data.command) {
         case dto.Command.command_started:
           this.replaceData("Command started...");
+          this.syncStatus$.next(null); // Reset sync status
           break;
         case dto.Command.command_stoped:
           this.currentAction$.next(undefined);
           this.currentId$.next(0);
+          this.syncStatus$.next(null); // Clear sync status
           break;
         case dto.Command.command_output:
           this.replaceData(data.error);
@@ -79,6 +87,10 @@ export class AppService implements OnDestroy {
           // Create new array to avoid mutating current state
           const dataValue = [...this.data$.value, data];
           this.data$.next(dataValue);
+          break;
+        case "sync_status":
+          // Handle sync status updates
+          this.handleSyncStatusUpdate(data as SyncStatusEvent);
           break;
       }
     });
@@ -100,6 +112,36 @@ export class AppService implements OnDestroy {
 
   replaceData(str: string) {
     this.data$.next([str]);
+  }
+
+  private handleSyncStatusUpdate(statusEvent: SyncStatusEvent) {
+    const currentStatus = this.syncStatus$.value || { ...DEFAULT_SYNC_STATUS };
+
+    // Update the current status with new data
+    const updatedStatus: SyncStatus = {
+      ...currentStatus,
+      ...statusEvent,
+      // Ensure required fields have defaults
+      status: (statusEvent.status as any) || currentStatus.status,
+      progress: statusEvent.progress ?? currentStatus.progress,
+      speed: statusEvent.speed || currentStatus.speed,
+      eta: statusEvent.eta || currentStatus.eta,
+      files_transferred:
+        statusEvent.files_transferred ?? currentStatus.files_transferred,
+      total_files: statusEvent.total_files ?? currentStatus.total_files,
+      bytes_transferred:
+        statusEvent.bytes_transferred ?? currentStatus.bytes_transferred,
+      total_bytes: statusEvent.total_bytes ?? currentStatus.total_bytes,
+      current_file: statusEvent.current_file || currentStatus.current_file,
+      errors: statusEvent.errors ?? currentStatus.errors,
+      checks: statusEvent.checks ?? currentStatus.checks,
+      deletes: statusEvent.deletes ?? currentStatus.deletes,
+      renames: statusEvent.renames ?? currentStatus.renames,
+      elapsed_time: statusEvent.elapsed_time || currentStatus.elapsed_time,
+      action: (statusEvent.action as any) || currentStatus.action,
+    };
+
+    this.syncStatus$.next(updatedStatus);
   }
 
   async pull(profile: models.Profile) {

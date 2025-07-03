@@ -35,3 +35,11 @@ func NewCommandStartedDTO(pid int, task string) dto.CommandDTO {
 func NewCommandStartedDTOWithTab(pid int, task string, tabId string) dto.CommandDTO {
 	return dto.CommandDTO{Command: dto.CommandStarted.String(), Id: &pid, Task: &task, TabId: &tabId}
 }
+
+func NewSyncStatusDTO(pid int, action string) dto.SyncStatusDTO {
+	return *dto.NewSyncStatusDTO(pid, action)
+}
+
+func NewSyncStatusDTOWithTab(pid int, action string, tabId string) dto.SyncStatusDTO {
+	return *dto.NewSyncStatusDTOWithTab(pid, action, tabId)
+}

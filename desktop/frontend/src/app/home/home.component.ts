@@ -17,6 +17,7 @@ import {
   validateTabProfileSelection,
 } from "./home.types";
 import { FormsModule } from "@angular/forms";
+import { SyncStatusComponent } from "../components/sync-status/sync-status.component";
 import {
   LucideAngularModule,
   Settings,
@@ -42,7 +43,12 @@ import {
 
 @Component({
   selector: "app-home",
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    SyncStatusComponent,
+  ],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,

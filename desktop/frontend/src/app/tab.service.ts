@@ -1,6 +1,11 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { Action } from "./app.service";
+import {
+  SyncStatus,
+  SyncStatusEvent,
+  DEFAULT_SYNC_STATUS,
+} from "./models/sync-status.interface";
 
 export interface Tab {
   id: string;
@@ -12,6 +17,7 @@ export interface Tab {
   isActive: boolean;
   isEditing: boolean;
   isStopping?: boolean;
+  syncStatus?: SyncStatus | null;
 }
 
 interface CommandDTO {
@@ -63,6 +69,7 @@ export class TabService {
       isActive: false,
       isEditing: false,
       isStopping: false,
+      syncStatus: null,
     };
 
     const currentTabs = this.tabs$.value;
@@ -163,6 +170,7 @@ export class TabService {
         // Clear previous data when a new command starts
         this.updateTab(data.tab_id, {
           data: ["Command started..."],
+          syncStatus: null, // Reset sync status
         });
         break;
       case "command_stoped":
@@ -170,6 +178,7 @@ export class TabService {
           currentAction: undefined,
           currentTaskId: 0,
           isStopping: false,
+          syncStatus: null, // Clear sync status
         });
         break;
       case "command_output":
@@ -184,7 +193,47 @@ export class TabService {
           data: [...tab.data, data.error || ""],
         });
         break;
+      case "sync_status":
+        // Handle sync status updates for tabs
+        this.handleTabSyncStatusUpdate(data.tab_id, data as SyncStatusEvent);
+        break;
     }
+  }
+
+  private handleTabSyncStatusUpdate(
+    tabId: string,
+    statusEvent: SyncStatusEvent
+  ): void {
+    const tab = this.getTab(tabId);
+    if (!tab) return;
+
+    const currentStatus = tab.syncStatus || { ...DEFAULT_SYNC_STATUS };
+
+    // Update the current status with new data
+    const updatedStatus: SyncStatus = {
+      ...currentStatus,
+      ...statusEvent,
+      // Ensure required fields have defaults
+      status: (statusEvent.status as any) || currentStatus.status,
+      progress: statusEvent.progress ?? currentStatus.progress,
+      speed: statusEvent.speed || currentStatus.speed,
+      eta: statusEvent.eta || currentStatus.eta,
+      files_transferred:
+        statusEvent.files_transferred ?? currentStatus.files_transferred,
+      total_files: statusEvent.total_files ?? currentStatus.total_files,
+      bytes_transferred:
+        statusEvent.bytes_transferred ?? currentStatus.bytes_transferred,
+      total_bytes: statusEvent.total_bytes ?? currentStatus.total_bytes,
+      current_file: statusEvent.current_file || currentStatus.current_file,
+      errors: statusEvent.errors ?? currentStatus.errors,
+      checks: statusEvent.checks ?? currentStatus.checks,
+      deletes: statusEvent.deletes ?? currentStatus.deletes,
+      renames: statusEvent.renames ?? currentStatus.renames,
+      elapsed_time: statusEvent.elapsed_time || currentStatus.elapsed_time,
+      action: (statusEvent.action as any) || currentStatus.action,
+    };
+
+    this.updateTab(tabId, { syncStatus: updatedStatus });
   }
 
   private generateTabId(): string {
