@@ -17,17 +17,20 @@
     </div>
 
     <!-- Action Buttons in Header -->
-    <div class="flex items-center space-x-3" *ngIf="profile">
+    @if (profile) {
+    <div class="flex items-center space-x-3">
       <button class="btn-primary flex items-center" (click)="saveProfile()">
         <lucide-icon [img]="SaveIcon" class="w-5 h-5 mr-2"></lucide-icon>
         {{ saveBtnText$ | async }}
       </button>
     </div>
+    }
   </div>
 </div>
 
 <!-- Content with top padding to account for fixed header -->
-<div class="pt-20 p-6 max-w-4xl mx-auto space-y-6" *ngIf="profile">
+@if (profile) {
+<div class="pt-20 p-6 max-w-4xl mx-auto space-y-6">
   <!-- Profile Form -->
   <div class="card">
     <div class="mb-6">
@@ -60,7 +63,6 @@
       </div>
     </div>
   </div>
-
   <!-- Path Configuration -->
   <div class="card">
     <div class="mb-6">
@@ -90,12 +92,11 @@
               (change)="onFromRemoteChange($event)"
             >
               <option value="">Local</option>
-              <option
-                *ngFor="let remote of appService.remotes$ | async"
-                [value]="remote.name"
-              >
+              @for (remote of appService.remotes$ | async; track remote) {
+              <option [value]="remote.name">
                 {{ remote.name }}
               </option>
+              }
             </select>
           </div>
           <div>
@@ -124,7 +125,6 @@
           </div>
         </div>
       </div>
-
       <!-- To Path -->
       <div>
         <h3 class="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
@@ -143,12 +143,11 @@
               (change)="onToRemoteChange($event)"
             >
               <option value="">Local</option>
-              <option
-                *ngFor="let remote of appService.remotes$ | async"
-                [value]="remote.name"
-              >
+              @for (remote of appService.remotes$ | async; track remote) {
+              <option [value]="remote.name">
                 {{ remote.name }}
               </option>
+              }
             </select>
           </div>
           <div>
@@ -179,7 +178,6 @@
       </div>
     </div>
   </div>
-
   <!-- Include/Exclude Paths -->
   <div class="card">
     <div class="mb-6">
@@ -190,7 +188,6 @@
         Configure which files and folders to include or exclude from sync
       </p>
     </div>
-
     <!-- Include Paths -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
@@ -212,11 +209,8 @@
           <span>Add Path</span>
         </button>
       </div>
-
-      <div
-        *ngIf="profile.included_paths.length === 0"
-        class="text-center py-8 text-gray-500 dark:text-gray-400"
-      >
+      @if (profile.included_paths.length === 0) {
+      <div class="text-center py-8 text-gray-500 dark:text-gray-400">
         <lucide-icon
           [img]="CheckIcon"
           class="w-12 h-12 mx-auto mb-2 opacity-50"
@@ -224,14 +218,10 @@
         <p>No include paths configured</p>
         <p class="text-sm">All files will be included by default</p>
       </div>
-
-      <div class="space-y-3" *ngIf="profile.included_paths.length > 0">
+      } @if (profile.included_paths.length > 0) {
+      <div class="space-y-3">
+        @for (path of profile.included_paths; track $index; let i = $index) {
         <div
-          *ngFor="
-            let path of profile.included_paths;
-            let i = index;
-            trackBy: trackByIndex
-          "
           class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
         >
           <!-- Path Type Selector -->
@@ -245,7 +235,6 @@
               <option value="folder">Folder</option>
             </select>
           </div>
-
           <!-- Path Input -->
           <div class="flex-1 relative">
             <input
@@ -264,7 +253,6 @@
               ></lucide-icon>
             </div>
           </div>
-
           <!-- Remove Button -->
           <button
             type="button"
@@ -275,9 +263,10 @@
             <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
           </button>
         </div>
+        }
       </div>
+      }
     </div>
-
     <!-- Exclude Paths -->
     <div class="mb-6">
       <div class="flex items-center justify-between mb-4">
@@ -296,11 +285,8 @@
           <span>Add Path</span>
         </button>
       </div>
-
-      <div
-        *ngIf="profile.excluded_paths.length === 0"
-        class="text-center py-8 text-gray-500 dark:text-gray-400"
-      >
+      @if (profile.excluded_paths.length === 0) {
+      <div class="text-center py-8 text-gray-500 dark:text-gray-400">
         <lucide-icon
           [img]="XIcon"
           class="w-12 h-12 mx-auto mb-2 opacity-50"
@@ -308,14 +294,10 @@
         <p>No exclude paths configured</p>
         <p class="text-sm">No files will be excluded</p>
       </div>
-
-      <div class="space-y-3" *ngIf="profile.excluded_paths.length > 0">
+      } @if (profile.excluded_paths.length > 0) {
+      <div class="space-y-3">
+        @for (path of profile.excluded_paths; track $index; let i = $index) {
         <div
-          *ngFor="
-            let path of profile.excluded_paths;
-            let i = index;
-            trackBy: trackByIndex
-          "
           class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
         >
           <!-- Path Type Selector -->
@@ -329,7 +311,6 @@
               <option value="folder">Folder</option>
             </select>
           </div>
-
           <!-- Path Input -->
           <div class="flex-1 relative">
             <input
@@ -348,7 +329,6 @@
               ></lucide-icon>
             </div>
           </div>
-
           <!-- Remove Button -->
           <button
             type="button"
@@ -359,10 +339,11 @@
             <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
           </button>
         </div>
+        }
       </div>
+      }
     </div>
   </div>
-
   <!-- Performance Settings -->
   <div class="card">
     <div class="mb-6">
@@ -386,9 +367,11 @@
             [(ngModel)]="profile.parallel"
             (ngModelChange)="onProfileFieldChange()"
           >
-            <option *ngFor="let num of getNumberRange(1, 32)" [value]="num">
+            @for (num of getNumberRange(1, 32); track num) {
+            <option [value]="num">
               {{ num }}
             </option>
+            }
           </select>
           <div
             class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
@@ -400,7 +383,6 @@
           </div>
         </div>
       </div>
-
       <div>
         <label
           class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
@@ -413,9 +395,11 @@
             [(ngModel)]="profile.bandwidth"
             (ngModelChange)="onProfileFieldChange()"
           >
-            <option *ngFor="let num of getNumberRange(1, 100)" [value]="num">
+            @for (num of getNumberRange(1, 100); track num) {
+            <option [value]="num">
               {{ num }}
             </option>
+            }
           </select>
           <div
             class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
@@ -430,9 +414,11 @@
     </div>
   </div>
 </div>
+}
 
 <!-- Loading State -->
-<div *ngIf="!profile" class="p-6 max-w-4xl mx-auto">
+@if (!profile) {
+<div class="p-6 max-w-4xl mx-auto">
   <div class="card text-center">
     <div class="flex justify-center mb-4">
       <div
@@ -442,3 +428,4 @@
     <p class="text-gray-600 dark:text-gray-400">Loading profile...</p>
   </div>
 </div>
+}
