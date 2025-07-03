@@ -1,0 +1,26 @@
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend/node_modules
+      - frontend/dist
+      - bin
+      - build
+    file:
+      - .DS_Store
+      - .gitignore
+      - .gitkeep
+    watched_extension:
+      - "*.go"
+  git_ignore: true
+  executes:
+    - cmd: go mod tidy
+      type: blocking
+    - cmd: go build -o bin/ns-drive
+      type: blocking
+    - cmd: ./bin/ns-drive
+      type: primary

@@ -1,0 +1,22 @@
+[ERROR] 2025/07/03 17:06:16 handlers.go:150: TraceID: 2e7a8b8d-c0af-46ca-aee9-c215c8f72c0a | Code: INTERNAL_ERROR | Message: Internal server error [Context: [test_context]]
+[ERROR] 2025/07/03 17:06:16 handlers.go:154: TraceID: 2e7a8b8d-c0af-46ca-aee9-c215c8f72c0a | Details: test error
+[ERROR] 2025/07/03 17:06:16 handlers.go:164: TraceID: 2e7a8b8d-c0af-46ca-aee9-c215c8f72c0a | Underlying Error: test error
+[ERROR] 2025/07/03 17:06:16 handlers.go:150: TraceID: 147b25ae-5992-41c4-9577-f3f0c50229c2 | Code: VALIDATION_ERROR | Message: Existing error [Context: [test_context]]
+[ERROR] 2025/07/03 17:06:16 handlers.go:150: TraceID: 90308962-6cd5-45c0-a9e5-b58f6fdb3e19 | Code: VALIDATION_ERROR | Message: Validation failed for field 'email' [Context: [validation]]
+[ERROR] 2025/07/03 17:06:16 handlers.go:154: TraceID: 90308962-6cd5-45c0-a9e5-b58f6fdb3e19 | Details: Invalid email format
+[ERROR] 2025/07/03 17:06:16 handlers.go:150: TraceID: ca7a9b04-ea42-4d9d-ae6b-43380a351cb0 | Code: NOT_FOUND_ERROR | Message: user not found [Context: [not_found]]
+[ERROR] 2025/07/03 17:06:16 handlers.go:154: TraceID: ca7a9b04-ea42-4d9d-ae6b-43380a351cb0 | Details: No user found with identifier: 123
+[ERROR] 2025/07/03 17:06:16 handlers.go:150: TraceID: d806fd31-1f74-4a68-ab9c-1468ba9af78e | Code: RCLONE_ERROR | Message: Rclone operation 'sync' failed [Context: [rclone sync]]
+[ERROR] 2025/07/03 17:06:16 handlers.go:154: TraceID: d806fd31-1f74-4a68-ab9c-1468ba9af78e | Details: rclone failed
+[ERROR] 2025/07/03 17:06:16 handlers.go:164: TraceID: d806fd31-1f74-4a68-ab9c-1468ba9af78e | Underlying Error: rclone failed
+[ERROR] 2025/07/03 23:13:53 handlers.go:150: TraceID: fa1a4469-78dc-4263-aee4-9ccdf7f3f4b3 | Code: INTERNAL_ERROR | Message: Internal server error [Context: [test_context]]
+[ERROR] 2025/07/03 23:13:53 handlers.go:154: TraceID: fa1a4469-78dc-4263-aee4-9ccdf7f3f4b3 | Details: test error
+[ERROR] 2025/07/03 23:13:53 handlers.go:164: TraceID: fa1a4469-78dc-4263-aee4-9ccdf7f3f4b3 | Underlying Error: test error
+[ERROR] 2025/07/03 23:13:53 handlers.go:150: TraceID: 48d130ed-aba8-474d-8f65-ec19e593d2ec | Code: VALIDATION_ERROR | Message: Existing error [Context: [test_context]]
+[ERROR] 2025/07/03 23:13:53 handlers.go:150: TraceID: d552506b-6347-4fff-9001-b635aac6ed79 | Code: VALIDATION_ERROR | Message: Validation failed for field 'email' [Context: [validation]]
+[ERROR] 2025/07/03 23:13:53 handlers.go:154: TraceID: d552506b-6347-4fff-9001-b635aac6ed79 | Details: Invalid email format
+[ERROR] 2025/07/03 23:13:53 handlers.go:150: TraceID: 13640083-312e-4820-aba8-6cd283aeb23f | Code: NOT_FOUND_ERROR | Message: user not found [Context: [not_found]]
+[ERROR] 2025/07/03 23:13:53 handlers.go:154: TraceID: 13640083-312e-4820-aba8-6cd283aeb23f | Details: No user found with identifier: 123
+[ERROR] 2025/07/03 23:13:53 handlers.go:150: TraceID: 45f990bf-bf77-472e-b445-0125122b5e2b | Code: RCLONE_ERROR | Message: Rclone operation 'sync' failed [Context: [rclone sync]]
+[ERROR] 2025/07/03 23:13:53 handlers.go:154: TraceID: 45f990bf-bf77-472e-b445-0125122b5e2b | Details: rclone failed
+[ERROR] 2025/07/03 23:13:53 handlers.go:164: TraceID: 45f990bf-bf77-472e-b445-0125122b5e2b | Underlying Error: rclone failed

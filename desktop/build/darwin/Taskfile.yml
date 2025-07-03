@@ -1,0 +1,37 @@
+version: "3"
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  APP_NAME: ns-drive
+  BIN_DIR: bin
+  BINARY_NAME: "{{.APP_NAME}}"
+
+tasks:
+  # Build for macOS
+  build:
+    summary: Build the application for macOS
+    cmds:
+      - task: common:install:frontend:deps
+      - task: common:build:frontend
+      - task: common:generate:bindings
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.BINARY_NAME}}
+    env:
+      CGO_CFLAGS: "-mmacosx-version-min=12.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=12.0"
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+  # Run the application
+  run:
+    summary: Run the application
+    cmds:
+      - ./{{.BIN_DIR}}/{{.BINARY_NAME}}
+    deps:
+      - build
+
+  # Package the application
+  package:
+    summary: Package the application for distribution
+    cmds:
+      - wails3 package
