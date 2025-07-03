@@ -10,7 +10,7 @@ import { AppService } from "../app.service";
 import { NavigationService } from "../navigation.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
-import { models } from "../../../wailsjs/go/models";
+import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   parseRemotePath,
   buildRemotePath,

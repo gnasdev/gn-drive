@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-NS-Drive is a desktop application built with **Wails v2** that provides a GUI for **rclone** file synchronization operations. It allows users to manage cloud storage remotes and sync profiles through a modern Angular Material interface.
+NS-Drive is a desktop application built with **Wails v3** that provides a GUI for **rclone** file synchronization operations. It allows users to manage cloud storage remotes and sync profiles through a modern Angular interface.
 
 ### Core Technologies
 
-- **Backend**: Go 1.23.4 with Wails v2 framework
-- **Frontend**: Angular 19.2.3 with Angular Material 19.2.19
+- **Backend**: Go 1.23.4 with Wails v3 framework
+- **Frontend**: Angular 20.0.6 with Tailwind CSS
 - **Package Manager**: Yarn 4.9.2
 - **Build Tool**: Taskfile (task runner)
 - **Cloud Sync**: rclone integration
@@ -135,15 +135,18 @@ NS-Drive is a desktop application built with **Wails v2** that provides a GUI fo
 
 ### Build Commands
 
-- **Development**: `task dev` (runs Wails dev server)
-- **Mac Build**: `task build-mac` (creates .app bundle)
-- **Windows Build**: `task build-win` (creates .exe)
+- **Development**: `task dev` (runs application in development mode)
+- **Development with hot reload**: `task devs` (runs Wails v3 dev server)
+- **Build**: `task build` (creates platform-specific binary)
+- **Package**: `task package` (packages for distribution - experimental)
+- **Frontend only**: `task build:frontend` (builds frontend assets)
+- **Install dependencies**: `task install:frontend:deps` (installs frontend dependencies)
 
 ### Package Management
 
 - **Always use yarn** for frontend dependencies
 - **Go modules** for backend dependencies
-- **Wails CLI** for framework operations
+- **Wails v3 CLI** for framework operations
 
 ### Testing Strategy
 
@@ -248,11 +251,11 @@ NS-Drive is a desktop application built with **Wails v2** that provides a GUI fo
 
 ### Debug Commands
 
-- `wails dev -debug`: Enable debug mode
-- `go test ./...`: Run backend tests
-- `yarn test`: Run frontend tests
-- `yarn lint`: Check code quality
-- `task build-mac -v 2`: Verbose build output
+- `task devs`: Enable debug mode with hot reload
+- `task test`: Run backend tests
+- `task fmt`: Format Go code
+- `task clean`: Clean build artifacts
+- `task generate:bindings`: Generate TypeScript bindings
 
 ## Future Extensibility
 

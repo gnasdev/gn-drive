@@ -10,12 +10,12 @@ import (
 
 	fsConfig "github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configfile"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// App struct
+// App struct - now implements Wails v3 service interface
 type App struct {
-	ctx          context.Context
+	app          *application.App
 	oc           chan []byte
 	ConfigInfo   models.ConfigInfo
 	errorHandler *errors.Middleware
@@ -28,15 +28,28 @@ func NewApp() *App {
 	}
 }
 
+// NewAppWithApplication creates a new App with application reference for events
+func NewAppWithApplication(app *application.App) *App {
+	return &App{
+		app:          app,
+		errorHandler: errors.NewMiddleware(true), // Enable debug mode for development
+	}
+}
+
+// SetApp sets the application reference for events
+func (a *App) SetApp(app *application.App) {
+	a.app = app
+}
+
 //go:embed .env
 var envConfigStr string
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (a *App) Startup(ctx context.Context) {
-	a.ctx = ctx
+// ServiceStartup is called when the service starts
+func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	// Note: In Wails v3, we don't have direct access to the application instance from ServiceOptions
+	// We'll need to handle events differently or get the app reference another way
 
-	if err := utils.CdToNormalizeWorkingDir(a.ctx); err != nil {
+	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
 		a.errorHandler.HandleError(err, "startup", "working_directory")
 		utils.LogErrorAndExit(err)
 	}
@@ -62,11 +75,14 @@ func (a *App) Startup(ctx context.Context) {
 	a.oc = make(chan []byte)
 	go func() {
 		for data := range a.oc {
-			runtime.EventsEmit(a.ctx, "tofe", string(data))
+			// Use Wails v3 events API
+			a.app.EmitEvent("tofe", string(data))
 		}
 	}()
 
 	// Load Rclone config
 	fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath)
 	configfile.Install()
+
+	return nil
 }

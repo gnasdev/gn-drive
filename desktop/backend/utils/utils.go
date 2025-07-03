@@ -5,22 +5,25 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sync"
 
 	"desktop/backend/constants"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func GetPlatform(ctx context.Context) string {
-	env := runtime.Environment(ctx)
-	return env.Platform // windows, darwin, linux
+	return runtime.GOOS // windows, darwin, linux
 }
 
 func GetCurrentEnvName(ctx context.Context) string {
-	if runtime.Environment(ctx).BuildType == "dev" {
-		return constants.Development.String()
+	// Check if we're in development mode by looking for debug info
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "-tags" && setting.Value == "dev" {
+				return constants.Development.String()
+			}
+		}
 	}
 	return constants.Production.String()
 }

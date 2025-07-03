@@ -2,7 +2,7 @@
  * Type definitions for the profiles component
  */
 
-import { models } from "../../../wailsjs/go/models";
+import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 
 // Re-export the Profile type for convenience
 export type Profile = models.Profile;

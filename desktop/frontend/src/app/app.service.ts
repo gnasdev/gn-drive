@@ -1,6 +1,10 @@
 import { Injectable, OnDestroy } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
-import { config, dto, models } from "../../wailsjs/go/models";
+// Import models from the new v3 bindings
+import * as config from "../../wailsjs/github.com/rclone/rclone/fs/config/models.js";
+import * as models from "../../wailsjs/desktop/backend/models/models.js";
+
+// Import functions from the new v3 bindings
 import {
   Sync,
   SyncWithTabId,
@@ -15,8 +19,8 @@ import {
   ImportProfiles,
   ExportRemotes,
   ImportRemotes,
-} from "../../wailsjs/go/backend/App";
-import { EventsOn } from "../../wailsjs/runtime/runtime";
+} from "../../wailsjs/desktop/backend/app";
+import { Events } from "@wailsio/runtime";
 import { TabService } from "./tab.service";
 import { ErrorService } from "./services/error.service";
 import {
@@ -66,7 +70,8 @@ export class AppService implements OnDestroy {
     console.log("AppService initial configInfo:", configInfo);
 
     // Store cleanup function for event listener
-    this.eventCleanup = EventsOn("tofe", (rawData: unknown) => {
+    this.eventCleanup = Events.On("tofe", (event) => {
+      const rawData = event.data;
       const data = JSON.parse(rawData as string) as CommandDTO;
 
       // If event has tab_id, route to TabService
@@ -77,19 +82,19 @@ export class AppService implements OnDestroy {
 
       // Legacy handling for events without tab_id
       switch (data.command) {
-        case dto.Command.command_started:
+        case "command_started":
           this.replaceData("Command started...");
           this.syncStatus$.next(null); // Reset sync status
           break;
-        case dto.Command.command_stoped:
+        case "command_stoped":
           this.currentAction$.next(undefined);
           this.currentId$.next(0);
           this.syncStatus$.next(null); // Clear sync status
           break;
-        case dto.Command.command_output:
+        case "command_output":
           this.replaceData(data.error || "");
           break;
-        case dto.Command.error: {
+        case "error": {
           // Create new array to avoid mutating current state
           const dataValue = [
             ...this.data$.value,

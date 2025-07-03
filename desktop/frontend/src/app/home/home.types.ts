@@ -3,7 +3,7 @@
  */
 
 import { Action } from "../app.service";
-import { models } from "../../../wailsjs/go/models";
+import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 
 // Re-export types for convenience
 export type Profile = models.Profile;

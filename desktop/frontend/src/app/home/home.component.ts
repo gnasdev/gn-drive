@@ -9,7 +9,7 @@ import {
 import { map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
 import { TabService, Tab } from "../tab.service";
-import { models } from "../../../wailsjs/go/models";
+import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   isValidProfileIndex,
   getActionConfig,

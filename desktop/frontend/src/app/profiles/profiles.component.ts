@@ -21,7 +21,7 @@ import {
   Download,
   Upload,
 } from "lucide-angular";
-import { models } from "../../../wailsjs/go/models";
+import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   parseRemotePath,
   buildRemotePath,

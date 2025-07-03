@@ -1,29 +1,113 @@
 version: "3"
 
+vars:
+  APP_NAME: ns-drive
+  BIN_DIR: bin
+  VITE_PORT: "{{.WAILS_VITE_PORT | default 9245}}"
+
 tasks:
-  # Desktop
+  # Desktop - Wails v3 tasks
+  build:
+    summary: Builds the application
+    cmds:
+      - task: install:frontend:deps
+      - task: build:frontend
+      - task: generate:bindings
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
+    dir: desktop
+    env:
+      CGO_CFLAGS: "-mmacosx-version-min=10.13"
+      CGO_LDFLAGS: "-mmacosx-version-min=10.13"
+      MACOSX_DEPLOYMENT_TARGET: "10.13"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: build
+      - $(go env GOPATH)/bin/wails3 task package
+    dir: desktop
+
+  run:
+    summary: Runs the application
+    cmds:
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}
+    dir: desktop
+    deps:
+      - build
+
   dev:
+    summary: Runs the application in development mode
     cmds:
-      - rm -rf ./frontend/dist
-      - wails dev
+      - go build -o bin/ns-drive
+      - ./bin/ns-drive
     dir: desktop
 
-  build-mac:
-    platforms: [darwin]
+  devs:
+    summary: Runs the application with Wails v3 dev server (requires frontend dev server)
     cmds:
-      - rm -rf ./frontend/dist
-      - wails build -v 2
-      - rm -rf ../desktop.app
-      - mv build/bin/desktop.app ../desktop.app
-      # - codesign --sign - --force --deep build/bin/desktop.app
-      # - upx --best build/bin/desktop --force-macos
-      # - chmod +x build/bin/desktop.app/Contents/MacOS/desktop
-      - open ../desktop.app
+      - echo "⚠️  Make sure to run 'task dev:frontend' in another terminal first!"
+      - echo "Starting Wails v3 dev server..."
+      - $(go env GOPATH)/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
     dir: desktop
 
-  build-win:
-    platforms: [windows]
+  dev:full:
+    summary: Starts both frontend and backend dev servers (experimental)
     cmds:
-      - wails build -v 2 # -windowsconsole to show the console for debugging
-      - powershell.exe "Move-Item -Path ./build/bin/desktop.exe -Destination ../desktop.exe -Force"
+      - echo "Starting Angular dev server..."
+      - cd frontend && yarn start &
+      - sleep 8
+      - echo "Starting Wails v3 dev server..."
+      - $(go env GOPATH)/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
     dir: desktop
+
+  # Frontend tasks
+  install:frontend:deps:
+    summary: Install frontend dependencies
+    dir: desktop/frontend
+    cmds:
+      - yarn install
+
+  build:frontend:
+    summary: Build frontend for production
+    dir: desktop/frontend
+    cmds:
+      - yarn build
+    sources:
+      - src/**/*
+      - package.json
+      - angular.json
+      - tsconfig.json
+    generates:
+      - dist/browser/**/*
+
+  dev:frontend:
+    summary: Build frontend for development with watch
+    dir: desktop/frontend
+    cmds:
+      - yarn start
+
+  # Development utilities
+  generate:bindings:
+    summary: Generate TypeScript bindings from Go code
+    dir: desktop
+    cmds:
+      - $(go env GOPATH)/bin/wails3 generate bindings
+
+  clean:
+    summary: Clean build artifacts
+    dir: desktop
+    cmds:
+      - rm -rf {{.BIN_DIR}}/
+      - rm -rf frontend/dist/browser
+
+  fmt:
+    summary: Format Go code
+    dir: desktop
+    cmds:
+      - go fmt ./...
+
+  test:
+    summary: Run tests
+    dir: desktop
+    cmds:
+      - go test ./...

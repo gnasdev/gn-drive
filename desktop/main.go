@@ -2,64 +2,47 @@ package main
 
 import (
 	be "desktop/backend"
-	"desktop/backend/constants"
-	"desktop/backend/dto"
 	"embed"
+	"log"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist/browser
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
-	app := be.NewApp()
+	// Create an instance of the app service
+	appService := be.NewApp()
 
 	// Create application with options
-	err := wails.Run(&options.App{
-		Title:  "ns-drive",
-		Width:  768,
-		Height: 768,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	app := application.New(application.Options{
+		Name:        "ns-drive",
+		Description: "A desktop application for rclone file synchronization",
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
 		},
-		OnStartup: app.Startup,
-		Bind: []interface{}{
-			app,
-		},
-		EnumBind: []interface{}{
-			[]struct {
-				Value  constants.Platform
-				TSName string
-			}{
-				{constants.Windows, constants.Windows.String()},
-				{constants.Darwin, constants.Darwin.String()},
-				{constants.Linux, constants.Linux.String()},
-			},
-			[]struct {
-				Value  constants.Environment
-				TSName string
-			}{
-				{constants.Development, constants.Development.String()},
-				{constants.Production, constants.Production.String()},
-			},
-			[]struct {
-				Value  dto.Command
-				TSName string
-			}{
-				{dto.CommandStoped, dto.CommandStoped.String()},
-				{dto.CommandOutput, dto.CommandOutput.String()},
-				{dto.CommandStarted, dto.CommandStarted.String()},
-				{dto.WorkingDirUpdated, dto.WorkingDirUpdated.String()},
-				{dto.Error, dto.Error.String()},
-			},
+		Services: []application.Service{
+			application.NewService(appService),
 		},
 	})
 
+	// Store the application reference in the service for events
+	appService.SetApp(app)
+
+	// Create the main window
+	window := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+		Title:  "ns-drive",
+		Width:  768,
+		Height: 768,
+	})
+
+	// Set the window URL to load the frontend
+	window.SetURL("/")
+
+	// Run the application
+	err := app.Run()
 	if err != nil {
-		println("Error:", err.Error())
+		log.Fatal("Error:", err.Error())
 	}
 }

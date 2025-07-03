@@ -2725,6 +2725,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@wailsio/runtime@npm:^3.0.0-alpha.66":
+  version: 3.0.0-alpha.66
+  resolution: "@wailsio/runtime@npm:3.0.0-alpha.66"
+  checksum: 10c0/8a996bba19531116163dcda594af567bef1bb40354f4a3a5d22b6ca61882a5cba0cceb09cf488f16a0c96ef06e51611f19ab9e5d18a9e393dcf9b31c1eee4096
+  languageName: node
+  linkType: hard
+
 "@yarnpkg/lockfile@npm:1.1.0":
   version: 1.1.0
   resolution: "@yarnpkg/lockfile@npm:1.1.0"
@@ -3515,6 +3522,7 @@ __metadata:
     "@tailwindcss/forms": "npm:^0.5.10"
     "@tailwindcss/postcss": "npm:^4.1.11"
     "@types/jasmine": "npm:~5.1.0"
+    "@wailsio/runtime": "npm:^3.0.0-alpha.66"
     angular-eslint: "npm:19.0.2"
     autoprefixer: "npm:^10.4.21"
     eslint: "npm:^9.16.0"

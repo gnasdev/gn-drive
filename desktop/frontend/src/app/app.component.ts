@@ -9,7 +9,7 @@ import {
 import { Action, AppService } from "./app.service.js";
 import { combineLatest, Subscription } from "rxjs";
 import { HomeComponent } from "./home/home.component.js";
-import { models } from "../../wailsjs/go/models.js";
+import * as models from "../../wailsjs/desktop/backend/models/models.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";

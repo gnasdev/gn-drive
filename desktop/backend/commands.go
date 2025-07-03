@@ -17,7 +17,6 @@ import (
 	fsConfig "github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/rc"
 	"github.com/rclone/rclone/lib/oauthutil"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func (a *App) Sync(task string, profile models.Profile) int {
@@ -247,36 +246,15 @@ func (a *App) SyncWithTabId(task string, profile models.Profile, tabId string) i
 
 // File dialog functions
 func (a *App) OpenFileDialog(title string, filters []string) (string, *dto.AppError) {
-	filePath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: title,
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "JSON Files",
-				Pattern:     "*.json",
-			},
-		},
-	})
-	if err != nil {
-		return "", dto.NewAppError(err)
-	}
-	return filePath, nil
+	// TODO: Implement Wails v3 dialogs API
+	// For now, return empty string to avoid compilation errors
+	return "", dto.NewAppError(fmt.Errorf("file dialogs not yet implemented in v3 migration"))
 }
 
 func (a *App) SaveFileDialog(title string, defaultFilename string, filters []string) (string, *dto.AppError) {
-	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           title,
-		DefaultFilename: defaultFilename,
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "JSON Files",
-				Pattern:     "*.json",
-			},
-		},
-	})
-	if err != nil {
-		return "", dto.NewAppError(err)
-	}
-	return filePath, nil
+	// TODO: Implement Wails v3 dialogs API
+	// For now, return empty string to avoid compilation errors
+	return "", dto.NewAppError(fmt.Errorf("file dialogs not yet implemented in v3 migration"))
 }
 
 // Profile import/export functions
