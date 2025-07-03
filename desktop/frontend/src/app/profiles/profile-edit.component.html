@@ -180,6 +180,189 @@
     </div>
   </div>
 
+  <!-- Include/Exclude Paths -->
+  <div class="card">
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        Filter Settings
+      </h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        Configure which files and folders to include or exclude from sync
+      </p>
+    </div>
+
+    <!-- Include Paths -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2">
+          <lucide-icon
+            [img]="CheckIcon"
+            class="w-5 h-5 text-green-600"
+          ></lucide-icon>
+          <h3 class="text-md font-medium text-gray-900 dark:text-gray-100">
+            Include Paths
+          </h3>
+        </div>
+        <button
+          type="button"
+          class="btn-secondary flex items-center space-x-2"
+          (click)="addIncludePath()"
+        >
+          <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
+          <span>Add Path</span>
+        </button>
+      </div>
+
+      <div
+        *ngIf="profile.included_paths.length === 0"
+        class="text-center py-8 text-gray-500 dark:text-gray-400"
+      >
+        <lucide-icon
+          [img]="CheckIcon"
+          class="w-12 h-12 mx-auto mb-2 opacity-50"
+        ></lucide-icon>
+        <p>No include paths configured</p>
+        <p class="text-sm">All files will be included by default</p>
+      </div>
+
+      <div class="space-y-3" *ngIf="profile.included_paths.length > 0">
+        <div
+          *ngFor="
+            let path of profile.included_paths;
+            let i = index;
+            trackBy: trackByIndex
+          "
+          class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+        >
+          <!-- Path Type Selector -->
+          <div class="flex-shrink-0">
+            <select
+              class="select-field w-24"
+              [value]="getIncludePathType(i)"
+              (change)="onIncludePathTypeChange(i, $event)"
+            >
+              <option value="file">File</option>
+              <option value="folder">Folder</option>
+            </select>
+          </div>
+
+          <!-- Path Input -->
+          <div class="flex-1 relative">
+            <input
+              type="text"
+              class="input-field pr-10"
+              [value]="getIncludePathValue(i)"
+              (input)="onIncludePathValueChange(i, $event)"
+              placeholder="Enter path pattern"
+            />
+            <div
+              class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+            >
+              <lucide-icon
+                [img]="getIncludePathType(i) === 'file' ? FileIcon : FolderIcon"
+                class="w-4 h-4 text-gray-400"
+              ></lucide-icon>
+            </div>
+          </div>
+
+          <!-- Remove Button -->
+          <button
+            type="button"
+            class="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:!bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
+            (click)="removeIncludePath(i)"
+            title="Remove path"
+          >
+            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exclude Paths -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2">
+          <lucide-icon [img]="XIcon" class="w-5 h-5 text-red-600"></lucide-icon>
+          <h3 class="text-md font-medium text-gray-900 dark:text-gray-100">
+            Exclude Paths
+          </h3>
+        </div>
+        <button
+          type="button"
+          class="btn-secondary flex items-center space-x-2"
+          (click)="addExcludePath()"
+        >
+          <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
+          <span>Add Path</span>
+        </button>
+      </div>
+
+      <div
+        *ngIf="profile.excluded_paths.length === 0"
+        class="text-center py-8 text-gray-500 dark:text-gray-400"
+      >
+        <lucide-icon
+          [img]="XIcon"
+          class="w-12 h-12 mx-auto mb-2 opacity-50"
+        ></lucide-icon>
+        <p>No exclude paths configured</p>
+        <p class="text-sm">No files will be excluded</p>
+      </div>
+
+      <div class="space-y-3" *ngIf="profile.excluded_paths.length > 0">
+        <div
+          *ngFor="
+            let path of profile.excluded_paths;
+            let i = index;
+            trackBy: trackByIndex
+          "
+          class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+        >
+          <!-- Path Type Selector -->
+          <div class="flex-shrink-0">
+            <select
+              class="select-field w-24"
+              [value]="getExcludePathType(i)"
+              (change)="onExcludePathTypeChange(i, $event)"
+            >
+              <option value="file">File</option>
+              <option value="folder">Folder</option>
+            </select>
+          </div>
+
+          <!-- Path Input -->
+          <div class="flex-1 relative">
+            <input
+              type="text"
+              class="input-field pr-10"
+              [value]="getExcludePathValue(i)"
+              (input)="onExcludePathValueChange(i, $event)"
+              placeholder="Enter path pattern"
+            />
+            <div
+              class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+            >
+              <lucide-icon
+                [img]="getExcludePathType(i) === 'file' ? FileIcon : FolderIcon"
+                class="w-4 h-4 text-gray-400"
+              ></lucide-icon>
+            </div>
+          </div>
+
+          <!-- Remove Button -->
+          <button
+            type="button"
+            class="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:!bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
+            (click)="removeExcludePath(i)"
+            title="Remove path"
+          >
+            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Performance Settings -->
   <div class="card">
     <div class="mb-6">

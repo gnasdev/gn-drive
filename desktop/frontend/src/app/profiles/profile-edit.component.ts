@@ -14,6 +14,9 @@ import { models } from "../../../wailsjs/go/models";
 import {
   parseRemotePath,
   buildRemotePath,
+  parsePathConfig,
+  buildPath,
+  isValidPathIndex,
   DEFAULT_BANDWIDTH_OPTIONS,
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
@@ -26,6 +29,12 @@ import {
   Wifi,
   Save,
   Trash,
+  Plus,
+  Minus,
+  File,
+  Folder,
+  Check,
+  X,
 } from "lucide-angular";
 
 // No Material imports needed anymore
@@ -49,6 +58,12 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   readonly WifiIcon = Wifi;
   readonly SaveIcon = Save;
   readonly TrashIcon = Trash;
+  readonly PlusIcon = Plus;
+  readonly MinusIcon = Minus;
+  readonly FileIcon = File;
+  readonly FolderIcon = Folder;
+  readonly CheckIcon = Check;
+  readonly XIcon = X;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
   profileIndex = 0; // Will be set from navigation
@@ -175,5 +190,152 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   onToPathChange(event: Event): void {
     const target = event.target as HTMLInputElement;
     this.updateToPath(this.getToRemote(), target.value);
+  }
+
+  // Include path methods
+  addIncludePath(): void {
+    if (!this.profile) return;
+    this.profile.included_paths = [...this.profile.included_paths, "/**"];
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  removeIncludePath(index: number): void {
+    if (!this.profile || !isValidPathIndex(this.profile.included_paths, index))
+      return;
+    this.profile.included_paths = this.profile.included_paths.filter(
+      (_, i) => i !== index
+    );
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  getIncludePathType(index: number): string {
+    if (
+      !this.profile ||
+      !isValidPathIndex(this.profile.included_paths, index)
+    ) {
+      return "folder";
+    }
+    const parsed = parsePathConfig(this.profile.included_paths[index]);
+    return parsed.type;
+  }
+
+  getIncludePathValue(index: number): string {
+    if (
+      !this.profile ||
+      !isValidPathIndex(this.profile.included_paths, index)
+    ) {
+      return "";
+    }
+    const parsed = parsePathConfig(this.profile.included_paths[index]);
+    return parsed.value;
+  }
+
+  updateIncludePathType(index: number, type: string): void {
+    if (!this.profile || !isValidPathIndex(this.profile.included_paths, index))
+      return;
+    const currentValue = this.getIncludePathValue(index);
+    const pathConfig = { type: type as "file" | "folder", value: currentValue };
+    this.profile.included_paths[index] = buildPath(pathConfig);
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  updateIncludePathValue(index: number, value: string): void {
+    if (!this.profile || !isValidPathIndex(this.profile.included_paths, index))
+      return;
+    const currentType = this.getIncludePathType(index);
+    const pathConfig = { type: currentType as "file" | "folder", value };
+    this.profile.included_paths[index] = buildPath(pathConfig);
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  // Exclude path methods
+  addExcludePath(): void {
+    if (!this.profile) return;
+    this.profile.excluded_paths = [...this.profile.excluded_paths, "/**"];
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  removeExcludePath(index: number): void {
+    if (!this.profile || !isValidPathIndex(this.profile.excluded_paths, index))
+      return;
+    this.profile.excluded_paths = this.profile.excluded_paths.filter(
+      (_, i) => i !== index
+    );
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  getExcludePathType(index: number): string {
+    if (
+      !this.profile ||
+      !isValidPathIndex(this.profile.excluded_paths, index)
+    ) {
+      return "folder";
+    }
+    const parsed = parsePathConfig(this.profile.excluded_paths[index]);
+    return parsed.type;
+  }
+
+  getExcludePathValue(index: number): string {
+    if (
+      !this.profile ||
+      !isValidPathIndex(this.profile.excluded_paths, index)
+    ) {
+      return "";
+    }
+    const parsed = parsePathConfig(this.profile.excluded_paths[index]);
+    return parsed.value;
+  }
+
+  updateExcludePathType(index: number, type: string): void {
+    if (!this.profile || !isValidPathIndex(this.profile.excluded_paths, index))
+      return;
+    const currentValue = this.getExcludePathValue(index);
+    const pathConfig = { type: type as "file" | "folder", value: currentValue };
+    this.profile.excluded_paths[index] = buildPath(pathConfig);
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  updateExcludePathValue(index: number, value: string): void {
+    if (!this.profile || !isValidPathIndex(this.profile.excluded_paths, index))
+      return;
+    const currentType = this.getExcludePathType(index);
+    const pathConfig = { type: currentType as "file" | "folder", value };
+    this.profile.excluded_paths[index] = buildPath(pathConfig);
+    this.appService.updateProfile(this.profileIndex, this.profile);
+    this.cdr.detectChanges();
+  }
+
+  // Event handlers for include paths
+  onIncludePathTypeChange(index: number, event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.updateIncludePathType(index, target.value);
+  }
+
+  onIncludePathValueChange(index: number, event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.updateIncludePathValue(index, target.value);
+  }
+
+  // Event handlers for exclude paths
+  onExcludePathTypeChange(index: number, event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.updateExcludePathType(index, target.value);
+  }
+
+  onExcludePathValueChange(index: number, event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.updateExcludePathValue(index, target.value);
+  }
+
+  // Track by function for ngFor
+  trackByIndex(index: number): number {
+    return index;
   }
 }
