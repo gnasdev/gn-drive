@@ -1,10 +1,7 @@
 version: "3"
 
 includes:
-  common: ./build/Taskfile.yml
-  windows: ./build/windows/Taskfile.yml
-  darwin: ./build/darwin/Taskfile.yml
-  linux: ./build/linux/Taskfile.yml
+  darwin: ./desktop/build/darwin/Taskfile.yml
 
 vars:
   APP_NAME: "ns-drive"
@@ -14,20 +11,30 @@ vars:
 tasks:
   build:
     summary: Builds the application
+    dir: desktop
     cmds:
       - task: "{{OS}}:build"
 
   package:
     summary: Packages a production build of the application
+    dir: desktop
     cmds:
       - task: "{{OS}}:package"
 
   run:
     summary: Runs the application
+    dir: desktop
     cmds:
       - task: "{{OS}}:run"
 
-  dev:
-    summary: Runs the application in development mode
+  dev:frontend:
+    summary: Starts the frontend development server
+    dir: desktop/frontend
     cmds:
-      - wails3 dev -config ./desktop/build/config.yml -port {{.VITE_PORT}}
+      - yarn start --port {{.VITE_PORT}}
+
+  dev:
+    summary: Runs the application in development mode (requires frontend dev server to be running)
+    dir: desktop
+    cmds:
+      - '{{env "GOPATH"}}/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}'

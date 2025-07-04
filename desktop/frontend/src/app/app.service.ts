@@ -286,8 +286,7 @@ export class AppService implements OnDestroy {
     }
 
     try {
-      const err = await AddRemote(objData["name"], objData["type"], {});
-      if (err) throw new Error(err.message);
+      await AddRemote(objData["name"], objData["type"], {});
       await this.getRemotes();
     } catch (error) {
       console.error("Error adding remote:", error);
@@ -298,8 +297,7 @@ export class AppService implements OnDestroy {
 
   async stopAddingRemote(): Promise<void> {
     try {
-      const err = await StopAddingRemote();
-      if (err) throw new Error(err.message);
+      await StopAddingRemote();
     } catch (error) {
       console.error("Error stopping add remote:", error);
       this.errorService.handleApiError(error, "stop_adding_remote");
@@ -393,10 +391,7 @@ export class AppService implements OnDestroy {
 
   async saveConfigInfo() {
     try {
-      const err = await UpdateProfiles(this.configInfo$.value.profiles);
-      if (err) {
-        throw err.message;
-      }
+      await UpdateProfiles(this.configInfo$.value.profiles);
     } catch (e) {
       console.error(e);
       this.errorService.handleApiError(e, "save_config_info");
@@ -486,7 +481,7 @@ export class AppService implements OnDestroy {
   // Import/Export methods
   async exportProfiles(): Promise<void> {
     try {
-      await ExportProfiles();
+      await ExportProfiles("profiles_export.json");
     } catch (error) {
       console.error("Error exporting profiles:", error);
       this.errorService.handleApiError(error, "export_profiles");
@@ -496,7 +491,7 @@ export class AppService implements OnDestroy {
 
   async importProfiles(): Promise<void> {
     try {
-      await ImportProfiles();
+      await ImportProfiles("profiles_import.json");
       await this.getConfigInfo(); // Refresh the profiles list
     } catch (error) {
       console.error("Error importing profiles:", error);
@@ -507,7 +502,7 @@ export class AppService implements OnDestroy {
 
   async exportRemotes(): Promise<void> {
     try {
-      await ExportRemotes();
+      await ExportRemotes("remotes_export.conf");
     } catch (error) {
       console.error("Error exporting remotes:", error);
       this.errorService.handleApiError(error, "export_remotes");
@@ -517,7 +512,7 @@ export class AppService implements OnDestroy {
 
   async importRemotes(): Promise<void> {
     try {
-      await ImportRemotes();
+      await ImportRemotes("remotes_import.conf");
       await this.getRemotes(); // Refresh the remotes list
     } catch (error) {
       console.error("Error importing remotes:", error);

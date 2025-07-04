@@ -1,26 +1,44 @@
 version: "3"
 
-includes:
-  common: ../Taskfile.yml
-
 vars:
   APP_NAME: ns-drive
   BIN_DIR: bin
   BINARY_NAME: "{{.APP_NAME}}"
 
 tasks:
+  # Install frontend dependencies
+  install:frontend:deps:
+    summary: Install frontend dependencies
+    dir: frontend
+    cmds:
+      - yarn install
+
+  # Build frontend
+  build:frontend:
+    summary: Build the frontend
+    dir: frontend
+    cmds:
+      - yarn build
+    deps:
+      - install:frontend:deps
+
+  # Generate Wails bindings
+  generate:bindings:
+    summary: Generate Wails bindings
+    cmds:
+      - wails3 generate bindings
+
   # Build for macOS
   build:
     summary: Build the application for macOS
     cmds:
-      - task: common:install:frontend:deps
-      - task: common:build:frontend
-      - task: common:generate:bindings
+      - task: build:frontend
+      - task: generate:bindings
       - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.BINARY_NAME}}
     env:
-      CGO_CFLAGS: "-mmacosx-version-min=12.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=12.0"
-      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      CGO_CFLAGS: "-mmacosx-version-min=14.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=14.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
 
   # Run the application
   run:

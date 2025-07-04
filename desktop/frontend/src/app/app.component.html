@@ -27,6 +27,13 @@
       <app-remotes></app-remotes>
     </div>
     }
+
+    <!-- Demo Tab Content -->
+    @if (getSelectedTabIndex() === 3) {
+    <div class="h-full overflow-auto">
+      <app-demo></app-demo>
+    </div>
+    }
   </div>
 
   <!-- Bottom Navigation -->
@@ -71,6 +78,19 @@
       >
         <lucide-icon [img]="CloudIcon" class="w-6 h-6 mb-1"></lucide-icon>
         <span>Remotes</span>
+      </button>
+
+      <!-- Demo Tab -->
+      <button
+        (click)="openDemo()"
+        [class]="
+          getSelectedTabIndex() === 3
+            ? 'bottom-nav-item-active'
+            : 'bottom-nav-item'
+        "
+      >
+        <lucide-icon [img]="SettingsIcon" class="w-6 h-6 mb-1"></lucide-icon>
+        <span>Demo</span>
       </button>
     </div>
   </nav>

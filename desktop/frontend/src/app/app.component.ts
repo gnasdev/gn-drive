@@ -13,6 +13,7 @@ import * as models from "../../wailsjs/desktop/backend/models/models.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
+import { DemoComponent } from "./demo/demo.component.js";
 import { NavigationService } from "./navigation.service.js";
 import { ErrorDisplayComponent } from "./components/error-display/error-display.component.js";
 import { ToastComponent } from "./components/toast/toast.component.js";
@@ -32,6 +33,7 @@ import {
     ProfilesComponent,
     ProfileEditComponent,
     RemotesComponent,
+    DemoComponent,
     ErrorDisplayComponent,
     ToastComponent,
     LucideAngularModule,
@@ -126,6 +128,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.navigationService.navigateToRemotes();
   }
 
+  openDemo() {
+    this.navigationService.navigateToDemo();
+  }
+
   getSelectedTabIndex(): number {
     const currentState = this.navigationService.currentState;
     switch (currentState.page) {
@@ -136,6 +142,8 @@ export class AppComponent implements OnInit, OnDestroy {
         return 1;
       case "remotes":
         return 2;
+      case "demo":
+        return 3;
       default:
         return 0;
     }
@@ -152,6 +160,9 @@ export class AppComponent implements OnInit, OnDestroy {
         break;
       case 2:
         this.navigationService.navigateToRemotes();
+        break;
+      case 3:
+        this.navigationService.navigateToDemo();
         break;
     }
   }

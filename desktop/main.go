@@ -2,6 +2,7 @@ package main
 
 import (
 	be "desktop/backend"
+	"desktop/backend/services"
 	"embed"
 	"log"
 
@@ -12,10 +13,14 @@ import (
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app service
+	// Create service instances
 	appService := be.NewApp()
+	syncService := services.NewSyncService(nil)
+	configService := services.NewConfigService(nil)
+	remoteService := services.NewRemoteService(nil)
+	tabService := services.NewTabService(nil)
 
-	// Create application with options
+	// Create application with all services registered
 	app := application.New(application.Options{
 		Name:        "ns-drive",
 		Description: "A desktop application for rclone file synchronization",
@@ -24,11 +29,19 @@ func main() {
 		},
 		Services: []application.Service{
 			application.NewService(appService),
+			application.NewService(syncService),
+			application.NewService(configService),
+			application.NewService(remoteService),
+			application.NewService(tabService),
 		},
 	})
 
-	// Store the application reference in the service for events
+	// Store the application reference in all services for events
 	appService.SetApp(app)
+	syncService.SetApp(app)
+	configService.SetApp(app)
+	remoteService.SetApp(app)
+	tabService.SetApp(app)
 
 	// Create the main window
 	window := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
