@@ -9,10 +9,14 @@ import {
 import { Observable, throwError } from "rxjs";
 import { catchError, retry } from "rxjs/operators";
 import { ErrorService } from "../services/error.service";
+import { LoggingService } from "../services/logging.service";
 
 @Injectable()
 export class ErrorInterceptor implements HttpInterceptor {
-  constructor(private errorService: ErrorService) {}
+  constructor(
+    private errorService: ErrorService,
+    private loggingService: LoggingService
+  ) {}
 
   intercept(
     req: HttpRequest<unknown>,
@@ -69,6 +73,15 @@ export class ErrorInterceptor implements HttpInterceptor {
     req: HttpRequest<unknown>
   ): void {
     const context = `${req.method} ${req.url}`;
+
+    // Log HTTP error to backend
+    this.loggingService.error(
+      `HTTP ${error.status} Error: ${error.message}`,
+      "http_error",
+      `URL: ${req.url}, Method: ${req.method}, Status: ${
+        error.status
+      }, Error: ${JSON.stringify(error.error)}`
+    );
 
     switch (error.status) {
       case 0:

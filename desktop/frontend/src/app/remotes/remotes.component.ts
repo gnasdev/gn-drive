@@ -161,9 +161,21 @@ export class RemotesComponent implements OnInit, OnDestroy {
     this.showDeleteConfirmModal = true;
   }
 
+  getProfilesUsingRemote(remoteName: string): number {
+    const profiles = this.appService.configInfo$.value.profiles;
+    return profiles.filter((profile) => {
+      const fromRemote = profile.from.includes(":")
+        ? profile.from.split(":")[0]
+        : "";
+      const toRemote = profile.to.includes(":") ? profile.to.split(":")[0] : "";
+      return fromRemote === remoteName || toRemote === remoteName;
+    }).length;
+  }
+
   closeDeleteConfirmModal(): void {
     this.showDeleteConfirmModal = false;
     this.remoteToDelete = null;
+    this.cdr.detectChanges();
   }
 
   async deleteRemote(): Promise<void> {

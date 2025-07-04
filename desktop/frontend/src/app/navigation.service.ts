@@ -5,8 +5,7 @@ export type NavigationState =
   | { page: "profiles" }
   | { page: "profile-edit"; profileIndex: number }
   | { page: "remotes" }
-  | { page: "home" }
-  | { page: "demo" };
+  | { page: "home" };
 
 @Injectable({
   providedIn: "root",
@@ -49,10 +48,5 @@ export class NavigationService {
   navigateToHome() {
     console.log("NavigationService navigateToHome called");
     this.navigationState$.next({ page: "home" });
-  }
-
-  navigateToDemo() {
-    console.log("NavigationService navigateToDemo called");
-    this.navigationState$.next({ page: "demo" });
   }
 }

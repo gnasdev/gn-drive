@@ -312,7 +312,9 @@ export class AppService implements OnDestroy {
 
     try {
       await DeleteRemote(name);
+      // Refresh both remotes and config info since profiles might have been deleted
       await this.getRemotes();
+      await this.getConfigInfo();
     } catch (error) {
       console.error("Error deleting remote:", error);
       this.errorService.handleApiError(error, "delete_remote");

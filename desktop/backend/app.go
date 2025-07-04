@@ -6,8 +6,10 @@ import (
 	"desktop/backend/models"
 	"desktop/backend/utils"
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	fsConfig "github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configfile"
@@ -16,25 +18,29 @@ import (
 
 // App struct - now implements Wails v3 service interface
 type App struct {
-	app          *application.App
-	oc           chan []byte
-	ConfigInfo   models.ConfigInfo
-	errorHandler *errors.Middleware
-	initialized  bool
+	app            *application.App
+	oc             chan []byte
+	ConfigInfo     models.ConfigInfo
+	errorHandler   *errors.Middleware
+	frontendLogger *errors.FrontendLogger
+	initialized    bool
+	initMutex      sync.Mutex
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		errorHandler: errors.NewMiddleware(true), // Enable debug mode for development
+		errorHandler:   errors.NewMiddleware(true),     // Enable debug mode for development
+		frontendLogger: errors.NewFrontendLogger(true), // Enable debug mode for development
 	}
 }
 
 // NewAppWithApplication creates a new App with application reference for events
 func NewAppWithApplication(app *application.App) *App {
 	return &App{
-		app:          app,
-		errorHandler: errors.NewMiddleware(true), // Enable debug mode for development
+		app:            app,
+		errorHandler:   errors.NewMiddleware(true),     // Enable debug mode for development
+		frontendLogger: errors.NewFrontendLogger(true), // Enable debug mode for development
 	}
 }
 
@@ -80,7 +86,9 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	if err != nil {
 		log.Printf("DEBUG: Error loading profiles: %v", err)
 		a.errorHandler.HandleError(err, "startup", "load_profiles")
-		utils.LogErrorAndExit(err)
+		// Initialize with empty profiles if file doesn't exist instead of exiting
+		log.Printf("WARNING: Could not load profiles, initializing with empty profiles")
+		a.ConfigInfo.Profiles = []models.Profile{}
 	}
 	log.Printf("DEBUG: Loaded %d profiles", len(a.ConfigInfo.Profiles))
 
@@ -102,7 +110,10 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 
 // initializeConfig initializes the configuration if it hasn't been done yet
 func (a *App) initializeConfig() {
-	// Check if already initialized
+	a.initMutex.Lock()
+	defer a.initMutex.Unlock()
+
+	// Check if already initialized (double-check pattern)
 	if a.initialized {
 		return
 	}
@@ -128,7 +139,9 @@ func (a *App) initializeConfig() {
 	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
 		a.errorHandler.HandleError(err, "init_config", "load_profiles")
-		return
+		// Initialize with empty profiles if file doesn't exist instead of returning
+		log.Printf("WARNING: Could not load profiles during initialization, initializing with empty profiles")
+		a.ConfigInfo.Profiles = []models.Profile{}
 	}
 
 	// Load Rclone config
@@ -137,4 +150,20 @@ func (a *App) initializeConfig() {
 
 	// Mark as initialized
 	a.initialized = true
+}
+
+// LogFrontendMessage logs a message from the frontend
+func (a *App) LogFrontendMessage(entry models.FrontendLogEntry) error {
+	if a.frontendLogger == nil {
+		log.Printf("Frontend logger not initialized")
+		return fmt.Errorf("frontend logger not initialized")
+	}
+
+	// Validate the log entry
+	if !entry.IsValid() {
+		return fmt.Errorf("invalid log entry: missing required fields")
+	}
+
+	// Log the entry
+	return a.frontendLogger.LogEntry(&entry)
 }

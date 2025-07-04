@@ -13,17 +13,13 @@ import * as models from "../../wailsjs/desktop/backend/models/models.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
 import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
 import { RemotesComponent } from "./remotes/remotes.component.js";
-import { DemoComponent } from "./demo/demo.component.js";
+
 import { NavigationService } from "./navigation.service.js";
 import { ErrorDisplayComponent } from "./components/error-display/error-display.component.js";
 import { ToastComponent } from "./components/toast/toast.component.js";
-import {
-  LucideAngularModule,
-  Home,
-  Users,
-  Cloud,
-  Settings,
-} from "lucide-angular";
+import { LoggingService } from "./services/logging.service.js";
+import { ConsoleLoggerService } from "./services/console-logger.service.js";
+import { LucideAngularModule, Home, Users, Cloud } from "lucide-angular";
 
 @Component({
   selector: "app-root",
@@ -33,7 +29,6 @@ import {
     ProfilesComponent,
     ProfileEditComponent,
     RemotesComponent,
-    DemoComponent,
     ErrorDisplayComponent,
     ToastComponent,
     LucideAngularModule,
@@ -49,7 +44,6 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly HomeIcon = Home;
   readonly UsersIcon = Users;
   readonly CloudIcon = Cloud;
-  readonly SettingsIcon = Settings;
 
   private subscriptions = new Subscription();
   private isInitialized = false;
@@ -57,13 +51,18 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    public readonly navigationService: NavigationService
+    public readonly navigationService: NavigationService,
+    private readonly loggingService: LoggingService,
+    private readonly consoleLoggerService: ConsoleLoggerService
   ) {
     console.log("AppComponent constructor called");
     console.log(
       "AppComponent navigationService initial state:",
       this.navigationService.currentState
     );
+
+    // Initialize logging systems
+    this.initializeLogging();
   }
 
   ngOnInit() {
@@ -95,6 +94,10 @@ export class AppComponent implements OnInit, OnDestroy {
     console.log("AppComponent ngOnDestroy called");
     this.isInitialized = false;
     this.subscriptions.unsubscribe();
+
+    // Cleanup logging
+    this.consoleLoggerService.restoreConsole();
+    this.loggingService.destroy();
   }
 
   async pull(profile: models.Profile) {
@@ -128,10 +131,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.navigationService.navigateToRemotes();
   }
 
-  openDemo() {
-    this.navigationService.navigateToDemo();
-  }
-
   getSelectedTabIndex(): number {
     const currentState = this.navigationService.currentState;
     switch (currentState.page) {
@@ -142,8 +141,6 @@ export class AppComponent implements OnInit, OnDestroy {
         return 1;
       case "remotes":
         return 2;
-      case "demo":
-        return 3;
       default:
         return 0;
     }
@@ -161,9 +158,62 @@ export class AppComponent implements OnInit, OnDestroy {
       case 2:
         this.navigationService.navigateToRemotes();
         break;
-      case 3:
-        this.navigationService.navigateToDemo();
-        break;
     }
+  }
+
+  private initializeLogging(): void {
+    // Initialize console logging override
+    this.consoleLoggerService.initializeConsoleOverride();
+
+    // Set up global window error handlers
+    this.setupWindowErrorHandlers();
+
+    // Log application startup as warning to ensure it gets sent to backend
+    this.loggingService.warn(
+      "Application started",
+      "app_startup",
+      "Angular application initialized"
+    );
+  }
+
+  private setupWindowErrorHandlers(): void {
+    // Handle unhandled JavaScript errors
+    window.addEventListener("error", (event) => {
+      this.loggingService.critical(
+        `Unhandled Error: ${event.message}`,
+        "window_error",
+        `File: ${event.filename}, Line: ${event.lineno}, Column: ${event.colno}`,
+        event.error
+      );
+    });
+
+    // Handle unhandled promise rejections
+    window.addEventListener("unhandledrejection", (event) => {
+      this.loggingService.critical(
+        `Unhandled Promise Rejection: ${event.reason}`,
+        "unhandled_promise_rejection",
+        JSON.stringify(event.reason),
+        event.reason instanceof Error ? event.reason : undefined
+      );
+    });
+
+    // Handle resource loading errors
+    window.addEventListener(
+      "error",
+      (event) => {
+        if (event.target !== window) {
+          this.loggingService.error(
+            `Resource Load Error: ${
+              (event.target as any)?.src || (event.target as any)?.href
+            }`,
+            "resource_load_error",
+            `Element: ${(event.target as any)?.tagName}, Type: ${
+              (event.target as any)?.type
+            }`
+          );
+        }
+      },
+      true
+    );
   }
 }

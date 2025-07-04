@@ -1,5 +1,7 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
+import { LoggingService } from "./logging.service";
+import { LogLevel } from "../models/logging.interface";
 
 export interface AppError {
   code: string;
@@ -41,7 +43,7 @@ export class ErrorService {
 
   private errorCounter = 0;
 
-  constructor() {
+  constructor(private loggingService: LoggingService) {
     // Initialize service
   }
 
@@ -50,6 +52,14 @@ export class ErrorService {
    */
   handleApiError(error: unknown, context?: string): void {
     console.error("API Error:", error, "Context:", context);
+
+    // Log to backend
+    this.loggingService.error(
+      `API Error: ${this.extractErrorMessage(error)}`,
+      context || "api_error",
+      JSON.stringify(error),
+      error instanceof Error ? error : undefined
+    );
 
     let errorNotification: ErrorNotification;
 
@@ -107,6 +117,13 @@ export class ErrorService {
    * Handle validation errors
    */
   handleValidationError(field: string, message: string): void {
+    // Log to backend
+    this.loggingService.warn(
+      `Validation Error: ${field}: ${message}`,
+      "form_validation",
+      `Field: ${field}, Message: ${message}`
+    );
+
     const errorNotification = this.createNotification(
       ErrorSeverity.WARNING,
       "Validation Error",
@@ -121,6 +138,13 @@ export class ErrorService {
    * Handle network errors
    */
   handleNetworkError(): void {
+    // Log to backend
+    this.loggingService.error(
+      "Network Error: Unable to connect to the server",
+      "network",
+      "Connection failed - check network connectivity"
+    );
+
     const errorNotification = this.createNotification(
       ErrorSeverity.ERROR,
       "Network Error",
@@ -349,5 +373,18 @@ export class ErrorService {
 
   private generateErrorId(): string {
     return `error_${++this.errorCounter}_${Date.now()}`;
+  }
+
+  private extractErrorMessage(error: unknown): string {
+    if (typeof error === "string") {
+      return error;
+    }
+    if (error && typeof error === "object" && "message" in error) {
+      return String((error as { message: unknown }).message);
+    }
+    if (this.isErrorResponse(error)) {
+      return error.error.message;
+    }
+    return "Unknown error";
   }
 }

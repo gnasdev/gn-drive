@@ -254,6 +254,22 @@
           >"{{ remoteToDelete?.name }}"</strong
         >?
       </p>
+      @if (remoteToDelete && getProfilesUsingRemote(remoteToDelete.name) > 0) {
+      <div
+        class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-3"
+      >
+        <p class="text-yellow-800 dark:text-yellow-200 text-sm">
+          <strong>Warning:</strong> This will also delete
+          {{ getProfilesUsingRemote(remoteToDelete.name) }} profile{{
+            getProfilesUsingRemote(remoteToDelete.name) === 1 ? "" : "s"
+          }}
+          that use{{
+            getProfilesUsingRemote(remoteToDelete.name) === 1 ? "s" : ""
+          }}
+          this remote.
+        </p>
+      </div>
+      }
       <p class="text-red-600 dark:text-red-400 text-sm mt-2">
         This action cannot be undone.
       </p>

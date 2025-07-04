@@ -1,5 +1,5 @@
 dev_mode:
-  root_path: .
+  root_path: ..
   log_level: warn
   debounce: 1000
   ignore:

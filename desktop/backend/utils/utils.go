@@ -51,7 +51,10 @@ func CdToNormalizeWorkingDir(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		wd = filepath.Clean(wd + "/../")
+		// In development, we're in /path/to/ns-drive/desktop, we want to go to /path/to/ns-drive
+		if filepath.Base(wd) == "desktop" {
+			wd = filepath.Dir(wd)
+		}
 	} else {
 		exePath, err := os.Executable()
 		if err != nil {

@@ -1,13 +1,26 @@
 import { ErrorHandler, Injectable, NgZone } from "@angular/core";
 import { ErrorService } from "./error.service";
+import { LoggingService } from "./logging.service";
 
 @Injectable()
 export class GlobalErrorHandler implements ErrorHandler {
-  constructor(private errorService: ErrorService, private zone: NgZone) {}
+  constructor(
+    private errorService: ErrorService,
+    private zone: NgZone,
+    private loggingService: LoggingService
+  ) {}
 
   handleError(error: unknown): void {
     // Log to console for debugging
     console.error("Global error caught:", error);
+
+    // Log to backend immediately for critical errors
+    this.loggingService.critical(
+      `Global Error: ${this.extractErrorMessage(error)}`,
+      "global_error_handler",
+      this.getErrorDetails(error),
+      error instanceof Error ? error : undefined
+    );
 
     // Run inside Angular zone to ensure change detection works
     this.zone.run(() => {
@@ -57,9 +70,33 @@ export class GlobalErrorHandler implements ErrorHandler {
 
   private handleChunkLoadError(): void {
     // For chunk load errors, we might want to reload the page
+    this.loggingService.warn(
+      "Chunk load error detected",
+      "chunk_load_error",
+      "Lazy loading chunk failed to load"
+    );
+
     this.errorService.showWarning(
       "Application update detected. Please refresh the page.",
       10000
     );
+  }
+
+  private extractErrorMessage(error: unknown): string {
+    if (typeof error === "string") {
+      return error;
+    }
+    if (error && typeof error === "object" && "message" in error) {
+      return String((error as { message: unknown }).message);
+    }
+    return "Unknown error";
+  }
+
+  private getErrorDetails(error: unknown): string {
+    try {
+      return JSON.stringify(error, null, 2);
+    } catch {
+      return String(error);
+    }
   }
 }

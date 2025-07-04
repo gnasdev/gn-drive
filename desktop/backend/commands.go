@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	fsConfig "github.com/rclone/rclone/fs/config"
@@ -181,10 +182,25 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 func (a *App) GetRemotes() []fsConfig.Remote {
 	// Initialize configuration if not already done
 	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+		log.Printf("DEBUG: GetRemotes - initializing config")
 		a.initializeConfig()
 	}
 
-	return fsConfig.GetRemotes()
+	// Debug: Check current working directory and config path
+	wd, _ := os.Getwd()
+	log.Printf("DEBUG: GetRemotes - current working directory: %s", wd)
+	log.Printf("DEBUG: GetRemotes - rclone config path: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
+
+	// Check if config file exists
+	if _, err := os.Stat(a.ConfigInfo.EnvConfig.RcloneFilePath); os.IsNotExist(err) {
+		log.Printf("DEBUG: GetRemotes - rclone config file does not exist: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
+	} else {
+		log.Printf("DEBUG: GetRemotes - rclone config file exists: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
+	}
+
+	remotes := fsConfig.GetRemotes()
+	log.Printf("DEBUG: GetRemotes - found %d remotes", len(remotes))
+	return remotes
 }
 
 func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
@@ -196,12 +212,56 @@ func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[s
 		return a.addICloudRemote(ctx, remoteName, remoteConfig)
 	default:
 		// Standard OAuth flow for other providers
-		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, rc.Params{}, fsConfig.UpdateRemoteOpt{})
+		return a.addOAuthRemote(ctx, remoteName, remoteType, remoteConfig)
+	}
+}
+
+func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
+	log.Printf("Creating OAuth remote: name=%s, type=%s", remoteName, remoteType)
+
+	// Prepare configuration parameters
+	configParams := rc.Params{}
+
+	// Set basic configuration
+	for key, value := range remoteConfig {
+		configParams[key] = value
+	}
+
+	// For OAuth providers, we need to handle the authentication flow
+	switch remoteType {
+	case "drive", "dropbox", "onedrive", "box", "yandex", "gphotos":
+		// These providers require OAuth authentication
+		// Use auto config for desktop applications
+		configParams["config_is_local"] = "true"
+
+		// Create the remote with OAuth flow
+		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, configParams, fsConfig.UpdateRemoteOpt{
+			NonInteractive: false, // Allow interactive OAuth
+			NoObscure:      false, // Allow password obscuring
+		})
+
 		if err != nil {
+			log.Printf("Error creating OAuth remote %s (%s): %v", remoteName, remoteType, err)
+			a.errorHandler.HandleError(err, "add_oauth_remote", remoteType, remoteName)
+			a.DeleteRemote(remoteName) // Clean up on failure
+			return dto.NewAppError(err)
+		}
+
+		log.Printf("Successfully created OAuth remote: %s (%s)", remoteName, remoteType)
+		return nil
+
+	default:
+		// For non-OAuth providers, use standard creation
+		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, configParams, fsConfig.UpdateRemoteOpt{})
+		if err != nil {
+			log.Printf("Error creating remote %s (%s): %v", remoteName, remoteType, err)
 			a.errorHandler.HandleError(err, "add_remote", remoteType, remoteName)
 			a.DeleteRemote(remoteName)
+			return dto.NewAppError(err)
 		}
-		return dto.NewAppError(err)
+
+		log.Printf("Successfully created remote: %s (%s)", remoteName, remoteType)
+		return nil
 	}
 }
 
@@ -235,6 +295,25 @@ func (a *App) OpenICloudSetup(remoteName string) *dto.AppError {
 	return a.addICloudRemote(context.Background(), remoteName, nil)
 }
 
+func (a *App) GetOAuthURL(remoteType string) (string, *dto.AppError) {
+	// Return the OAuth authorization URL for the given remote type
+	// This can be used to open the browser for authentication
+	switch remoteType {
+	case "drive":
+		return "https://accounts.google.com/oauth/authorize", nil
+	case "dropbox":
+		return "https://www.dropbox.com/oauth2/authorize", nil
+	case "onedrive":
+		return "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", nil
+	case "box":
+		return "https://account.box.com/api/oauth2/authorize", nil
+	case "yandex":
+		return "https://oauth.yandex.com/authorize", nil
+	default:
+		return "", dto.NewAppError(fmt.Errorf("OAuth not supported for remote type: %s", remoteType))
+	}
+}
+
 func (a *App) StopAddingRemote() *dto.AppError {
 	const OAUTH_REDIRECT_URL = oauthutil.RedirectURL
 	resp, err := http.Get(OAUTH_REDIRECT_URL)
@@ -246,8 +325,65 @@ func (a *App) StopAddingRemote() *dto.AppError {
 	return nil
 }
 
-func (a *App) DeleteRemote(remoteName string) {
+func (a *App) DeleteRemote(remoteName string) *dto.AppError {
+	// Initialize configuration if not already done
+	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+		a.initializeConfig()
+	}
+
+	// Find and remove profiles that use this remote
+	var profilesToKeep []models.Profile
+	deletedProfileCount := 0
+
+	for _, profile := range a.ConfigInfo.Profiles {
+		// Check if profile uses this remote in from or to paths
+		fromRemote := ""
+		toRemote := ""
+
+		// Parse from path
+		if colonIndex := strings.Index(profile.From, ":"); colonIndex > 0 {
+			fromRemote = profile.From[:colonIndex]
+		}
+
+		// Parse to path
+		if colonIndex := strings.Index(profile.To, ":"); colonIndex > 0 {
+			toRemote = profile.To[:colonIndex]
+		}
+
+		// Keep profile only if it doesn't use the remote being deleted
+		if fromRemote != remoteName && toRemote != remoteName {
+			profilesToKeep = append(profilesToKeep, profile)
+		} else {
+			deletedProfileCount++
+			log.Printf("Deleting profile '%s' because it uses remote '%s'", profile.Name, remoteName)
+		}
+	}
+
+	// Update profiles if any were deleted
+	if deletedProfileCount > 0 {
+		a.ConfigInfo.Profiles = profilesToKeep
+
+		// Save updated profiles to file
+		profilesJson, err := models.Profiles(a.ConfigInfo.Profiles).ToJSON()
+		if err != nil {
+			a.errorHandler.HandleError(err, "delete_remote", "json_marshal")
+			return dto.NewAppError(err)
+		}
+
+		err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0644)
+		if err != nil {
+			a.errorHandler.HandleError(err, "delete_remote", "write_file", a.ConfigInfo.EnvConfig.ProfileFilePath)
+			return dto.NewAppError(err)
+		}
+
+		log.Printf("Deleted %d profiles that were using remote '%s'", deletedProfileCount, remoteName)
+	}
+
+	// Delete the remote from rclone config
 	fsConfig.DeleteRemote(remoteName)
+
+	log.Printf("Remote '%s' deleted successfully", remoteName)
+	return nil
 }
 
 func (a *App) SyncWithTabId(task string, profile models.Profile, tabId string) int {
