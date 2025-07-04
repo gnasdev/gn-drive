@@ -71,11 +71,30 @@ export class AppService implements OnDestroy {
 
     // Store cleanup function for event listener
     this.eventCleanup = Events.On("tofe", (event) => {
+      console.log("AppService received event:", event);
       const rawData = event.data;
-      const data = JSON.parse(rawData as string) as CommandDTO;
+      console.log("AppService raw event data:", rawData);
+
+      let data: CommandDTO;
+      try {
+        data = JSON.parse(rawData as string) as CommandDTO;
+        console.log("AppService parsed event data:", data);
+      } catch (error) {
+        console.error(
+          "AppService error parsing event data:",
+          error,
+          "rawData:",
+          rawData
+        );
+        return;
+      }
 
       // If event has tab_id, route to TabService
       if (data.tab_id) {
+        console.log(
+          "AppService routing event to TabService for tab:",
+          data.tab_id
+        );
         this.tabService.handleCommandEvent(data);
         return;
       }
@@ -168,21 +187,50 @@ export class AppService implements OnDestroy {
   async pull(profile: models.Profile) {
     if (this.currentAction$.value === Action.Pull) return;
 
+    console.log("pull called with profile:", profile);
     this.replaceData("Pulling...");
-    this.currentId$.next(await Sync(Action.Pull, profile));
-    if (this.currentId$.value) this.currentAction$.next(Action.Pull);
+
+    try {
+      const taskId = await Sync(Action.Pull, profile);
+      console.log("pull received taskId:", taskId);
+      this.currentId$.next(taskId);
+      if (this.currentId$.value) {
+        this.currentAction$.next(Action.Pull);
+      } else {
+        console.error("pull: No taskId returned from backend");
+        this.replaceData("Error: Failed to start pull operation");
+      }
+    } catch (error) {
+      console.error("pull error:", error);
+      this.replaceData("Error: " + (error as Error).message);
+    }
   }
 
   async pullWithTab(profile: models.Profile, tabId: string) {
     const tab = this.tabService.getTab(tabId);
     if (!tab || tab.currentAction === Action.Pull) return;
 
+    console.log("pullWithTab called with profile:", profile, "tabId:", tabId);
     this.tabService.updateTab(tabId, { data: ["Pulling..."] });
-    const taskId = await SyncWithTabId(Action.Pull, profile, tabId);
-    if (taskId) {
+
+    try {
+      const taskId = await SyncWithTabId(Action.Pull, profile, tabId);
+      console.log("pullWithTab received taskId:", taskId);
+      if (taskId) {
+        this.tabService.updateTab(tabId, {
+          currentAction: Action.Pull,
+          currentTaskId: taskId,
+        });
+      } else {
+        console.error("pullWithTab: No taskId returned from backend");
+        this.tabService.updateTab(tabId, {
+          data: ["Error: Failed to start pull operation"],
+        });
+      }
+    } catch (error) {
+      console.error("pullWithTab error:", error);
       this.tabService.updateTab(tabId, {
-        currentAction: Action.Pull,
-        currentTaskId: taskId,
+        data: ["Error: " + (error as Error).message],
       });
     }
   }
@@ -190,21 +238,50 @@ export class AppService implements OnDestroy {
   async push(profile: models.Profile) {
     if (this.currentAction$.value === Action.Push) return;
 
+    console.log("push called with profile:", profile);
     this.replaceData("Pushing...");
-    this.currentId$.next(await Sync(Action.Push, profile));
-    if (this.currentId$.value) this.currentAction$.next(Action.Push);
+
+    try {
+      const taskId = await Sync(Action.Push, profile);
+      console.log("push received taskId:", taskId);
+      this.currentId$.next(taskId);
+      if (this.currentId$.value) {
+        this.currentAction$.next(Action.Push);
+      } else {
+        console.error("push: No taskId returned from backend");
+        this.replaceData("Error: Failed to start push operation");
+      }
+    } catch (error) {
+      console.error("push error:", error);
+      this.replaceData("Error: " + (error as Error).message);
+    }
   }
 
   async pushWithTab(profile: models.Profile, tabId: string) {
     const tab = this.tabService.getTab(tabId);
     if (!tab || tab.currentAction === Action.Push) return;
 
+    console.log("pushWithTab called with profile:", profile, "tabId:", tabId);
     this.tabService.updateTab(tabId, { data: ["Pushing..."] });
-    const taskId = await SyncWithTabId(Action.Push, profile, tabId);
-    if (taskId) {
+
+    try {
+      const taskId = await SyncWithTabId(Action.Push, profile, tabId);
+      console.log("pushWithTab received taskId:", taskId);
+      if (taskId) {
+        this.tabService.updateTab(tabId, {
+          currentAction: Action.Push,
+          currentTaskId: taskId,
+        });
+      } else {
+        console.error("pushWithTab: No taskId returned from backend");
+        this.tabService.updateTab(tabId, {
+          data: ["Error: Failed to start push operation"],
+        });
+      }
+    } catch (error) {
+      console.error("pushWithTab error:", error);
       this.tabService.updateTab(tabId, {
-        currentAction: Action.Push,
-        currentTaskId: taskId,
+        data: ["Error: " + (error as Error).message],
       });
     }
   }
@@ -212,40 +289,98 @@ export class AppService implements OnDestroy {
   async bi(profile: models.Profile, resync = false) {
     if (this.currentAction$.value === Action.Bi) return;
 
-    this.replaceData("Bi...");
-    this.currentId$.next(
-      await Sync(resync ? Action.BiResync : Action.Bi, profile)
-    );
-    if (this.currentId$.value) this.currentAction$.next(Action.Bi);
+    const action = resync ? Action.BiResync : Action.Bi;
+    console.log("bi called with profile:", profile, "action:", action);
+    this.replaceData(resync ? "Resyncing..." : "Syncing...");
+
+    try {
+      const taskId = await Sync(action, profile);
+      console.log("bi received taskId:", taskId);
+      this.currentId$.next(taskId);
+      if (this.currentId$.value) {
+        this.currentAction$.next(Action.Bi);
+      } else {
+        console.error("bi: No taskId returned from backend");
+        this.replaceData("Error: Failed to start sync operation");
+      }
+    } catch (error) {
+      console.error("bi error:", error);
+      this.replaceData("Error: " + (error as Error).message);
+    }
   }
 
   async biWithTab(profile: models.Profile, tabId: string, resync = false) {
     const tab = this.tabService.getTab(tabId);
     if (!tab || tab.currentAction === Action.Bi) return;
 
-    this.tabService.updateTab(tabId, { data: ["Bi..."] });
-    const taskId = await SyncWithTabId(
-      resync ? Action.BiResync : Action.Bi,
+    const action = resync ? Action.BiResync : Action.Bi;
+    console.log(
+      "biWithTab called with profile:",
       profile,
-      tabId
+      "tabId:",
+      tabId,
+      "action:",
+      action
     );
-    if (taskId) {
+    this.tabService.updateTab(tabId, {
+      data: [resync ? "Resyncing..." : "Syncing..."],
+    });
+
+    try {
+      const taskId = await SyncWithTabId(action, profile, tabId);
+      console.log("biWithTab received taskId:", taskId);
+      if (taskId) {
+        this.tabService.updateTab(tabId, {
+          currentAction: Action.Bi,
+          currentTaskId: taskId,
+        });
+      } else {
+        console.error("biWithTab: No taskId returned from backend");
+        this.tabService.updateTab(tabId, {
+          data: ["Error: Failed to start sync operation"],
+        });
+      }
+    } catch (error) {
+      console.error("biWithTab error:", error);
       this.tabService.updateTab(tabId, {
-        currentAction: Action.Bi,
-        currentTaskId: taskId,
+        data: ["Error: " + (error as Error).message],
       });
     }
   }
 
   stopCommand() {
     if (!this.currentAction$.value) return;
-    StopCommand(this.currentId$.value);
+
+    console.log("stopCommand called with taskId:", this.currentId$.value);
+    try {
+      StopCommand(this.currentId$.value);
+    } catch (error) {
+      console.error("stopCommand error:", error);
+      this.replaceData("Error stopping command: " + (error as Error).message);
+    }
   }
 
   stopCommandForTab(tabId: string) {
     const tab = this.tabService.getTab(tabId);
     if (!tab || !tab.currentAction || !tab.currentTaskId) return;
-    StopCommand(tab.currentTaskId);
+
+    console.log(
+      "stopCommandForTab called with tabId:",
+      tabId,
+      "taskId:",
+      tab.currentTaskId
+    );
+    try {
+      StopCommand(tab.currentTaskId);
+    } catch (error) {
+      console.error("stopCommandForTab error:", error);
+      this.tabService.updateTab(tabId, {
+        data: [
+          ...tab.data,
+          "Error stopping command: " + (error as Error).message,
+        ],
+      });
+    }
   }
 
   async getConfigInfo() {

@@ -162,11 +162,25 @@ export class TabService {
   }
 
   handleCommandEvent(data: CommandDTO): void {
-    if (!data.tab_id) return;
+    console.log("TabService handleCommandEvent called with data:", data);
+
+    if (!data.tab_id) {
+      console.log("TabService: No tab_id in event data");
+      return;
+    }
 
     const tab = this.getTab(data.tab_id);
-    if (!tab) return;
+    if (!tab) {
+      console.log("TabService: Tab not found for id:", data.tab_id);
+      return;
+    }
 
+    console.log(
+      "TabService: Processing command:",
+      data.command,
+      "for tab:",
+      data.tab_id
+    );
     switch (data.command) {
       case "command_started":
         // Clear previous data when a new command starts
@@ -183,12 +197,14 @@ export class TabService {
           syncStatus: null, // Clear sync status
         });
         break;
-      case "command_output":
+      case "command_output": {
         // Accumulate output during command execution
+        const currentData = tab.data || [];
         this.updateTab(data.tab_id, {
-          data: [data.error || ""],
+          data: [...currentData, data.error || ""],
         });
         break;
+      }
       case "error":
         // Append errors to existing data
         this.updateTab(data.tab_id, {

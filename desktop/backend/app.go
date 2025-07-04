@@ -46,6 +46,7 @@ func NewAppWithApplication(app *application.App) *App {
 
 // SetApp sets the application reference for events
 func (a *App) SetApp(app *application.App) {
+	log.Printf("SetApp called with app: %v", app != nil)
 	a.app = app
 }
 
@@ -93,13 +94,16 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	log.Printf("DEBUG: Loaded %d profiles", len(a.ConfigInfo.Profiles))
 
 	// Setup event channel for sending messages to the frontend
-	a.oc = make(chan []byte)
+	a.oc = make(chan []byte, 100) // buffered channel to prevent blocking
 	go func() {
 		for data := range a.oc {
 			// Use Wails v3 events API
-			a.app.EmitEvent("tofe", string(data))
+			if a.app != nil {
+				a.app.EmitEvent("tofe", string(data))
+			}
 		}
 	}()
+	log.Printf("Event channel initialized successfully")
 
 	// Load Rclone config
 	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
@@ -152,6 +156,20 @@ func (a *App) initializeConfig() {
 		fmt.Printf("Warning: failed to set rclone config path: %v\n", err)
 	}
 	configfile.Install()
+
+	// Setup event channel if not already initialized
+	if a.oc == nil {
+		a.oc = make(chan []byte, 100) // buffered channel to prevent blocking
+		go func() {
+			for data := range a.oc {
+				// Use Wails v3 events API
+				if a.app != nil {
+					a.app.EmitEvent("tofe", string(data))
+				}
+			}
+		}()
+		log.Printf("Event channel initialized in initializeConfig")
+	}
 
 	// Mark as initialized
 	a.initialized = true

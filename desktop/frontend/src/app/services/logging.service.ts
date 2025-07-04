@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
-import { LogFrontendMessage } from "../../../bindings/desktop/backend/app";
-import { FrontendLogEntry as BackendLogEntry } from "../../../bindings/desktop/backend/models/models";
+import { LogFrontendMessage } from "@bindings/desktop/backend/app";
+import { FrontendLogEntry as BackendLogEntry } from "@bindings/desktop/backend/models/models";
 import {
   LogLevel,
   FrontendLogEntry,

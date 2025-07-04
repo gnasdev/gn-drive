@@ -38,7 +38,24 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	} else {
 		j, _ = utils.NewCommandStartedDTO(id, task).ToJSON()
 	}
-	a.oc <- j
+
+	if a.oc != nil {
+		a.oc <- j
+	} else {
+		log.Printf("ERROR: Event channel is nil, cannot send events")
+		// Initialize the event channel if it's nil
+		a.oc = make(chan []byte, 100) // buffered channel
+		go func() {
+			for data := range a.oc {
+				if a.app != nil {
+					a.app.EmitEvent("tofe", string(data))
+				}
+			}
+		}()
+		// Try sending the event again
+		a.oc <- j
+		log.Printf("Event channel initialized and event sent")
+	}
 
 	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
 	if err != nil {

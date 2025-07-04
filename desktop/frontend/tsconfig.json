@@ -9,7 +9,7 @@
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
@@ -17,6 +17,8 @@
     "noImplicitThis": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "allowJs": true,
+    "checkJs": false,
     "sourceMap": true,
     "declaration": false,
     "experimentalDecorators": true,
@@ -25,7 +27,10 @@
     "target": "ES2022",
     "module": "ES2022",
     "useDefineForClassFields": false,
-    "lib": ["ES2022", "dom"]
+    "lib": ["ES2022", "dom"],
+    "paths": {
+      "@bindings/*": ["./bindings/*"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

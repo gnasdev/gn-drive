@@ -76,6 +76,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly ArchiveIcon = Archive;
   readonly StopCircleIcon = StopCircle;
   readonly ClockIcon = Clock;
+  readonly EraseIcon = Eraser;
 
   private subscriptions = new Subscription();
   showRenameDialog = false;
@@ -389,6 +390,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.appService.stopCommandForTab(tabId);
       this.cdr.detectChanges();
     }
+  }
+
+  clearTabOutput(tabId: string): void {
+    this.tabService.updateTab(tabId, { data: [] });
   }
 
   changeProfileTab(

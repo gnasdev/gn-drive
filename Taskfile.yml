@@ -10,18 +10,13 @@ tasks:
     summary: Builds the application for production
     dir: desktop
     cmds:
-      - echo "Installing frontend dependencies..."
-      - cd frontend && yarn install
-      - echo "Building frontend..."
-      - cd frontend && yarn build
-      - echo "Generating Wails bindings..."
-      - wails3 generate bindings
-      - echo "Building application..."
+      - '{{env "GOPATH"}}/bin/wails3 generate bindings'
+      - cd frontend && yarn install && yarn build
       - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
     env:
-      CGO_CFLAGS: "-mmacosx-version-min=16.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=16.0"
-      MACOSX_DEPLOYMENT_TARGET: "16.0"
+      CGO_CFLAGS: "-mmacosx-version-min=11.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=11.0"
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
 
   dev:fe:
     summary: Starts the frontend development server

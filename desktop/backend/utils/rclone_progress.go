@@ -41,6 +41,19 @@ func (h *progressLogHandler) Enabled(ctx context.Context, level slog.Level) bool
 }
 
 func (h *progressLogHandler) Handle(ctx context.Context, r slog.Record) error {
+	// Filter out backend debug messages to prevent recursive logging
+	message := r.Message
+	if strings.Contains(message, "Emitting event to frontend") ||
+		strings.Contains(message, "Event emitted successfully") ||
+		strings.Contains(message, "Event channel") ||
+		strings.Contains(message, "SetApp called") ||
+		strings.Contains(message, "SyncWithTab called") ||
+		strings.Contains(message, "Generated task ID") ||
+		strings.Contains(message, "Sending command") {
+		// Skip these backend debug messages
+		return h.originalHandler.Handle(ctx, r)
+	}
+
 	// Format the log message similar to the original format
 	defer h.outLogClosedRecover()
 	if !*h.isOutLogClosed {
