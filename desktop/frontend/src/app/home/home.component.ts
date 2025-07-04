@@ -402,7 +402,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   ): void {
     if (!tabId) return;
     const selectedIndex = parseProfileSelection(selectedValue);
+    console.log("changeProfileTab called:", {
+      selectedValue,
+      selectedIndex,
+      tabId,
+    });
     this.tabService.updateTab(tabId, { selectedProfileIndex: selectedIndex });
+    // Force change detection to ensure UI is updated
+    this.cdr.detectChanges();
   }
 
   validateTabProfileIndex(tab: Tab): boolean {
@@ -465,14 +472,31 @@ export class HomeComponent implements OnInit, OnDestroy {
     const index = this.tabService.tabsValue.findIndex(
       (tab) => tab.id === activeTabId
     );
-    return index >= 0 ? index : 0; // Always return valid index
+    const result = index >= 0 ? index : 0;
+    console.log("getActiveTabIndex:", { activeTabId, index, result });
+    return result; // Always return valid index
   }
 
   onTabChange(index: number): void {
     try {
       const tabs = this.tabService.tabsValue;
+      console.log("onTabChange called:", { index, tabsLength: tabs.length });
       if (index >= 0 && index < tabs.length && tabs[index]) {
-        this.tabService.setActiveTab(tabs[index].id);
+        const selectedTab = tabs[index];
+        console.log("Switching to tab:", {
+          id: selectedTab.id,
+          name: selectedTab.name,
+          selectedProfileIndex: selectedTab.selectedProfileIndex,
+        });
+        this.tabService.setActiveTab(selectedTab.id);
+
+        // Force change detection and update select element
+        this.cdr.detectChanges();
+
+        // Explicitly update the select element value after a short delay
+        setTimeout(() => {
+          this.updateSelectElementValue(selectedTab);
+        }, 0);
       }
     } catch (error) {
       console.error("Error in onTabChange:", error);
@@ -520,6 +544,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   onProfileChange(event: Event, tabId: string | undefined): void {
     const target = event.target as HTMLSelectElement;
     const value = target.value === "null" ? null : +target.value;
+    console.log("onProfileChange called:", {
+      value,
+      tabId,
+      targetValue: target.value,
+    });
     this.changeProfileTab(value, tabId);
   }
 
@@ -545,5 +574,47 @@ export class HomeComponent implements OnInit, OnDestroy {
       return null;
     }
     return configInfo.profiles[tab.selectedProfileIndex];
+  }
+
+  getTabProfileValue(tab: Tab | undefined): number | null {
+    if (!tab) {
+      console.log("getTabProfileValue: no tab provided");
+      return null;
+    }
+    const value = tab.selectedProfileIndex ?? null;
+    console.log("getTabProfileValue:", {
+      tabId: tab.id,
+      tabName: tab.name,
+      selectedProfileIndex: tab.selectedProfileIndex,
+      value,
+      isActive: tab.isActive,
+    });
+    return value;
+  }
+
+  private updateSelectElementValue(tab: Tab): void {
+    try {
+      const selectElement = document.getElementById(
+        `profile-select-${tab.id}`
+      ) as HTMLSelectElement;
+      if (selectElement) {
+        const expectedValue = tab.selectedProfileIndex?.toString() ?? "null";
+        console.log("updateSelectElementValue:", {
+          tabId: tab.id,
+          expectedValue,
+          currentValue: selectElement.value,
+          selectedProfileIndex: tab.selectedProfileIndex,
+        });
+
+        if (selectElement.value !== expectedValue) {
+          selectElement.value = expectedValue;
+          console.log("Updated select element value to:", expectedValue);
+        }
+      } else {
+        console.warn("Select element not found for tab:", tab.id);
+      }
+    } catch (error) {
+      console.error("Error updating select element value:", error);
+    }
   }
 }

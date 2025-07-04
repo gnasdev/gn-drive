@@ -141,16 +141,20 @@
           </label>
           <div class="relative">
             <select
-              id="profile-select-{{ i }}"
+              id="profile-select-{{ tab?.id }}"
               class="select-field pr-10"
-              [value]="tab?.selectedProfileIndex"
+              [value]="getTabProfileValue(tab)"
               (change)="onProfileChange($event, tab?.id)"
               [disabled]="!tab || !tab.id"
+              #profileSelect
             >
               <option [value]="null">No profile selected</option>
               @for ( profile of appService.configInfo$.value.profiles; track
               profile; let idx = $index) {
-              <option [value]="idx">
+              <option
+                [value]="idx"
+                [selected]="tab?.selectedProfileIndex === idx"
+              >
                 {{ profile.name }}
               </option>
               }

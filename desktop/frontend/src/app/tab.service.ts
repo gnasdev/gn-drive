@@ -195,13 +195,13 @@ export class TabService {
           currentTaskId: 0,
           isStopping: false,
           syncStatus: null, // Clear sync status
+          data: [...tab.data, "Command stopped."],
         });
         break;
       case "command_output": {
         // Accumulate output during command execution
-        const currentData = tab.data || [];
         this.updateTab(data.tab_id, {
-          data: [...currentData, data.error || ""],
+          data: [data.error || ""],
         });
         break;
       }
