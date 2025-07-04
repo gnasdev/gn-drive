@@ -13,7 +13,7 @@ A modern desktop application for cloud storage synchronization powered by rclone
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Go 1.23.4 with Wails v3 framework
+- **Backend**: Go 1.24.2 with Wails v3 framework
 - **Frontend**: Angular 20.0.6 with Tailwind CSS
 - **Cloud Sync**: rclone integration
 - **Package Manager**: Yarn 4.9.2
@@ -23,7 +23,7 @@ A modern desktop application for cloud storage synchronization powered by rclone
 
 Before building or running NS-Drive, ensure you have the following installed:
 
-- **Go**: v1.23.4 or later
+- **Go**: v1.24.2 or later
 - **Node.js**: v18 or later
 - **Yarn**: v4.9.2 (package manager)
 - **Taskfile**: Task runner for build automation
@@ -53,39 +53,17 @@ go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 ```bash
 # Option 1: Two-terminal setup (recommended)
 # Terminal 1: Start frontend dev server
-task dev:frontend
+task dev:fe
 
 # Terminal 2: Start Wails dev server (with hot reload)
-task devs
-
-# Option 2: Single command (experimental)
-task dev:full
-
-# Option 3: Simple development mode (no hot reload)
-task dev
+task dev:be
 ```
 
 ### Production Build
 
-#### macOS
-
 ```bash
 task build
-# Creates: desktop.app in project root
-```
-
-#### Windows
-
-```bash
-task build
-# Creates: desktop.exe in project root
-```
-
-#### Linux
-
-```bash
-task build
-# Creates: desktop binary in project root
+# Creates: bin/ns-drive in desktop directory
 ```
 
 ## 🚀 Quick Start
@@ -100,17 +78,17 @@ task build
 2. **Install dependencies**
 
    ```bash
-   task install:frontend:deps
+   cd desktop/frontend && yarn install
    ```
 
 3. **Run in development mode**
 
    ```bash
    # Start frontend dev server (Terminal 1)
-   task dev:frontend
+   task dev:fe
 
    # Start Wails dev server (Terminal 2)
-   task devs
+   task dev:be
    ```
 
 4. **Build for production**
@@ -120,7 +98,7 @@ task build
    ```
 
 5. **Run the application**
-   - Execute `./desktop.app` (macOS) or `./desktop.exe` (Windows) from the project root
+   - Execute `./desktop/bin/ns-drive` (macOS/Linux) or `./desktop/bin/ns-drive.exe` (Windows)
 
 ## 📖 Usage Guide
 
@@ -152,21 +130,14 @@ task build
 
 ## 🔧 Available Commands
 
-| Command                      | Description                                                 | Status          |
-| ---------------------------- | ----------------------------------------------------------- | --------------- |
-| `task build`                 | Build the application for current platform                  | ✅ Working      |
-| `task package`               | Package the application for distribution                    | ⚠️ Experimental |
-| `task run`                   | Run the built application                                   | ✅ Working      |
-| `task dev`                   | Run in development mode                                     | ✅ Working      |
-| `task devs`                  | Run with Wails v3 dev server (requires frontend dev server) | ✅ Working      |
-| `task dev:full`              | Start both frontend and backend dev servers                 | ⚠️ Experimental |
-| `task install:frontend:deps` | Install frontend dependencies                               | ✅ Working      |
-| `task build:frontend`        | Build frontend for production                               | ✅ Working      |
-| `task dev:frontend`          | Build frontend with watch mode                              | ✅ Working      |
-| `task generate:bindings`     | Generate TypeScript bindings                                | ✅ Working      |
-| `task clean`                 | Clean build artifacts                                       | ✅ Working      |
-| `task fmt`                   | Format Go code                                              | ✅ Working      |
-| `task test`                  | Run tests                                                   | ✅ Working      |
+| Command        | Description                                           | Status     |
+| -------------- | ----------------------------------------------------- | ---------- |
+| `task build`   | Build the application for current platform            | ✅ Working |
+| `task dev:fe`  | Start frontend development server                     | ✅ Working |
+| `task dev:be`  | Start Wails dev server (requires frontend dev server) | ✅ Working |
+| `task lint:fe` | Run ESLint on frontend code                           | ✅ Working |
+| `task lint:be` | Run golangci-lint on backend code                     | ✅ Working |
+| `task lint`    | Run linting on both frontend and backend              | ✅ Working |
 
 ## 🌐 Supported Cloud Providers
 
@@ -178,23 +149,26 @@ task build
 - **iCloud Drive** - Apple cloud storage
 - **And many more** - Any provider supported by rclone
 
-For detailed setup instructions for each provider, see [Cloud Providers Documentation](docs/CLOUD_PROVIDERS.md).
+For detailed setup instructions for each provider, refer to the [rclone documentation](https://rclone.org/docs/).
 
 ## 📱 Screenshots
 
 ### Dashboard
 
 ![Homepage](./screenshots/s1.png)
+
 _Multi-tab operation dashboard with real-time monitoring_
 
 ### Profile Management
 
 ![Profile Manager Page](./screenshots/s2.png)
+
 _Create and configure sync profiles with advanced settings_
 
 ### Remote Configuration
 
 ![Remote Manager Page](./screenshots/s3.png)
+
 _Manage cloud storage connections and authentication_
 
 ## 🏗️ Project Structure
@@ -204,13 +178,17 @@ ns-drive/
 ├── desktop/                 # Main application directory
 │   ├── backend/            # Go backend code
 │   │   ├── app.go         # Main application logic
-│   │   ├── commands.go    # Sync operations
+│   │   ├── services/      # Domain services
 │   │   ├── models/        # Data structures
-│   │   └── rclone/        # rclone integration
+│   │   ├── errors/        # Error handling
+│   │   └── utils/         # Utility functions
 │   ├── frontend/          # Angular frontend
 │   │   ├── src/app/       # Application components
 │   │   └── dist/          # Built frontend assets
-│   └── build/             # Build configuration
+│   ├── build/             # Build configuration
+│   ├── bin/               # Built binaries
+│   ├── go.mod             # Go module definition
+│   └── main.go            # Application entry point
 ├── docs/                  # Documentation
 ├── screenshots/           # Application screenshots
 ├── Taskfile.yml          # Build tasks
@@ -222,7 +200,7 @@ ns-drive/
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests: `task test`
+4. Run linting: `task lint`
 5. Submit a pull request
 
 ## 📄 License
@@ -242,22 +220,19 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ```bash
 # Enable debug mode with hot reload
-task devs
+task dev:be
 
-# Run backend tests
-task test
-
-# Check code formatting
-task fmt
-
-# Clean and rebuild
-task clean && task build
-
-# Generate TypeScript bindings
-task generate:bindings
+# Run linting
+task lint
 
 # Install frontend dependencies
-task install:frontend:deps
+cd desktop/frontend && yarn install
+
+# Build frontend
+cd desktop/frontend && yarn build
+
+# Generate TypeScript bindings (done automatically during build)
+cd desktop && wails3 generate bindings
 ```
 
 ### Common Issues & Solutions
@@ -266,7 +241,7 @@ task install:frontend:deps
 
    ```bash
    # Solution: Build frontend first
-   task build:frontend
+   cd desktop/frontend && yarn build
    task build
    ```
 
@@ -275,10 +250,10 @@ task install:frontend:deps
    ```bash
    # Solution: Start frontend dev server first
    # Terminal 1:
-   task dev:frontend
+   task dev:fe
 
    # Terminal 2:
-   task devs
+   task dev:be
    ```
 
 3. **Wails3 command not found**
@@ -292,23 +267,23 @@ task install:frontend:deps
 
    ```bash
    # Solution: Install dependencies
-   task install:frontend:deps
+   cd desktop/frontend && yarn install
    ```
 
 5. **Linker warnings about macOS version**
 
    ```
-   ld: warning: object file was built for newer 'macOS' version (16.0) than being linked (12.0)
+   ld: warning: object file was built for newer 'macOS' version (16.0) than being linked (16.0)
    ```
 
-   These warnings are harmless and don't affect functionality. They occur because the Go compiler targets a newer macOS version than the minimum deployment target (macOS 12.0 Monterey). The warnings should be minimal with the current deployment target.
+   These warnings are harmless and don't affect functionality. The current deployment target is macOS 16.0 (macOS Sequoia).
 
 For more detailed troubleshooting, see [RULES.md](RULES.md).
 
 ## 📞 Support
 
-- **Documentation**: Check [RULES.md](RULES.md) for detailed project information
-- **Cloud Setup**: See [Cloud Providers Guide](docs/CLOUD_PROVIDERS.md)
+- **Architecture**: See [Architecture Documentation](docs/ARCHITECTURE.md) for technical details
+- **Cloud Setup**: Refer to [rclone documentation](https://rclone.org/docs/) for cloud provider setup
 - **Issues**: Report bugs and feature requests via GitHub Issues
 
 ---
