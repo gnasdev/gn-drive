@@ -54,7 +54,9 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 
 	// Set bandwidth limit
 	if profile.Bandwidth > 0 {
-		utils.HandleError(fsConfig.BwLimit.Set(fmt.Sprint(profile.Bandwidth)+"M"), "Failed to set bandwidth limit", nil, nil)
+		if err := utils.HandleError(fsConfig.BwLimit.Set(fmt.Sprint(profile.Bandwidth)+"M"), "Failed to set bandwidth limit", nil, nil); err != nil {
+			return err
+		}
 	}
 
 	// Set up filter rules
@@ -62,11 +64,15 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
 	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
 	newFilter, err := filter.NewFilter(&filterOpt)
-	utils.HandleError(err, "Invalid filters file", nil, func() {
+	if err := utils.HandleError(err, "Invalid filters file", nil, func() {
 		ctx = filter.ReplaceConfig(ctx, newFilter)
-	})
+	}); err != nil {
+		return err
+	}
 
-	fsConfig.Reload(ctx)
+	if err := fsConfig.Reload(ctx); err != nil {
+		return err
+	}
 
 	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
 		return utils.HandleError(fssync.Sync(ctx, dstFs, srcFs, false), "Sync failed", nil, nil)

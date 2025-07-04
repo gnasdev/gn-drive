@@ -35,31 +35,31 @@ export class ConsoleLoggerService {
     this.isInitialized = true;
 
     // Override console.log (but don't send to backend - only keep local)
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       this.originalConsole.log(...args);
       // Don't send console.log to backend
     };
 
     // Override console.info (but don't send to backend - only keep local)
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       this.originalConsole.info(...args);
       // Don't send console.info to backend
     };
 
     // Override console.warn
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       this.originalConsole.warn(...args);
       this.logToBackend(LogLevel.WARN, args, "console.warn");
     };
 
     // Override console.error
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       this.originalConsole.error(...args);
       this.logToBackend(LogLevel.ERROR, args, "console.error");
     };
 
     // Override console.debug (but don't send to backend - only keep local)
-    console.debug = (...args: any[]) => {
+    console.debug = (...args: unknown[]) => {
       this.originalConsole.debug(...args);
       // Don't send console.debug to backend
     };
@@ -82,7 +82,11 @@ export class ConsoleLoggerService {
     console.info("Console logging override restored");
   }
 
-  private logToBackend(level: LogLevel, args: any[], context: string): void {
+  private logToBackend(
+    level: LogLevel,
+    args: unknown[],
+    context: string
+  ): void {
     try {
       const message = this.formatConsoleArgs(args);
       const details = this.getConsoleDetails(args);
@@ -118,7 +122,7 @@ export class ConsoleLoggerService {
     }
   }
 
-  private formatConsoleArgs(args: any[]): string {
+  private formatConsoleArgs(args: unknown[]): string {
     return args
       .map((arg) => {
         if (typeof arg === "string") {
@@ -136,7 +140,7 @@ export class ConsoleLoggerService {
       .join(" ");
   }
 
-  private getConsoleDetails(args: any[]): string {
+  private getConsoleDetails(args: unknown[]): string {
     try {
       return JSON.stringify(
         args.map((arg) => {
@@ -158,12 +162,7 @@ export class ConsoleLoggerService {
   }
 
   // Method to manually log without console override
-  logDirect(
-    level: LogLevel,
-    message: string,
-    context?: string,
-    details?: string
-  ): void {
+  logDirect(level: LogLevel, message: string, context?: string): void {
     switch (level) {
       case LogLevel.DEBUG:
         this.originalConsole.debug(message);

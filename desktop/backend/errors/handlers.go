@@ -167,7 +167,7 @@ func (h *ErrorHandler) logError(appErr *AppError, context ...string) {
 
 // contains checks if any of the substrings exist in the main string (case-insensitive)
 func contains(s string, substrings ...string) bool {
-	s = fmt.Sprintf("%s", s) // Ensure string conversion
+	// s is already a string, no conversion needed
 	for _, substr := range substrings {
 		if len(s) >= len(substr) {
 			for i := 0; i <= len(s)-len(substr); i++ {

@@ -1,7 +1,6 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { LoggingService } from "./logging.service";
-import { LogLevel } from "../models/logging.interface";
 
 export interface AppError {
   code: string;

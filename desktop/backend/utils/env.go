@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -15,7 +16,11 @@ func LoadEnvFile(filename string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close env file: %v\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -39,7 +44,9 @@ func LoadEnvFile(filename string) error {
 		value = strings.Trim(value, `"'`)
 
 		// Set the environment variable
-		os.Setenv(key, value)
+		if err := os.Setenv(key, value); err != nil {
+			fmt.Printf("Warning: failed to set environment variable %s: %v\n", key, err)
+		}
 	}
 
 	return scanner.Err()

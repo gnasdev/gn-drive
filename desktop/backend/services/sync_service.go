@@ -35,11 +35,11 @@ type SyncResult struct {
 
 // SyncService handles all sync operations
 type SyncService struct {
-	app          *application.App
-	activeTasks  map[int]*SyncTask
-	taskCounter  int
-	mutex        sync.RWMutex
-	errorHandler interface{} // Will be properly typed later
+	app         *application.App
+	activeTasks map[int]*SyncTask
+	taskCounter int
+	mutex       sync.RWMutex
+	// errorHandler interface{} // Will be properly typed later - removed unused field
 }
 
 // SyncTask represents an active sync task
@@ -161,7 +161,9 @@ func (s *SyncService) StopSync(ctx context.Context, taskId int) error {
 
 	// Kill the process if it's running
 	if task.Cmd != nil && task.Cmd.Process != nil {
-		task.Cmd.Process.Kill()
+		if err := task.Cmd.Process.Kill(); err != nil {
+			fmt.Printf("Warning: failed to kill process: %v\n", err)
+		}
 	}
 
 	// Update task status

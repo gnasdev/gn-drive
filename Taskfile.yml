@@ -30,10 +30,30 @@ tasks:
       - echo "Starting frontend development server on port {{.VITE_PORT}}..."
       - yarn start --port {{.VITE_PORT}}
 
-  dev:
+  dev:be:
     summary: Runs the application in development mode (run 'task dev:frontend' in another terminal first)
     dir: desktop
     cmds:
       - echo "Starting Wails development mode..."
       - echo "Make sure frontend dev server is running on port {{.VITE_PORT}}"
       - '{{env "GOPATH"}}/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}'
+
+  lint:fe:
+    summary: Runs ESLint on the frontend code
+    dir: desktop/frontend
+    cmds:
+      - echo "Running frontend linting..."
+      - yarn lint
+
+  lint:be:
+    summary: Runs golangci-lint on the backend code
+    dir: desktop
+    cmds:
+      - echo "Running backend linting..."
+      - golangci-lint run
+
+  lint:
+    summary: Runs linting on both frontend and backend
+    cmds:
+      - task: lint:fe
+      - task: lint:be

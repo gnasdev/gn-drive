@@ -102,7 +102,9 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	}()
 
 	// Load Rclone config
-	fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath)
+	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
+		return fmt.Errorf("failed to set rclone config path: %w", err)
+	}
 	configfile.Install()
 
 	return nil
@@ -145,7 +147,10 @@ func (a *App) initializeConfig() {
 	}
 
 	// Load Rclone config
-	fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath)
+	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
+		// Log error but don't fail initialization
+		fmt.Printf("Warning: failed to set rclone config path: %v\n", err)
+	}
 	configfile.Install()
 
 	// Mark as initialized

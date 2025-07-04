@@ -122,7 +122,7 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 			pprof.StopCPUProfile()
 			err := f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(ctx, err)
+				_ = fs.CountError(ctx, err)
 			}
 		})
 	}
@@ -135,15 +135,15 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 			fs.Infof(nil, "Saving Memory profile %q\n", memProfile)
 			f, err := os.Create(memProfile)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(ctx, err)
+				_ = fs.CountError(ctx, err)
 			}
 			err = pprof.WriteHeapProfile(f)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(ctx, err)
+				_ = fs.CountError(ctx, err)
 			}
 			err = f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				fs.CountError(ctx, err)
+				_ = fs.CountError(ctx, err)
 			}
 		})
 	}

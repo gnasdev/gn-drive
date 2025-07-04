@@ -145,7 +145,9 @@ func (fl *FrontendLogger) rotateLogIfNeeded() error {
 
 	if fileInfo.Size() > fl.maxLogSize {
 		// Close current file
-		fl.file.Close()
+		if err := fl.file.Close(); err != nil {
+			log.Printf("Failed to close log file: %v", err)
+		}
 
 		// Rename current log file with timestamp
 		timestamp := time.Now().Format("20060102-150405")
@@ -175,7 +177,9 @@ func (fl *FrontendLogger) LogInfo(message, context string) {
 		Context:   context,
 		Timestamp: time.Now(),
 	}
-	fl.LogEntry(entry)
+	if err := fl.LogEntry(entry); err != nil {
+		log.Printf("Failed to log warning entry: %v", err)
+	}
 }
 
 // LogWarning logs a warning level message
@@ -186,7 +190,9 @@ func (fl *FrontendLogger) LogWarning(message, context string) {
 		Context:   context,
 		Timestamp: time.Now(),
 	}
-	fl.LogEntry(entry)
+	if err := fl.LogEntry(entry); err != nil {
+		log.Printf("Failed to log error entry: %v", err)
+	}
 }
 
 // LogError logs an error level message
@@ -197,7 +203,9 @@ func (fl *FrontendLogger) LogError(message, context string) {
 		Context:   context,
 		Timestamp: time.Now(),
 	}
-	fl.LogEntry(entry)
+	if err := fl.LogEntry(entry); err != nil {
+		log.Printf("Failed to log critical entry: %v", err)
+	}
 }
 
 // LogCritical logs a critical level message
@@ -208,7 +216,9 @@ func (fl *FrontendLogger) LogCritical(message, context string) {
 		Context:   context,
 		Timestamp: time.Now(),
 	}
-	fl.LogEntry(entry)
+	if err := fl.LogEntry(entry); err != nil {
+		log.Printf("Failed to log critical entry: %v", err)
+	}
 }
 
 // Close closes the log file

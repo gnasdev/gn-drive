@@ -123,20 +123,26 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
 	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
 	newFilter, err := filter.NewFilter(&filterOpt)
-	utils.HandleError(err, "Invalid filters file", nil, func() {
+	if err := utils.HandleError(err, "Invalid filters file", nil, func() {
 		ctx = filter.ReplaceConfig(ctx, newFilter)
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Set bandwidth limit
 	if profile.Bandwidth > 0 {
-		utils.HandleError(fsConfig.BwLimit.Set(fmt.Sprint(profile.Bandwidth)+"M"), "Failed to set bandwidth limit", nil, nil)
+		if err := utils.HandleError(fsConfig.BwLimit.Set(fmt.Sprint(profile.Bandwidth)+"M"), "Failed to set bandwidth limit", nil, nil); err != nil {
+			return err
+		}
 	}
 
 	// Set parallel transfers
 	fsConfig.Transfers = profile.Parallel
 
 	fsConfig.Progress = true
-	fsConfig.Reload(ctx)
+	if err := fsConfig.Reload(ctx); err != nil {
+		return err
+	}
 
 	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
 		return utils.HandleError(bisync.Bisync(ctx, dstFs, srcFs, opt), "Sync failed", nil, nil)

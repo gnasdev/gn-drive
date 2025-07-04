@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +19,11 @@ func ReadFromFile(filePath string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				fmt.Printf("Warning: failed to close file: %v\n", err)
+			}
+		}()
 
 		_, err = file.Write([]byte("[]"))
 		if err != nil {
@@ -30,7 +35,11 @@ func ReadFromFile(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	byteValue, err := io.ReadAll(file)
 	if err != nil {

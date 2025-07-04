@@ -118,7 +118,11 @@ func RemoveTabMapping(pid int) {
 func LogError(inErr error) {
 	if wd, err := os.Getwd(); err == nil {
 		if f, fileErr := os.OpenFile(filepath.Join(wd, "desktop.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); fileErr == nil {
-			defer f.Close()
+			defer func() {
+				if err := f.Close(); err != nil {
+					log.Printf("Warning: failed to close log file: %v", err)
+				}
+			}()
 			logger := log.New(f, "", log.LstdFlags)
 			logger.Printf("Error: %v\nStack Trace:\n%s", inErr, debug.Stack())
 		} else {

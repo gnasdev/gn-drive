@@ -202,13 +202,15 @@ export class AppComponent implements OnInit, OnDestroy {
       "error",
       (event) => {
         if (event.target !== window) {
+          const target = event.target as HTMLElement;
           this.loggingService.error(
             `Resource Load Error: ${
-              (event.target as any)?.src || (event.target as any)?.href
+              (target as HTMLImageElement)?.src ||
+              (target as HTMLLinkElement)?.href
             }`,
             "resource_load_error",
-            `Element: ${(event.target as any)?.tagName}, Type: ${
-              (event.target as any)?.type
+            `Element: ${target?.tagName}, Type: ${
+              (target as HTMLInputElement)?.type
             }`
           );
         }

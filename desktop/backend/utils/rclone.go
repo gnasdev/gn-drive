@@ -147,7 +147,11 @@ func CalculateFileHash(filePath string, hashFunc func() hash.Hash) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	// Initialize the hash function
 	hasher := hashFunc()

@@ -321,7 +321,11 @@ func (a *App) StopAddingRemote() *dto.AppError {
 		return dto.NewAppError(err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 	return nil
 }
 
