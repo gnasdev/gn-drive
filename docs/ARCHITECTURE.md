@@ -96,7 +96,6 @@ SaveProfiles(ctx context.Context) error
 - Initialize and maintain rclone config
 - CRUD operations for remotes
 - Test remote connections (planned)
-- Import/export remote configurations (planned)
 
 **Key Methods:**
 
@@ -106,8 +105,6 @@ AddRemote(ctx context.Context, name, remoteType string, config map[string]string
 UpdateRemote(ctx context.Context, name string, config map[string]string) error
 DeleteRemote(ctx context.Context, name string) error
 TestRemote(ctx context.Context, name string) error
-ExportRemotes(ctx context.Context, filePath string) error
-ImportRemotes(ctx context.Context, filePath string) error
 ```
 
 **Events Emitted:**

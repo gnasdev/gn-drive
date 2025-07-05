@@ -1,35 +1,15 @@
 <!-- Profiles List -->
 <div class="p-6 max-w-4xl mx-auto">
-  <!-- Header with import/export buttons - always visible -->
+  <!-- Header -->
   <div class="mb-6">
-    <div class="flex items-center justify-between mb-2">
-      <div class="flex items-center space-x-3">
-        <lucide-icon
-          [img]="UsersIcon"
-          class="w-6 h-6 text-primary-600"
-        ></lucide-icon>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Sync Profiles
-        </h1>
-      </div>
-      <div class="flex items-center space-x-2">
-        <button
-          (click)="importProfiles()"
-          class="btn-secondary flex items-center space-x-2"
-          title="Import Profiles"
-        >
-          <lucide-icon [img]="UploadIcon" class="w-4 h-4"></lucide-icon>
-          <span>Import</span>
-        </button>
-        <button
-          (click)="exportProfiles()"
-          class="btn-secondary flex items-center space-x-2"
-          title="Export Profiles"
-        >
-          <lucide-icon [img]="DownloadIcon" class="w-4 h-4"></lucide-icon>
-          <span>Export</span>
-        </button>
-      </div>
+    <div class="flex items-center space-x-3 mb-2">
+      <lucide-icon
+        [img]="UsersIcon"
+        class="w-6 h-6 text-primary-600"
+      ></lucide-icon>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        Sync Profiles
+      </h1>
     </div>
     <p class="text-gray-600 dark:text-gray-400">
       {{ (appService.configInfo$ | async)?.profiles?.length || 0 }} profile(s)

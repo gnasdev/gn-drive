@@ -1,9 +1,5 @@
 package models
 
-import (
-	"encoding/json"
-)
-
 type Profile struct {
 	Name          string   `json:"name"`
 	From          string   `json:"from"`
@@ -17,11 +13,3 @@ type Profile struct {
 }
 
 type Profiles []Profile
-
-func (profiles Profiles) ToJSON() ([]byte, error) {
-	jsonData, err := json.MarshalIndent(profiles, "", "    ")
-	if err != nil {
-		return []byte{}, err
-	}
-	return jsonData, nil
-}

@@ -15,10 +15,6 @@ import {
   DeleteRemote,
   AddRemote,
   StopAddingRemote,
-  ExportProfiles,
-  ImportProfiles,
-  ExportRemotes,
-  ImportRemotes,
 } from "../../wailsjs/desktop/backend/app";
 import { Events } from "@wailsio/runtime";
 import { TabService } from "./tab.service";
@@ -613,48 +609,5 @@ export class AppService implements OnDestroy {
     });
 
     this.configInfo$.next(updatedConfig);
-  }
-
-  // Import/Export methods
-  async exportProfiles(): Promise<void> {
-    try {
-      await ExportProfiles("profiles_export.json");
-    } catch (error) {
-      console.error("Error exporting profiles:", error);
-      this.errorService.handleApiError(error, "export_profiles");
-      throw new Error("Failed to export profiles");
-    }
-  }
-
-  async importProfiles(): Promise<void> {
-    try {
-      await ImportProfiles("profiles_import.json");
-      await this.getConfigInfo(); // Refresh the profiles list
-    } catch (error) {
-      console.error("Error importing profiles:", error);
-      this.errorService.handleApiError(error, "import_profiles");
-      throw new Error("Failed to import profiles");
-    }
-  }
-
-  async exportRemotes(): Promise<void> {
-    try {
-      await ExportRemotes("remotes_export.conf");
-    } catch (error) {
-      console.error("Error exporting remotes:", error);
-      this.errorService.handleApiError(error, "export_remotes");
-      throw new Error("Failed to export remotes");
-    }
-  }
-
-  async importRemotes(): Promise<void> {
-    try {
-      await ImportRemotes("remotes_import.conf");
-      await this.getRemotes(); // Refresh the remotes list
-    } catch (error) {
-      console.error("Error importing remotes:", error);
-      this.errorService.handleApiError(error, "import_remotes");
-      throw new Error("Failed to import remotes");
-    }
   }
 }

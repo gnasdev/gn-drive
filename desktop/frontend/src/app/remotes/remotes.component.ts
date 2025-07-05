@@ -20,15 +20,7 @@ import {
   RemoteInfo,
   REMOTE_TYPE_OPTIONS,
 } from "./remotes.types";
-import {
-  LucideAngularModule,
-  Cloud,
-  Plus,
-  Download,
-  Upload,
-  X,
-  Trash2,
-} from "lucide-angular";
+import { LucideAngularModule, Cloud, Plus, X, Trash2 } from "lucide-angular";
 
 @Component({
   selector: "app-remotes",
@@ -43,8 +35,6 @@ export class RemotesComponent implements OnInit, OnDestroy {
   // Lucide Icons
   readonly CloudIcon = Cloud;
   readonly PlusIcon = Plus;
-  readonly DownloadIcon = Download;
-  readonly UploadIcon = Upload;
   readonly XIcon = X;
   readonly Trash2Icon = Trash2;
   private subscriptions = new Subscription();
@@ -203,25 +193,5 @@ export class RemotesComponent implements OnInit, OnDestroy {
   getRemoteTypeLabel(type: string): string {
     const option = this.remoteTypeOptions.find((opt) => opt.value === type);
     return option?.label ?? type;
-  }
-
-  async exportRemotes(): Promise<void> {
-    try {
-      await this.appService.exportRemotes();
-      this.errorService.showSuccess("Remotes exported successfully!");
-    } catch (error) {
-      console.error("Error exporting remotes:", error);
-      this.errorService.handleApiError(error, "export_remotes");
-    }
-  }
-
-  async importRemotes(): Promise<void> {
-    try {
-      await this.appService.importRemotes();
-      this.errorService.showSuccess("Remotes imported successfully!");
-    } catch (error) {
-      console.error("Error importing remotes:", error);
-      this.errorService.handleApiError(error, "import_remotes");
-    }
   }
 }

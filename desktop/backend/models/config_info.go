@@ -40,7 +40,7 @@ func (c *ConfigInfo) ReadFromFile(cf config.Config) error {
 }
 
 func (c *ConfigInfo) WriteToFile(cf config.Config) error {
-	profilesJson, err := c.Profiles.ToJSON()
+	profilesJson, err := json.MarshalIndent(c.Profiles, "", "    ")
 	if err != nil {
 		return err
 	}

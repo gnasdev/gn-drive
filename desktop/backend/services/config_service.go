@@ -248,64 +248,6 @@ func (c *ConfigService) DeleteProfile(ctx context.Context, profileName string) e
 	return nil
 }
 
-// ExportProfiles exports profiles to a file
-func (c *ConfigService) ExportProfiles(ctx context.Context, filePath string) error {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	// Create a temporary config with current profiles
-	tempConfig := &models.ConfigInfo{
-		Profiles:  c.configInfo.Profiles,
-		EnvConfig: c.configInfo.EnvConfig,
-	}
-
-	// Create config for export
-	exportConfig := config.Config{
-		ProfileFilePath: filePath,
-	}
-
-	// Save to specified file
-	if err := tempConfig.WriteToFile(exportConfig); err != nil {
-		return fmt.Errorf("failed to export profiles: %w", err)
-	}
-
-	log.Printf("Profiles exported to '%s'", filePath)
-	return nil
-}
-
-// ImportProfiles imports profiles from a file
-func (c *ConfigService) ImportProfiles(ctx context.Context, filePath string) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	// Load profiles from file
-	tempConfig := &models.ConfigInfo{}
-	importConfig := config.Config{ProfileFilePath: filePath}
-	if err := tempConfig.ReadFromFile(importConfig); err != nil {
-		return fmt.Errorf("failed to import profiles: %w", err)
-	}
-
-	// Backup current profiles
-	backup := make([]models.Profile, len(c.configInfo.Profiles))
-	copy(backup, c.configInfo.Profiles)
-
-	// Replace profiles
-	c.configInfo.Profiles = tempConfig.Profiles
-
-	// Save to current profiles file
-	if err := c.saveProfiles(); err != nil {
-		// Rollback
-		c.configInfo.Profiles = backup
-		return fmt.Errorf("failed to save imported profiles: %w", err)
-	}
-
-	// Emit config updated event
-	c.emitConfigEvent(events.ConfigUpdated, "", c.configInfo)
-
-	log.Printf("Imported %d profiles from '%s'", len(tempConfig.Profiles), filePath)
-	return nil
-}
-
 // validateProfile validates a profile
 func (c *ConfigService) validateProfile(profile models.Profile) error {
 	if profile.Name == "" {

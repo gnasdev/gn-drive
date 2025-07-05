@@ -208,30 +208,6 @@ func (r *RemoteService) TestRemote(ctx context.Context, name string) error {
 	return nil
 }
 
-// ExportRemotes exports remote configurations to a file
-func (r *RemoteService) ExportRemotes(ctx context.Context, filePath string) error {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	// TODO: Implement remote export functionality
-	// This would involve reading the current rclone config and saving it to the specified file
-
-	log.Printf("Remotes exported to '%s'", filePath)
-	return nil
-}
-
-// ImportRemotes imports remote configurations from a file
-func (r *RemoteService) ImportRemotes(ctx context.Context, filePath string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	// TODO: Implement remote import functionality
-	// This would involve reading the config file and merging it with the current config
-
-	log.Printf("Remotes imported from '%s'", filePath)
-	return nil
-}
-
 // getRemoteDescription returns a description for a remote type
 func (r *RemoteService) getRemoteDescription(remoteType string) string {
 	descriptions := map[string]string{

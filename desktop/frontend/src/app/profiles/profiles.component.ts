@@ -18,8 +18,6 @@ import {
   FolderOpen,
   X,
   Trash2,
-  Download,
-  Upload,
 } from "lucide-angular";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
@@ -52,8 +50,6 @@ export class ProfilesComponent implements OnInit, OnDestroy {
   readonly FolderOpenIcon = FolderOpen;
   readonly XIcon = X;
   readonly Trash2Icon = Trash2;
-  readonly DownloadIcon = Download;
-  readonly UploadIcon = Upload;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
 
@@ -112,26 +108,6 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
     this.cdr.detectChanges();
-  }
-
-  async exportProfiles(): Promise<void> {
-    try {
-      await this.appService.exportProfiles();
-      this.errorService.showSuccess("Profiles exported successfully!");
-    } catch (error) {
-      console.error("Error exporting profiles:", error);
-      this.errorService.handleApiError(error, "export_profiles");
-    }
-  }
-
-  async importProfiles(): Promise<void> {
-    try {
-      await this.appService.importProfiles();
-      this.errorService.showSuccess("Profiles imported successfully!");
-    } catch (error) {
-      console.error("Error importing profiles:", error);
-      this.errorService.handleApiError(error, "import_profiles");
-    }
   }
 
   addIncludePath(profileIndex: number): void {
