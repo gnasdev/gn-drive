@@ -1,111 +1,123 @@
 <!-- Profiles List -->
-<div class="p-6 max-w-4xl mx-auto">
-  <!-- Header -->
-  <div class="mb-6">
-    <div class="flex items-center space-x-3 mb-2">
-      <lucide-icon
-        [img]="UsersIcon"
-        class="w-6 h-6 text-primary-600"
-      ></lucide-icon>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Sync Profiles
-      </h1>
+<div class="flex flex-col h-full">
+  <!-- Fixed Header -->
+  <div
+    class="fixed top-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+  >
+    <div class="max-w-4xl mx-auto">
+      <div class="p-6">
+        <div class="flex items-center space-x-3 mb-2">
+          <lucide-icon
+            [img]="UsersIcon"
+            class="w-6 h-6 text-primary-600"
+          ></lucide-icon>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Sync Profiles
+          </h1>
+        </div>
+        <p class="text-gray-600 dark:text-gray-400">
+          {{ (appService.configInfo$ | async)?.profiles?.length || 0 }}
+          profile(s) configured
+        </p>
+      </div>
     </div>
-    <p class="text-gray-600 dark:text-gray-400">
-      {{ (appService.configInfo$ | async)?.profiles?.length || 0 }} profile(s)
-      configured
-    </p>
   </div>
 
-  <!-- Profiles content -->
-  @if ((appService.configInfo$ | async)?.profiles?.length) {
-  <div class="card">
-    <div class="space-y-3">
-      @for ( profile of (appService.configInfo$ | async)?.profiles; track
-      profile; let idx = $index) {
-      <div
-        (click)="editProfile(idx)"
-        (keydown.enter)="editProfile(idx)"
-        (keydown.space)="editProfile(idx)"
-        tabindex="0"
-        role="button"
-        [attr.aria-label]="'Edit profile ' + profile.name"
-        class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 group"
-      >
-        <div class="flex-shrink-0 mr-4">
-          <lucide-icon
-            [img]="FolderOpenIcon"
-            class="w-8 h-8 text-gray-600 dark:text-gray-400"
-          ></lucide-icon>
-        </div>
-        <div class="flex-1 min-w-0">
-          <h3
-            class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate"
+  <!-- Scrollable Content -->
+  <div class="flex-1 overflow-auto" style="padding-top: 135px">
+    <div class="max-w-4xl mx-auto">
+      <!-- Profiles content -->
+      @if ((appService.configInfo$ | async)?.profiles?.length) {
+      <div class="px-6">
+        <div class="space-y-3">
+          @for ( profile of (appService.configInfo$ | async)?.profiles; track
+          profile; let idx = $index) {
+          <div
+            (click)="editProfile(idx)"
+            (keydown.enter)="editProfile(idx)"
+            (keydown.space)="editProfile(idx)"
+            tabindex="0"
+            role="button"
+            [attr.aria-label]="'Edit profile ' + profile.name"
+            class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 group"
           >
-            {{ profile.name || "Untitled Profile" }}
-          </h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {{ getProfileDescription(profile) }}
-          </p>
+            <div class="flex-shrink-0 mr-4">
+              <lucide-icon
+                [img]="FolderOpenIcon"
+                class="w-8 h-8 text-gray-600 dark:text-gray-400"
+              ></lucide-icon>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3
+                class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate"
+              >
+                {{ profile.name || "Untitled Profile" }}
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {{ getProfileDescription(profile) }}
+              </p>
+            </div>
+            <div class="flex-shrink-0 ml-4">
+              <button
+                (click)="removeProfile(idx); $event.stopPropagation()"
+                class="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100"
+                title="Delete profile"
+              >
+                <lucide-icon [img]="Trash2Icon" class="w-5 h-5"></lucide-icon>
+              </button>
+            </div>
+          </div>
+          }
         </div>
-        <div class="flex-shrink-0 ml-4">
-          <button
-            (click)="removeProfile(idx); $event.stopPropagation()"
-            class="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100"
-            title="Delete profile"
-          >
-            <lucide-icon [img]="Trash2Icon" class="w-5 h-5"></lucide-icon>
-          </button>
+      </div>
+      } @else {
+      <div class="p-6">
+        <div class="card text-center">
+          <div class="mb-6">
+            <div class="flex justify-center mb-4">
+              <div
+                class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
+              >
+                <div class="relative">
+                  <lucide-icon
+                    [img]="FolderOpenIcon"
+                    class="w-8 h-8 text-gray-400"
+                  ></lucide-icon>
+                  <lucide-icon
+                    [img]="XIcon"
+                    class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
+                  ></lucide-icon>
+                </div>
+              </div>
+            </div>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              No Profiles Found
+            </h2>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">
+              Create your first sync profile to get started
+            </p>
+          </div>
+          <div>
+            <p class="text-gray-700 dark:text-gray-300 mb-6">
+              Profiles allow you to configure different sync settings for
+              various directories and remotes.
+            </p>
+            <button class="btn-primary" (click)="addProfile()">
+              <div class="flex items-center space-x-2">
+                <lucide-icon
+                  [img]="PlusIcon"
+                  class="w-5 h-5 mr-2"
+                ></lucide-icon>
+                Create First Profile
+              </div>
+            </button>
+          </div>
         </div>
       </div>
       }
     </div>
   </div>
-  } @else {
-  <div class="p-6 max-w-4xl mx-auto">
-    <div class="card text-center">
-      <div class="mb-6">
-        <div class="flex justify-center mb-4">
-          <div
-            class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
-          >
-            <div class="relative">
-              <lucide-icon
-                [img]="FolderOpenIcon"
-                class="w-8 h-8 text-gray-400"
-              ></lucide-icon>
-              <lucide-icon
-                [img]="XIcon"
-                class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
-              ></lucide-icon>
-            </div>
-          </div>
-        </div>
-        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          No Profiles Found
-        </h2>
-        <p class="text-gray-600 dark:text-gray-400 mb-6">
-          Create your first sync profile to get started
-        </p>
-      </div>
-      <div>
-        <p class="text-gray-700 dark:text-gray-300 mb-6">
-          Profiles allow you to configure different sync settings for various
-          directories and remotes.
-        </p>
-        <button class="btn-primary" (click)="addProfile()">
-          <div class="flex items-center space-x-2">
-            <lucide-icon [img]="PlusIcon" class="w-5 h-5 mr-2"></lucide-icon>
-            Create First Profile
-          </div>
-        </button>
-      </div>
-    </div>
-  </div>
-  }
 </div>
-
-<!-- No Profiles State -->
 
 <!-- Floating Action Button -->
 <button
