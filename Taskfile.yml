@@ -13,10 +13,7 @@ tasks:
       - '{{env "GOPATH"}}/bin/wails3 generate bindings'
       - cd frontend && yarn install && yarn build
       - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
-    env:
-      CGO_CFLAGS: "-mmacosx-version-min=11.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=11.0"
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
 
   dev:fe:
     summary: Starts the frontend development server

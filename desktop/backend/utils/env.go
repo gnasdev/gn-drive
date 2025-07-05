@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	beConfig "desktop/backend/config"
@@ -53,12 +54,18 @@ func LoadEnvFile(filename string) error {
 }
 
 func LoadEnvConfigFromEnvStr(envConfigStr string) beConfig.Config {
-	// Create a Config struct with default values
+	// Create a Config struct with default values (using home directory paths)
+	homeDir, err := GetUserHomeDir()
+	if err != nil {
+		log.Printf("Warning: Could not get user home directory, using relative paths: %v", err)
+		homeDir = "."
+	}
+
 	cfg := beConfig.Config{
 		DebugMode:       false,
-		ProfileFilePath: ".config/.profiles",
-		ResyncFilePath:  ".config/.resync",
-		RcloneFilePath:  ".config/rclone.conf",
+		ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
+		ResyncFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "resync"),
+		RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
 	}
 
 	// Parse the env string manually to avoid Viper concurrency issues
@@ -88,11 +95,26 @@ func LoadEnvConfigFromEnvStr(envConfigStr string) beConfig.Config {
 		case "DEBUG_MODE":
 			cfg.DebugMode = value == "true"
 		case "PROFILE_FILE_PATH":
-			cfg.ProfileFilePath = value
+			if expandedPath, err := ExpandHomePath(value); err == nil {
+				cfg.ProfileFilePath = expandedPath
+			} else {
+				log.Printf("Warning: Could not expand home path for PROFILE_FILE_PATH: %v", err)
+				cfg.ProfileFilePath = value
+			}
 		case "RESYNC_FILE_PATH":
-			cfg.ResyncFilePath = value
+			if expandedPath, err := ExpandHomePath(value); err == nil {
+				cfg.ResyncFilePath = expandedPath
+			} else {
+				log.Printf("Warning: Could not expand home path for RESYNC_FILE_PATH: %v", err)
+				cfg.ResyncFilePath = value
+			}
 		case "RCLONE_FILE_PATH":
-			cfg.RcloneFilePath = value
+			if expandedPath, err := ExpandHomePath(value); err == nil {
+				cfg.RcloneFilePath = expandedPath
+			} else {
+				log.Printf("Warning: Could not expand home path for RCLONE_FILE_PATH: %v", err)
+				cfg.RcloneFilePath = value
+			}
 		}
 	}
 

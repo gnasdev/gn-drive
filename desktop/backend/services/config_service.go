@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -68,10 +69,16 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 
 	// Load environment config (embedded .env)
 	// This would need to be passed from the main app or loaded differently
-	// For now, we'll create a placeholder
+	// For now, we'll create a placeholder using home directory paths
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Warning: Could not get user home directory, using relative paths: %v", err)
+		homeDir = "."
+	}
+
 	c.configInfo.EnvConfig = config.Config{
-		ProfileFilePath: "profiles.json",
-		RcloneFilePath:  "rclone.conf",
+		ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
+		RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
 	}
 
 	// Get working directory

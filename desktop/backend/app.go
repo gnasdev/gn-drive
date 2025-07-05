@@ -71,6 +71,11 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	normalizedWd, _ := os.Getwd()
 	log.Printf("DEBUG: Working directory after normalization: %s", normalizedWd)
 
+	// Migrate config files from old location to new home directory location
+	if err := utils.MigrateConfigFiles(); err != nil {
+		log.Printf("Warning: Failed to migrate config files: %v", err)
+	}
+
 	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
 	log.Printf("DEBUG: Loaded env config: %+v", a.ConfigInfo.EnvConfig)
 
@@ -129,6 +134,11 @@ func (a *App) initializeConfig() {
 	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
 		a.errorHandler.HandleError(err, "init_config", "working_directory")
 		return
+	}
+
+	// Migrate config files from old location to new home directory location
+	if err := utils.MigrateConfigFiles(); err != nil {
+		log.Printf("Warning: Failed to migrate config files during initialization: %v", err)
 	}
 
 	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
