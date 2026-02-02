@@ -430,3 +430,11 @@
   </div>
 </div>
 }
+
+<!-- Delete Tab Confirmation Dialog -->
+<app-confirm-dialog
+  [isOpen]="showDeleteTabConfirm"
+  [data]="deleteTabConfirmData"
+  (confirmed)="onDeleteTabConfirmed()"
+  (cancelled)="closeDeleteTabConfirm()"
+></app-confirm-dialog>

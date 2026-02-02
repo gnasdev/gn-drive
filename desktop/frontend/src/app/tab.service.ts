@@ -8,6 +8,10 @@ import {
   isValidSyncStatus,
   isValidSyncAction,
 } from "./models/sync-status.interface";
+import { SyncEvent, CommandDTO } from "./models/events";
+
+// Maximum number of output lines to keep per tab to prevent memory leaks
+const MAX_OUTPUT_LINES = 1000;
 
 export interface Tab {
   id: string;
@@ -20,14 +24,6 @@ export interface Tab {
   isEditing: boolean;
   isStopping?: boolean;
   syncStatus?: SyncStatus | null;
-}
-
-interface CommandDTO {
-  command: string;
-  pid: number | undefined;
-  task: string | undefined;
-  error: string | undefined;
-  tab_id: string | undefined;
 }
 
 @Injectable({
@@ -195,7 +191,7 @@ export class TabService {
           currentTaskId: 0,
           isStopping: false,
           syncStatus: null, // Clear sync status
-          data: [...tab.data, "Command stopped."],
+          data: this.limitOutput([...tab.data, "Command stopped."]),
         });
         break;
       case "command_output": {
@@ -206,9 +202,9 @@ export class TabService {
         break;
       }
       case "error":
-        // Append errors to existing data
+        // Append errors to existing data with limit
         this.updateTab(data.tab_id, {
-          data: [...tab.data, data.error || ""],
+          data: this.limitOutput([...tab.data, data.error || ""]),
         });
         break;
       case "sync_status":
@@ -260,9 +256,75 @@ export class TabService {
     this.updateTab(tabId, { syncStatus: updatedStatus });
   }
 
+  // Handle new typed sync events from backend
+  handleTypedSyncEvent(event: SyncEvent): void {
+    if (!event.tabId) {
+      console.log("TabService: No tabId in sync event");
+      return;
+    }
+
+    const tab = this.getTab(event.tabId);
+    if (!tab) {
+      console.log("TabService: Tab not found for id:", event.tabId);
+      return;
+    }
+
+    console.log("TabService: Processing typed sync event:", event.type, "for tab:", event.tabId);
+
+    switch (event.type) {
+      case "sync:started":
+        this.updateTab(event.tabId, {
+          data: [`Sync started: ${event.message || ""}`],
+          syncStatus: null,
+        });
+        break;
+      case "sync:progress":
+        this.updateTab(event.tabId, {
+          data: [`Sync in progress: ${event.message || ""}`],
+        });
+        break;
+      case "sync:completed":
+        this.updateTab(event.tabId, {
+          currentAction: undefined,
+          currentTaskId: 0,
+          isStopping: false,
+          syncStatus: null,
+          data: this.limitOutput([...tab.data, `Sync completed: ${event.message || ""}`]),
+        });
+        break;
+      case "sync:failed":
+        this.updateTab(event.tabId, {
+          currentAction: undefined,
+          currentTaskId: 0,
+          isStopping: false,
+          syncStatus: null,
+          data: this.limitOutput([...tab.data, `Sync failed: ${event.message || ""}`]),
+        });
+        break;
+      case "sync:cancelled":
+        this.updateTab(event.tabId, {
+          currentAction: undefined,
+          currentTaskId: 0,
+          isStopping: false,
+          syncStatus: null,
+          data: this.limitOutput([...tab.data, "Sync cancelled"]),
+        });
+        break;
+    }
+  }
+
   private generateTabId(): string {
     return (
       "tab_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now()
     );
+  }
+
+  // Limit output array size to prevent memory leaks
+  private limitOutput(data: string[]): string[] {
+    if (data.length <= MAX_OUTPUT_LINES) {
+      return data;
+    }
+    // Keep the last MAX_OUTPUT_LINES entries
+    return data.slice(-MAX_OUTPUT_LINES);
   }
 }

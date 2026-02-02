@@ -3,17 +3,22 @@ package services
 import (
 	"context"
 	"desktop/backend/events"
+	"desktop/backend/validation"
 	"fmt"
 	"log"
 	"sync"
 
+	"github.com/rclone/rclone/fs"
+	fsConfig "github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configfile"
+	"github.com/rclone/rclone/fs/rc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // RemoteService handles remote storage operations
 type RemoteService struct {
 	app         *application.App
+	eventBus    *events.WailsEventBus
 	mutex       sync.RWMutex
 	initialized bool
 }
@@ -36,6 +41,12 @@ func NewRemoteService(app *application.App) *RemoteService {
 // SetApp sets the application reference for events
 func (r *RemoteService) SetApp(app *application.App) {
 	r.app = app
+	// Use shared EventBus or create new one
+	if bus := GetSharedEventBus(); bus != nil {
+		r.eventBus = bus
+	} else {
+		r.eventBus = events.NewEventBus(app)
+	}
 }
 
 // ServiceName returns the name of the service
@@ -75,64 +86,71 @@ func (r *RemoteService) initializeRcloneConfig() error {
 
 // GetRemotes returns all configured remotes
 func (r *RemoteService) GetRemotes(ctx context.Context) ([]RemoteInfo, error) {
+	// Check initialization without holding lock
 	r.mutex.RLock()
-	defer r.mutex.RUnlock()
+	initialized := r.initialized
+	r.mutex.RUnlock()
 
-	if !r.initialized {
+	if !initialized {
 		if err := r.initializeRcloneConfig(); err != nil {
 			return nil, fmt.Errorf("failed to initialize rclone config: %w", err)
 		}
 	}
 
-	// TODO: Implement proper rclone config reading
-	// For now, return empty list
-	remotes := make([]RemoteInfo, 0)
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 
-	// Get all remote names from rclone config
-	// remoteNames := fsConfig.FileSections()
-	// remotes := make([]RemoteInfo, 0, len(remoteNames))
+	// Get all configured remotes from rclone
+	rcloneRemotes := fsConfig.GetRemotes()
+	remotes := make([]RemoteInfo, 0, len(rcloneRemotes))
 
-	// for _, name := range remoteNames {
-	// 	remoteType := fsConfig.FileGet(name, "type")
-	// 	if remoteType == "" {
-	// 		continue // Skip invalid remotes
-	// 	}
+	for _, remote := range rcloneRemotes {
+		remoteInfo := RemoteInfo{
+			Name:        remote.Name,
+			Type:        remote.Type,
+			Config:      make(map[string]string),
+			Description: r.getRemoteDescription(remote.Type),
+		}
+		remotes = append(remotes, remoteInfo)
+	}
 
-	// 	// Get all config options for this remote
-	// 	config := make(map[string]string)
-	// 	for _, key := range fsConfig.FileGetKeys(name) {
-	// 		value := fsConfig.FileGet(name, key)
-	// 		config[key] = value
-	// 	}
-
-	// 	remote := RemoteInfo{
-	// 		Name:        name,
-	// 		Type:        remoteType,
-	// 		Config:      config,
-	// 		Description: r.getRemoteDescription(remoteType),
-	// 	}
-
-	// 	remotes = append(remotes, remote)
-	// }
-
+	log.Printf("RemoteService: Found %d configured remotes", len(remotes))
 	return remotes, nil
 }
 
 // AddRemote adds a new remote configuration
 func (r *RemoteService) AddRemote(ctx context.Context, name, remoteType string, config map[string]string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	// Validate input
-	if name == "" {
-		return fmt.Errorf("remote name cannot be empty")
+	// Validate remote name
+	if err := validation.ValidateRemoteName(name); err != nil {
+		return err
 	}
 	if remoteType == "" {
 		return fmt.Errorf("remote type cannot be empty")
 	}
 
-	// TODO: Implement proper rclone config management
-	// For now, just emit the event
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// Check if remote already exists
+	existingRemotes := fsConfig.GetRemotes()
+	for _, existing := range existingRemotes {
+		if existing.Name == name {
+			return fmt.Errorf("remote '%s' already exists", name)
+		}
+	}
+
+	// Convert config to rc.Params
+	rcParams := rc.Params{}
+	for k, v := range config {
+		rcParams[k] = v
+	}
+
+	// Create the remote using rclone's config
+	_, err := fsConfig.CreateRemote(ctx, name, remoteType, rcParams, fsConfig.UpdateRemoteOpt{})
+	if err != nil {
+		log.Printf("Failed to create remote '%s': %v", name, err)
+		return fmt.Errorf("failed to create remote: %w", err)
+	}
 
 	// Create remote info for event
 	remoteInfo := RemoteInfo{
@@ -154,15 +172,40 @@ func (r *RemoteService) UpdateRemote(ctx context.Context, name string, config ma
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	// TODO: Implement proper rclone config management
-	// For now, just emit the event
+	// Check if remote exists
+	existingRemotes := fsConfig.GetRemotes()
+	var existingType string
+	found := false
+	for _, existing := range existingRemotes {
+		if existing.Name == name {
+			existingType = existing.Type
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("remote '%s' not found", name)
+	}
+
+	// Convert config to rc.Params
+	rcParams := rc.Params{}
+	for k, v := range config {
+		rcParams[k] = v
+	}
+
+	// Update the remote configuration
+	_, err := fsConfig.CreateRemote(ctx, name, existingType, rcParams, fsConfig.UpdateRemoteOpt{})
+	if err != nil {
+		log.Printf("Failed to update remote '%s': %v", name, err)
+		return fmt.Errorf("failed to update remote: %w", err)
+	}
 
 	// Create remote info for event
 	remoteInfo := RemoteInfo{
 		Name:        name,
-		Type:        "unknown", // Would get from actual config
+		Type:        existingType,
 		Config:      config,
-		Description: r.getRemoteDescription("unknown"),
+		Description: r.getRemoteDescription(existingType),
 	}
 
 	// Emit remote updated event
@@ -177,15 +220,30 @@ func (r *RemoteService) DeleteRemote(ctx context.Context, name string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	// TODO: Implement proper rclone config management
-	// For now, just emit the event
+	// Check if remote exists and get its type
+	existingRemotes := fsConfig.GetRemotes()
+	var remoteType string
+	found := false
+	for _, existing := range existingRemotes {
+		if existing.Name == name {
+			remoteType = existing.Type
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("remote '%s' not found", name)
+	}
+
+	// Delete the remote from rclone config
+	fsConfig.DeleteRemote(name)
 
 	// Create remote info for event
 	remoteInfo := RemoteInfo{
 		Name:        name,
-		Type:        "unknown",
+		Type:        remoteType,
 		Config:      make(map[string]string),
-		Description: r.getRemoteDescription("unknown"),
+		Description: r.getRemoteDescription(remoteType),
 	}
 
 	// Emit remote deleted event
@@ -200,9 +258,26 @@ func (r *RemoteService) TestRemote(ctx context.Context, name string) error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	// TODO: Implement actual remote testing
-	// This would involve creating an rclone filesystem and testing connectivity
-	// For now, we'll just return success
+	// Check if remote exists
+	existingRemotes := fsConfig.GetRemotes()
+	found := false
+	for _, existing := range existingRemotes {
+		if existing.Name == name {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("remote '%s' not found", name)
+	}
+
+	// Test connection by creating a filesystem
+	remotePath := name + ":"
+	_, err := fs.NewFs(ctx, remotePath)
+	if err != nil {
+		log.Printf("Remote '%s' test failed: %v", name, err)
+		return fmt.Errorf("connection test failed: %w", err)
+	}
 
 	log.Printf("Remote '%s' test completed successfully", name)
 	return nil
@@ -235,8 +310,15 @@ func (r *RemoteService) getRemoteDescription(remoteType string) string {
 	return fmt.Sprintf("Remote type: %s", remoteType)
 }
 
-// emitRemoteEvent emits a remote event
+// emitRemoteEvent emits a remote event via unified EventBus
 func (r *RemoteService) emitRemoteEvent(eventType events.EventType, remoteName string, data interface{}) {
 	event := events.NewRemoteEvent(eventType, remoteName, data)
-	r.app.Event.Emit(string(eventType), event)
+	if r.eventBus != nil {
+		if err := r.eventBus.EmitRemoteEvent(event); err != nil {
+			log.Printf("Failed to emit remote event: %v", err)
+		}
+	} else if r.app != nil {
+		// Fallback to direct emission if EventBus not initialized
+		r.app.Event.Emit("tofe", event)
+	}
 }

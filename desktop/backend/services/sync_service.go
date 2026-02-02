@@ -13,6 +13,24 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// eventBusProvider is a shared EventBus instance for services
+var sharedEventBus *events.WailsEventBus
+var eventBusMutex sync.RWMutex
+
+// GetSharedEventBus returns the shared EventBus instance
+func GetSharedEventBus() *events.WailsEventBus {
+	eventBusMutex.RLock()
+	defer eventBusMutex.RUnlock()
+	return sharedEventBus
+}
+
+// SetSharedEventBus sets the shared EventBus instance
+func SetSharedEventBus(bus *events.WailsEventBus) {
+	eventBusMutex.Lock()
+	defer eventBusMutex.Unlock()
+	sharedEventBus = bus
+}
+
 // SyncAction represents the type of sync operation
 type SyncAction string
 
@@ -36,10 +54,10 @@ type SyncResult struct {
 // SyncService handles all sync operations
 type SyncService struct {
 	app         *application.App
+	eventBus    *events.WailsEventBus
 	activeTasks map[int]*SyncTask
 	taskCounter int
 	mutex       sync.RWMutex
-	// errorHandler interface{} // Will be properly typed later - removed unused field
 }
 
 // SyncTask represents an active sync task
@@ -51,6 +69,7 @@ type SyncTask struct {
 	Cmd       *exec.Cmd
 	Cancel    context.CancelFunc
 	StartTime time.Time
+	EndTime   *time.Time
 	Status    string
 }
 
@@ -66,6 +85,9 @@ func NewSyncService(app *application.App) *SyncService {
 // SetApp sets the application reference for events
 func (s *SyncService) SetApp(app *application.App) {
 	s.app = app
+	// Initialize EventBus with the app
+	s.eventBus = events.NewEventBus(app)
+	SetSharedEventBus(s.eventBus)
 }
 
 // ServiceName returns the name of the service
@@ -238,7 +260,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	// Success
 	task.Status = "completed"
 	endTime := time.Now()
-	task.StartTime = endTime // This should be EndTime, will fix in next iteration
+	task.EndTime = &endTime
 
 	s.emitSyncEvent(events.SyncCompleted, task.TabId, string(task.Action), "completed", "Sync operation completed successfully")
 }
@@ -283,19 +305,30 @@ func (s *SyncService) buildRcloneArgs(action SyncAction, profile models.Profile)
 	return args, nil
 }
 
-// emitSyncEvent emits a sync event to the frontend
+// emitSyncEvent emits a sync event to the frontend via unified EventBus
 func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, status, message string) {
 	event := events.NewSyncEvent(eventType, tabId, action, status, message)
-	s.app.Event.Emit(string(eventType), event)
+	if s.eventBus != nil {
+		if err := s.eventBus.EmitSyncEvent(event); err != nil {
+			log.Printf("Failed to emit sync event: %v", err)
+		}
+	} else if s.app != nil {
+		// Fallback to direct emission if EventBus not initialized
+		s.app.Event.Emit("tofe", event)
+	}
 }
 
 // handleSyncError handles sync operation errors
 func (s *SyncService) handleSyncError(task *SyncTask, errorMsg string) {
 	log.Printf("Sync error for task %d: %s", task.Id, errorMsg)
 
-	// Emit error event
+	// Emit error event via unified EventBus
 	errorEvent := events.NewErrorEvent("SYNC_ERROR", errorMsg, "", task.TabId)
-	s.app.Event.Emit(string(events.ErrorOccurred), errorEvent)
+	if s.eventBus != nil {
+		if err := s.eventBus.EmitErrorEvent(errorEvent); err != nil {
+			log.Printf("Failed to emit error event: %v", err)
+		}
+	}
 
 	// Emit sync failed event
 	s.emitSyncEvent(events.SyncFailed, task.TabId, string(task.Action), "failed", errorMsg)

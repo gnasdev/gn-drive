@@ -45,7 +45,7 @@ func (c *ConfigInfo) WriteToFile(cf config.Config) error {
 		return err
 	}
 
-	err = os.WriteFile(cf.ProfileFilePath, profilesJson, 0644)
+	err = os.WriteFile(cf.ProfileFilePath, profilesJson, 0600)
 	if err != nil {
 		return err
 	}

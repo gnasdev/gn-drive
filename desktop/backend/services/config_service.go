@@ -6,6 +6,7 @@ import (
 	"desktop/backend/events"
 	"desktop/backend/models"
 	"desktop/backend/utils"
+	"desktop/backend/validation"
 	"fmt"
 	"log"
 	"os"
@@ -18,9 +19,11 @@ import (
 // ConfigService handles configuration and profile management
 type ConfigService struct {
 	app         *application.App
+	eventBus    *events.WailsEventBus
 	configInfo  *models.ConfigInfo
 	mutex       sync.RWMutex
 	initialized bool
+	validator   *validation.ProfileValidator
 }
 
 // NewConfigService creates a new config service
@@ -28,12 +31,19 @@ func NewConfigService(app *application.App) *ConfigService {
 	return &ConfigService{
 		app:        app,
 		configInfo: &models.ConfigInfo{},
+		validator:  validation.NewProfileValidator(),
 	}
 }
 
 // SetApp sets the application reference for events
 func (c *ConfigService) SetApp(app *application.App) {
 	c.app = app
+	// Use shared EventBus or create new one
+	if bus := GetSharedEventBus(); bus != nil {
+		c.eventBus = bus
+	} else {
+		c.eventBus = events.NewEventBus(app)
+	}
 }
 
 // ServiceName returns the name of the service
@@ -106,14 +116,21 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 
 // GetConfigInfo returns the current configuration information
 func (c *ConfigService) GetConfigInfo(ctx context.Context) (*models.ConfigInfo, error) {
+	// Check initialization status first without holding lock
 	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	initialized := c.initialized
+	c.mutex.RUnlock()
 
-	if !c.initialized {
+	// Initialize if needed (initializeConfig acquires its own lock)
+	if !initialized {
 		if err := c.initializeConfig(ctx); err != nil {
 			return nil, err
 		}
 	}
+
+	// Now acquire read lock for returning data
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
 	// Return a copy to prevent external modifications
 	configCopy := *c.configInfo
@@ -125,14 +142,21 @@ func (c *ConfigService) GetConfigInfo(ctx context.Context) (*models.ConfigInfo, 
 
 // GetProfiles returns all profiles
 func (c *ConfigService) GetProfiles(ctx context.Context) ([]models.Profile, error) {
+	// Check initialization status first without holding lock
 	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	initialized := c.initialized
+	c.mutex.RUnlock()
 
-	if !c.initialized {
+	// Initialize if needed (initializeConfig acquires its own lock)
+	if !initialized {
 		if err := c.initializeConfig(ctx); err != nil {
 			return nil, err
 		}
 	}
+
+	// Now acquire read lock for returning data
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
 	// Return a copy to prevent external modifications
 	profiles := make([]models.Profile, len(c.configInfo.Profiles))
@@ -255,18 +279,9 @@ func (c *ConfigService) DeleteProfile(ctx context.Context, profileName string) e
 	return nil
 }
 
-// validateProfile validates a profile
+// validateProfile validates a profile using the comprehensive validator
 func (c *ConfigService) validateProfile(profile models.Profile) error {
-	if profile.Name == "" {
-		return fmt.Errorf("profile name cannot be empty")
-	}
-	if profile.From == "" {
-		return fmt.Errorf("from path cannot be empty")
-	}
-	if profile.To == "" {
-		return fmt.Errorf("to path cannot be empty")
-	}
-	return nil
+	return c.validator.ValidateProfile(profile)
 }
 
 // saveProfiles saves profiles to file
@@ -274,8 +289,15 @@ func (c *ConfigService) saveProfiles() error {
 	return c.configInfo.WriteToFile(c.configInfo.EnvConfig)
 }
 
-// emitConfigEvent emits a configuration event
+// emitConfigEvent emits a configuration event via unified EventBus
 func (c *ConfigService) emitConfigEvent(eventType events.EventType, profileId string, data interface{}) {
 	event := events.NewConfigEvent(eventType, profileId, data)
-	c.app.Event.Emit(string(eventType), event)
+	if c.eventBus != nil {
+		if err := c.eventBus.EmitConfigEvent(event); err != nil {
+			log.Printf("Failed to emit config event: %v", err)
+		}
+	} else if c.app != nil {
+		// Fallback to direct emission if EventBus not initialized
+		c.app.Event.Emit("tofe", event)
+	}
 }

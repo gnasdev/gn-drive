@@ -19,6 +19,10 @@ import {
 import { FormsModule } from "@angular/forms";
 import { SyncStatusComponent } from "../components/sync-status/sync-status.component";
 import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from "../components/confirm-dialog/confirm-dialog.component";
+import {
   LucideAngularModule,
   Settings,
   Plus,
@@ -48,6 +52,7 @@ import {
     FormsModule,
     LucideAngularModule,
     SyncStatusComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
@@ -80,6 +85,16 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private subscriptions = new Subscription();
   showRenameDialog = false;
+  showDeleteTabConfirm = false;
+  deleteTabConfirmData: ConfirmDialogData = {
+    title: "Delete Tab",
+    message: "",
+    confirmText: "Delete",
+    cancelText: "Cancel",
+    confirmButtonClass:
+      "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200",
+  };
+  pendingDeleteTabId: string | null = null;
 
   renameDialogData = {
     tabId: "",
@@ -277,19 +292,32 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Check if tab has an active operation
     if (tab && tab.currentTaskId && tab.currentAction) {
-      const confirmed = confirm(
-        `This operation is currently running (${tab.currentAction}). ` +
-          "Deleting this tab will stop the operation. Are you sure you want to continue?"
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      this.appService.stopCommandForTab(tabId);
+      this.pendingDeleteTabId = tabId;
+      this.deleteTabConfirmData = {
+        ...this.deleteTabConfirmData,
+        message: `This operation is currently running (${tab.currentAction}). Deleting this tab will stop the operation.`,
+        warning: "The running sync operation will be cancelled.",
+      };
+      this.showDeleteTabConfirm = true;
+      this.cdr.detectChanges();
+      return;
     }
 
     this.tabService.deleteTab(tabId);
+  }
+
+  onDeleteTabConfirmed(): void {
+    if (this.pendingDeleteTabId) {
+      this.appService.stopCommandForTab(this.pendingDeleteTabId);
+      this.tabService.deleteTab(this.pendingDeleteTabId);
+    }
+    this.closeDeleteTabConfirm();
+  }
+
+  closeDeleteTabConfirm(): void {
+    this.showDeleteTabConfirm = false;
+    this.pendingDeleteTabId = null;
+    this.cdr.detectChanges();
   }
 
   setActiveTab(tabId: string): void {

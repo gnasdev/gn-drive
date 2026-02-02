@@ -26,8 +26,20 @@ import {
   isValidSyncStatus,
   isValidSyncAction,
 } from "./models/sync-status.interface";
+import {
+  parseEvent,
+  isSyncEvent,
+  isConfigEvent,
+  isErrorEvent,
+  isLegacyCommandDTO,
+  SyncEvent,
+  ConfigEvent,
+  ErrorEvent,
+  CommandDTO,
+} from "./models/events";
 
-interface CommandDTO {
+// Legacy interface kept for backward compatibility
+interface LegacyCommandDTO {
   command: string;
   pid: number | undefined;
   task: string | undefined;
@@ -71,57 +83,38 @@ export class AppService implements OnDestroy {
       const rawData = event.data;
       console.log("AppService raw event data:", rawData);
 
-      let data: CommandDTO;
-      try {
-        data = JSON.parse(rawData as string) as CommandDTO;
-        console.log("AppService parsed event data:", data);
-      } catch (error) {
-        console.error(
-          "AppService error parsing event data:",
-          error,
-          "rawData:",
-          rawData
-        );
+      const parsedEvent = parseEvent(rawData as string);
+      if (!parsedEvent) {
+        console.error("AppService: Failed to parse event");
+        return;
+      }
+      console.log("AppService parsed event:", parsedEvent);
+
+      // Handle new typed events
+      if (isSyncEvent(parsedEvent)) {
+        this.handleSyncEvent(parsedEvent);
         return;
       }
 
-      // If event has tab_id, route to TabService
-      if (data.tab_id) {
-        console.log(
-          "AppService routing event to TabService for tab:",
-          data.tab_id
-        );
-        this.tabService.handleCommandEvent(data);
+      if (isConfigEvent(parsedEvent)) {
+        this.handleConfigEvent(parsedEvent);
         return;
       }
 
-      // Legacy handling for events without tab_id
-      switch (data.command) {
-        case "command_started":
-          this.replaceData("Command started...");
-          this.syncStatus$.next(null); // Reset sync status
-          break;
-        case "command_stoped":
-          this.currentAction$.next(undefined);
-          this.currentId$.next(0);
-          this.syncStatus$.next(null); // Clear sync status
-          break;
-        case "command_output":
-          this.replaceData(data.error || "");
-          break;
-        case "error": {
-          // Create new array to avoid mutating current state
-          const dataValue = [
-            ...this.data$.value,
-            data.error || "Unknown error",
-          ];
-          this.data$.next(dataValue);
-          break;
-        }
-        case "sync_status":
-          // Handle sync status updates
-          this.handleSyncStatusUpdate(data as SyncStatusEvent);
-          break;
+      if (isErrorEvent(parsedEvent)) {
+        this.handleErrorEvent(parsedEvent);
+        return;
+      }
+
+      // Handle legacy command DTOs
+      if (isLegacyCommandDTO(parsedEvent)) {
+        this.handleLegacyCommand(parsedEvent as LegacyCommandDTO);
+        return;
+      }
+
+      // Fallback: try to handle as legacy command if it has command field
+      if ("command" in parsedEvent) {
+        this.handleLegacyCommand(parsedEvent as unknown as LegacyCommandDTO);
       }
     });
 
@@ -178,6 +171,126 @@ export class AppService implements OnDestroy {
     };
 
     this.syncStatus$.next(updatedStatus);
+  }
+
+  // Handle new typed sync events from backend
+  private handleSyncEvent(event: SyncEvent) {
+    console.log("AppService handling sync event:", event);
+
+    // Route to tab if tabId is present
+    if (event.tabId) {
+      this.tabService.handleTypedSyncEvent(event);
+      return;
+    }
+
+    // Handle global sync events
+    switch (event.type) {
+      case "sync:started":
+        this.replaceData(`Sync started: ${event.message || ""}`);
+        this.syncStatus$.next(null);
+        break;
+      case "sync:progress":
+        // Progress updates are handled differently
+        this.replaceData(`Sync in progress: ${event.message || ""}`);
+        break;
+      case "sync:completed":
+        this.currentAction$.next(undefined);
+        this.currentId$.next(0);
+        this.replaceData(`Sync completed: ${event.message || ""}`);
+        this.syncStatus$.next(null);
+        break;
+      case "sync:failed":
+        this.currentAction$.next(undefined);
+        this.currentId$.next(0);
+        this.replaceData(`Sync failed: ${event.message || ""}`);
+        this.syncStatus$.next(null);
+        break;
+      case "sync:cancelled":
+        this.currentAction$.next(undefined);
+        this.currentId$.next(0);
+        this.replaceData("Sync cancelled");
+        this.syncStatus$.next(null);
+        break;
+    }
+  }
+
+  // Handle config events from backend
+  private handleConfigEvent(event: ConfigEvent) {
+    console.log("AppService handling config event:", event);
+
+    // Refresh config info when config events are received
+    switch (event.type) {
+      case "config:updated":
+      case "profile:added":
+      case "profile:updated":
+      case "profile:deleted":
+        // Refresh config from backend to ensure consistency
+        this.getConfigInfo();
+        break;
+    }
+  }
+
+  // Handle error events from backend
+  private handleErrorEvent(event: ErrorEvent) {
+    console.log("AppService handling error event:", event);
+
+    // Route to tab if tabId is present
+    if (event.tabId) {
+      const tab = this.tabService.getTab(event.tabId);
+      if (tab) {
+        this.tabService.updateTab(event.tabId, {
+          data: [...tab.data, `Error: ${event.message}`],
+        });
+      }
+      return;
+    }
+
+    // Handle global error
+    const dataValue = [...this.data$.value, `Error: ${event.message}`];
+    this.data$.next(dataValue);
+
+    // Also report to error service
+    this.errorService.handleApiError(new Error(event.message), event.code);
+  }
+
+  // Handle legacy command DTOs for backward compatibility
+  private handleLegacyCommand(data: LegacyCommandDTO) {
+    // If event has tab_id, route to TabService
+    if (data.tab_id) {
+      console.log(
+        "AppService routing legacy event to TabService for tab:",
+        data.tab_id
+      );
+      this.tabService.handleCommandEvent(data as CommandDTO);
+      return;
+    }
+
+    // Legacy handling for events without tab_id
+    switch (data.command) {
+      case "command_started":
+        this.replaceData("Command started...");
+        this.syncStatus$.next(null);
+        break;
+      case "command_stoped":
+        this.currentAction$.next(undefined);
+        this.currentId$.next(0);
+        this.syncStatus$.next(null);
+        break;
+      case "command_output":
+        this.replaceData(data.error || "");
+        break;
+      case "error": {
+        const dataValue = [
+          ...this.data$.value,
+          data.error || "Unknown error",
+        ];
+        this.data$.next(dataValue);
+        break;
+      }
+      case "sync_status":
+        this.handleSyncStatusUpdate(data as unknown as SyncStatusEvent);
+        break;
+    }
   }
 
   async pull(profile: models.Profile) {

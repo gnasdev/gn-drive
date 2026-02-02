@@ -4,6 +4,8 @@ vars:
   APP_NAME: "ns-drive"
   BIN_DIR: "bin"
   VITE_PORT: "{{.WAILS_VITE_PORT | default 9245}}"
+  VERSION: '{{.VERSION | default "dev"}}'
+  COMMIT: '{{.COMMIT | default "unknown"}}'
 
 tasks:
   build:
@@ -11,8 +13,17 @@ tasks:
     dir: desktop
     cmds:
       - '{{env "GOPATH"}}/bin/wails3 generate bindings'
+      - cd frontend && npm ci --legacy-peer-deps && npm run build
+      - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
+
+  build:dev:
+    summary: Builds the application for development (with debug info)
+    dir: desktop
+    cmds:
+      - '{{env "GOPATH"}}/bin/wails3 generate bindings'
       - cd frontend && npm install --legacy-peer-deps && npm run build
-      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - go build -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
 
   dev:fe:
@@ -49,3 +60,41 @@ tasks:
     cmds:
       - task: lint:fe
       - task: lint:be
+
+  test:
+    summary: Runs all tests
+    cmds:
+      - task: test:be
+      - task: test:fe
+
+  test:be:
+    summary: Runs Go backend tests
+    dir: desktop
+    cmds:
+      - echo "Running backend tests..."
+      - go test -v ./...
+
+  test:fe:
+    summary: Runs Angular frontend tests
+    dir: desktop/frontend
+    cmds:
+      - echo "Running frontend tests..."
+      - npm test -- --watch=false --browsers=ChromeHeadless
+
+  test:be:coverage:
+    summary: Runs Go backend tests with coverage
+    dir: desktop
+    cmds:
+      - echo "Running backend tests with coverage..."
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report generated: desktop/coverage.html"
+
+  clean:
+    summary: Cleans build artifacts
+    cmds:
+      - rm -f ns-drive
+      - rm -rf desktop/bin
+      - rm -rf desktop/frontend/dist
+      - rm -rf desktop/frontend/node_modules/.cache
+      - echo "Cleaned build artifacts"

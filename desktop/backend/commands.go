@@ -6,6 +6,7 @@ import (
 	"desktop/backend/models"
 	"desktop/backend/rclone"
 	"desktop/backend/utils"
+	"desktop/backend/validation"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -187,7 +188,7 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 		return dto.NewAppError(err)
 	}
 
-	err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0644)
+	err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0600)
 	if err != nil {
 		a.errorHandler.HandleError(err, "update_profiles", "write_file", a.ConfigInfo.EnvConfig.ProfileFilePath)
 		return dto.NewAppError(err)
@@ -222,6 +223,11 @@ func (a *App) GetRemotes() []fsConfig.Remote {
 
 func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
 	ctx := context.Background()
+
+	// Validate remote name
+	if err := validation.ValidateRemoteName(remoteName); err != nil {
+		return dto.NewAppError(err)
+	}
 
 	// Handle special cases for providers that need interactive setup
 	switch remoteType {
@@ -391,7 +397,7 @@ func (a *App) DeleteRemote(remoteName string) *dto.AppError {
 			return dto.NewAppError(err)
 		}
 
-		err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0644)
+		err = os.WriteFile(a.ConfigInfo.EnvConfig.ProfileFilePath, profilesJson, 0600)
 		if err != nil {
 			a.errorHandler.HandleError(err, "delete_remote", "write_file", a.ConfigInfo.EnvConfig.ProfileFilePath)
 			return dto.NewAppError(err)
