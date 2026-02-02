@@ -49,20 +49,63 @@ go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
 ### Development Mode
 
-```bash
-# Option 1: Two-terminal setup (recommended)
-# Terminal 1: Start frontend dev server
-task dev:fe
+Development requires running two separate processes: the Angular frontend dev server and the Wails backend.
 
-# Terminal 2: Start Wails dev server (with hot reload)
+**Terminal 1 - Start Frontend Dev Server:**
+
+```bash
+task dev:fe
+```
+
+Wait until you see:
+
+```
+✔ Building...
+Application bundle generation complete.
+  ➜  Local:   http://localhost:9245/
+```
+
+**Terminal 2 - Start Wails Backend:**
+
+```bash
 task dev:be
 ```
+
+The application window will open automatically once the backend is ready. You should see logs like:
+
+```
+INFO Connected to frontend dev server!
+NOTICE: SyncService starting up...
+NOTICE: ConfigService starting up...
+NOTICE: RemoteService starting up...
+NOTICE: TabService starting up...
+```
+
+**Hot Reload:**
+- Frontend changes: Automatically reloaded by Angular dev server
+- Backend changes: Wails automatically rebuilds and restarts the Go binary
 
 ### Production Build
 
 ```bash
 task build
 # Creates: ns-drive binary in project root
+```
+
+### Manual Development (Alternative)
+
+If `task` commands don't work, you can run manually:
+
+```bash
+# Terminal 1: Frontend
+cd desktop/frontend
+npm install --legacy-peer-deps
+npm start -- --port 9245
+
+# Terminal 2: Backend (after frontend is ready)
+cd desktop
+go mod tidy
+wails3 dev -config ./build/config.yml -port 9245
 ```
 
 ## 🚀 Quick Start
@@ -77,17 +120,24 @@ task build
 2. **Install dependencies**
 
    ```bash
-   cd desktop/frontend && npm install --legacy-peer-deps
+   # Install Go dependencies
+   cd desktop && go mod tidy
+
+   # Install frontend dependencies
+   cd frontend && npm install --legacy-peer-deps
+   cd ../..
    ```
 
-3. **Run in development mode**
+3. **Run in development mode** (requires 2 terminals)
 
    ```bash
-   # Start frontend dev server (Terminal 1)
+   # Terminal 1: Start frontend dev server
    task dev:fe
+   # Wait for "Local: http://localhost:9245/" message
 
-   # Start Wails dev server (Terminal 2)
+   # Terminal 2: Start Wails backend (after frontend is ready)
    task dev:be
+   # App window will open automatically
    ```
 
 4. **Build for production**
@@ -96,8 +146,15 @@ task build
    task build
    ```
 
-5. **Run the application**
-   - Execute `./ns-drive` (macOS/Linux) or `./ns-drive.exe` (Windows)
+5. **Run the built application**
+
+   ```bash
+   # macOS/Linux
+   ./ns-drive
+
+   # Windows
+   ./ns-drive.exe
+   ```
 
 ## 📖 Usage Guide
 
@@ -207,37 +264,72 @@ ns-drive/
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🐛 Troubleshooting
+## 🔧 Development Environment
 
-### Common Issues
+### Environment Variables
 
-1. **Build failures**: Check Go/Node versions and dependencies
-2. **Sync errors**: Verify remote configuration and permissions
-3. **UI freezing**: Check for blocking operations on main thread
-4. **Memory leaks**: Ensure proper cleanup of subscriptions
-
-### Debug Commands
+Ensure your Go environment is properly configured:
 
 ```bash
-# Enable debug mode with hot reload
-task dev:be
+# Check Go installation
+go version  # Should be 1.25+
 
-# Run linting
+# Ensure GOPATH/bin is in PATH (for wails3 command)
+export PATH="$PATH:$(go env GOPATH)/bin"
+
+# Verify wails3 is available
+wails3 version
+```
+
+### Configuration Files
+
+| File | Location | Description |
+|------|----------|-------------|
+| `desktop/build/config.yml` | Project | Wails dev mode configuration |
+| `desktop/go.mod` | Project | Go module dependencies |
+| `desktop/frontend/package.json` | Project | npm dependencies |
+| `~/.config/ns-drive/profiles.json` | User home | Sync profiles configuration |
+| `~/.config/ns-drive/rclone.conf` | User home | Rclone remotes configuration |
+
+### Generating Bindings
+
+When you modify Go services or models, regenerate TypeScript bindings:
+
+```bash
+cd desktop
+wails3 generate bindings
+```
+
+Bindings are generated to `desktop/frontend/bindings/` (symlinked as `wailsjs/` for compatibility).
+
+### Linting
+
+```bash
+# Lint both frontend and backend
 task lint
 
-# Install frontend dependencies
-cd desktop/frontend && npm install --legacy-peer-deps
+# Lint frontend only (ESLint)
+task lint:fe
 
-# Build frontend
-cd desktop/frontend && npm run build
-
-# Generate TypeScript bindings (done automatically during build)
-cd desktop && wails3 generate bindings
+# Lint backend only (golangci-lint)
+task lint:be
 ```
+
+## 🐛 Troubleshooting
 
 ### Common Issues & Solutions
 
-1. **Build fails with "no matching files found"**
+1. **`go.mod file not found` error when running `task dev:be`**
+
+   ```bash
+   # Solution: Run go mod tidy from desktop directory first
+   cd desktop && go mod tidy
+
+   # Then retry
+   task dev:be
+   ```
+
+2. **Build fails with "no matching files found"**
 
    ```bash
    # Solution: Build frontend first
@@ -245,40 +337,82 @@ cd desktop && wails3 generate bindings
    task build
    ```
 
-2. **Dev server fails to start**
+3. **Dev server fails to connect to frontend**
 
    ```bash
-   # Solution: Start frontend dev server first
-   # Terminal 1:
+   # Solution: Ensure frontend is running on correct port
+   # Terminal 1 - Start frontend FIRST:
    task dev:fe
+   # Wait for "Local: http://localhost:9245/" message
 
-   # Terminal 2:
+   # Terminal 2 - Then start backend:
    task dev:be
    ```
 
-3. **Wails3 command not found**
+4. **Wails3 command not found**
 
    ```bash
-   # Solution: Install Wails v3
+   # Solution: Install Wails v3 and update PATH
    go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+   # Add to your shell profile (~/.zshrc or ~/.bashrc):
+   export PATH="$PATH:$(go env GOPATH)/bin"
    ```
 
-4. **Frontend dependencies missing**
+5. **Frontend dependencies errors**
 
    ```bash
-   # Solution: Install dependencies
+   # Solution: Install with legacy peer deps flag
    cd desktop/frontend && npm install --legacy-peer-deps
    ```
 
-5. **Linker warnings about macOS version**
+6. **Linker warnings about macOS version**
 
    ```
    ld: warning: object file was built for newer 'macOS' version (26.0) than being linked (11.0)
    ```
 
-   These warnings are harmless and don't affect functionality.
+   These warnings are harmless and don't affect functionality. They occur due to CGO compilation targeting older macOS versions.
 
-For more detailed troubleshooting, see [RULES.md](RULES.md).
+7. **Port 9245 already in use**
+
+   ```bash
+   # Find and kill process using the port
+   lsof -i :9245
+   kill -9 <PID>
+
+   # Or use a different port
+   WAILS_VITE_PORT=9246 task dev:fe
+   WAILS_VITE_PORT=9246 task dev:be
+   ```
+
+8. **Changes not reflecting in app**
+
+   - Frontend changes: Should auto-reload. If not, refresh the app window
+   - Backend changes: Wails watches `*.go` files and auto-rebuilds
+   - If stuck, restart both dev servers
+
+### Debug Commands
+
+```bash
+# Check if frontend server is running
+curl http://localhost:9245
+
+# Check Go module status
+cd desktop && go mod verify
+
+# Clean and rebuild
+cd desktop/frontend && rm -rf node_modules dist && npm install --legacy-peer-deps
+cd desktop && go clean -cache
+
+# View backend logs in real-time
+task dev:be  # Logs appear in terminal
+
+# Generate fresh bindings
+cd desktop && wails3 generate bindings
+```
+
+For architecture details, see [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ## 📞 Support
 
