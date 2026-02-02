@@ -104,7 +104,7 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 		for data := range a.oc {
 			// Use Wails v3 events API
 			if a.app != nil {
-				a.app.EmitEvent("tofe", string(data))
+				a.app.Event.Emit("tofe", string(data))
 			}
 		}
 	}()
@@ -174,7 +174,7 @@ func (a *App) initializeConfig() {
 			for data := range a.oc {
 				// Use Wails v3 events API
 				if a.app != nil {
-					a.app.EmitEvent("tofe", string(data))
+					a.app.Event.Emit("tofe", string(data))
 				}
 			}
 		}()

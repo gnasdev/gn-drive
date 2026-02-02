@@ -286,7 +286,7 @@ func (s *SyncService) buildRcloneArgs(action SyncAction, profile models.Profile)
 // emitSyncEvent emits a sync event to the frontend
 func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, status, message string) {
 	event := events.NewSyncEvent(eventType, tabId, action, status, message)
-	s.app.EmitEvent(string(eventType), event)
+	s.app.Event.Emit(string(eventType), event)
 }
 
 // handleSyncError handles sync operation errors
@@ -295,7 +295,7 @@ func (s *SyncService) handleSyncError(task *SyncTask, errorMsg string) {
 
 	// Emit error event
 	errorEvent := events.NewErrorEvent("SYNC_ERROR", errorMsg, "", task.TabId)
-	s.app.EmitEvent(string(events.ErrorOccurred), errorEvent)
+	s.app.Event.Emit(string(events.ErrorOccurred), errorEvent)
 
 	// Emit sync failed event
 	s.emitSyncEvent(events.SyncFailed, task.TabId, string(task.Action), "failed", errorMsg)

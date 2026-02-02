@@ -4,6 +4,17 @@
 
 NS-Drive has been redesigned with a modern, domain-separated service architecture following Wails v3 best practices. This document outlines the new architecture and communication patterns.
 
+## Technology Stack
+
+| Component | Version | Description |
+|-----------|---------|-------------|
+| Go | 1.25 | Backend runtime |
+| Wails | v3.0.0-alpha.57 | Desktop app framework |
+| Angular | 21.1 | Frontend framework |
+| rclone | v1.73.0 | Cloud sync engine |
+| TypeScript | 5.9 | Frontend type system |
+| Tailwind CSS | 3.4 | UI styling |
+
 ## Architecture Principles
 
 ### 1. Domain Separation
@@ -179,10 +190,10 @@ type BaseEvent struct {
 
 ### Generated Bindings
 
-Services are automatically exposed to the frontend via Wails v3 bindings:
+Services are automatically exposed to the frontend via Wails v3 bindings. Bindings are generated in `frontend/bindings/` directory (symlinked to `frontend/wailsjs/` for compatibility):
 
 ```typescript
-// Example usage - Legacy app service (currently in use)
+// Example usage - App service
 import {
   Sync,
   GetConfigInfo,
@@ -192,20 +203,17 @@ import {
   DeleteRemote,
 } from "../../wailsjs/desktop/backend/app";
 
-// New service bindings (when migrated)
-import {
-  SyncService,
-  ConfigService,
-  RemoteService,
-  TabService,
-} from "../../wailsjs/desktop/backend/services";
+// Import models
+import * as models from "../../wailsjs/desktop/backend/models/models";
 
-// Start a sync operation (legacy)
+// Start a sync operation
 const result = await Sync("pull", profile);
 
-// Get configuration info (legacy)
+// Get configuration info
 const configInfo = await GetConfigInfo();
 ```
+
+**Note:** The `wailsjs` directory is a symlink to `bindings` for backward compatibility with existing imports.
 
 ### Event Handling
 

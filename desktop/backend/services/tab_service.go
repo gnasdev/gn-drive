@@ -339,5 +339,5 @@ func (t *TabService) SetTabError(ctx context.Context, tabId string, errorMsg str
 // emitTabEvent emits a tab event
 func (t *TabService) emitTabEvent(eventType events.EventType, tabId, tabName string, data interface{}) {
 	event := events.NewTabEvent(eventType, tabId, tabName, data)
-	t.app.EmitEvent(string(eventType), event)
+	t.app.Event.Emit(string(eventType), event)
 }

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:v3alpha.wails.io)"
+    ]
+  }
+}

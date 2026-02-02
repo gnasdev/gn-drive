@@ -92,7 +92,7 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 			accounting.GlobalStats().ResetErrors()
 		}
 		if fsConfig.RetriesInterval > 0 {
-			time.Sleep(fsConfig.RetriesInterval)
+			time.Sleep(time.Duration(fsConfig.RetriesInterval))
 		}
 	}
 

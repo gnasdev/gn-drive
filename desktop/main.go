@@ -44,7 +44,7 @@ func main() {
 	tabService.SetApp(app)
 
 	// Create the main window
-	window := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ns-drive",
 		Width:  768,
 		Height: 768,

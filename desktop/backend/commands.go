@@ -48,7 +48,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 		go func() {
 			for data := range a.oc {
 				if a.app != nil {
-					a.app.EmitEvent("tofe", string(data))
+					a.app.Event.Emit("tofe", string(data))
 				}
 			}
 		}()

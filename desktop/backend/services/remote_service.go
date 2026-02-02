@@ -238,5 +238,5 @@ func (r *RemoteService) getRemoteDescription(remoteType string) string {
 // emitRemoteEvent emits a remote event
 func (r *RemoteService) emitRemoteEvent(eventType events.EventType, remoteName string, data interface{}) {
 	event := events.NewRemoteEvent(eventType, remoteName, data)
-	r.app.EmitEvent(string(eventType), event)
+	r.app.Event.Emit(string(eventType), event)
 }

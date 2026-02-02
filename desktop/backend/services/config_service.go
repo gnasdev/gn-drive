@@ -277,5 +277,5 @@ func (c *ConfigService) saveProfiles() error {
 // emitConfigEvent emits a configuration event
 func (c *ConfigService) emitConfigEvent(eventType events.EventType, profileId string, data interface{}) {
 	event := events.NewConfigEvent(eventType, profileId, data)
-	c.app.EmitEvent(string(eventType), event)
+	c.app.Event.Emit(string(eventType), event)
 }

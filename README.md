@@ -13,19 +13,19 @@ A modern desktop application for cloud storage synchronization powered by rclone
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Go 1.24.2 with Wails v3 framework
-- **Frontend**: Angular 20.0.6 with Tailwind CSS
-- **Cloud Sync**: rclone integration
-- **Package Manager**: Yarn 4.9.2
+- **Backend**: Go 1.25 with Wails v3 (alpha.57)
+- **Frontend**: Angular 21.1 with Tailwind CSS
+- **Cloud Sync**: rclone v1.73.0 integration
+- **Package Manager**: npm
 - **Build Tool**: Taskfile (task runner)
 
 ## 📋 Prerequisites
 
 Before building or running NS-Drive, ensure you have the following installed:
 
-- **Go**: v1.24.2 or later
-- **Node.js**: v18 or later
-- **Yarn**: v4.9.2 (package manager)
+- **Go**: v1.25 or later
+- **Node.js**: v18 or later (v24+ recommended)
+- **npm**: Package manager (comes with Node.js)
 - **Taskfile**: Task runner for build automation
 - **Wails v3**: Desktop app framework
 
@@ -35,9 +35,8 @@ Before building or running NS-Drive, ensure you have the following installed:
 # Install Go (if not already installed)
 # Visit: https://golang.org/dl/
 
-# Install Node.js and Yarn
+# Install Node.js
 # Visit: https://nodejs.org/
-npm install -g yarn
 
 # Install Taskfile
 # Visit: https://taskfile.dev/installation/
@@ -63,7 +62,7 @@ task dev:be
 
 ```bash
 task build
-# Creates: bin/ns-drive in desktop directory
+# Creates: ns-drive binary in project root
 ```
 
 ## 🚀 Quick Start
@@ -78,7 +77,7 @@ task build
 2. **Install dependencies**
 
    ```bash
-   cd desktop/frontend && yarn install
+   cd desktop/frontend && npm install --legacy-peer-deps
    ```
 
 3. **Run in development mode**
@@ -98,7 +97,7 @@ task build
    ```
 
 5. **Run the application**
-   - Execute `./desktop/bin/ns-drive` (macOS/Linux) or `./desktop/bin/ns-drive.exe` (Windows)
+   - Execute `./ns-drive` (macOS/Linux) or `./ns-drive.exe` (Windows)
 
 ## 📖 Usage Guide
 
@@ -184,14 +183,15 @@ ns-drive/
 │   │   └── utils/         # Utility functions
 │   ├── frontend/          # Angular frontend
 │   │   ├── src/app/       # Application components
+│   │   ├── bindings/      # Wails generated bindings
 │   │   └── dist/          # Built frontend assets
 │   ├── build/             # Build configuration
-│   ├── bin/               # Built binaries
 │   ├── go.mod             # Go module definition
 │   └── main.go            # Application entry point
 ├── docs/                  # Documentation
 ├── screenshots/           # Application screenshots
 ├── Taskfile.yml          # Build tasks
+├── ns-drive              # Built binary (after build)
 └── README.md             # This file
 ```
 
@@ -226,10 +226,10 @@ task dev:be
 task lint
 
 # Install frontend dependencies
-cd desktop/frontend && yarn install
+cd desktop/frontend && npm install --legacy-peer-deps
 
 # Build frontend
-cd desktop/frontend && yarn build
+cd desktop/frontend && npm run build
 
 # Generate TypeScript bindings (done automatically during build)
 cd desktop && wails3 generate bindings
@@ -241,7 +241,7 @@ cd desktop && wails3 generate bindings
 
    ```bash
    # Solution: Build frontend first
-   cd desktop/frontend && yarn build
+   cd desktop/frontend && npm run build
    task build
    ```
 
@@ -267,16 +267,16 @@ cd desktop && wails3 generate bindings
 
    ```bash
    # Solution: Install dependencies
-   cd desktop/frontend && yarn install
+   cd desktop/frontend && npm install --legacy-peer-deps
    ```
 
 5. **Linker warnings about macOS version**
 
    ```
-   ld: warning: object file was built for newer 'macOS' version (16.0) than being linked (16.0)
+   ld: warning: object file was built for newer 'macOS' version (26.0) than being linked (11.0)
    ```
 
-   These warnings are harmless and don't affect functionality. The current deployment target is macOS 16.0 (macOS Sequoia).
+   These warnings are harmless and don't affect functionality.
 
 For more detailed troubleshooting, see [RULES.md](RULES.md).
 
