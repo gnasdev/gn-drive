@@ -10,7 +10,7 @@ import { AppService } from "./app.service.js";
 import { combineLatest, Subscription } from "rxjs";
 import { HomeComponent } from "./home/home.component.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
-import { ProfileEditComponent } from "./profiles/profile-edit.component.js";
+
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { SidebarComponent } from "./components/sidebar/sidebar.component.js";
 import { DashboardComponent } from "./dashboard/dashboard.component.js";
@@ -34,7 +34,6 @@ import { ConfirmDialog } from "primeng/confirmdialog";
     HomeComponent,
     FileBrowserComponent,
     ProfilesComponent,
-    ProfileEditComponent,
     RemotesComponent,
     SchedulesComponent,
     HistoryComponent,

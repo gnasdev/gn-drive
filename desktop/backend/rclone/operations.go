@@ -113,10 +113,11 @@ func Check(ctx context.Context, config beConfig.Config, profile models.Profile, 
 }
 
 // ListFiles lists files at the given remote path and returns FileEntry items.
+// Returns an empty slice (not an error) when the path is invalid or listing fails.
 func ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models.FileEntry, error) {
 	remoteFs, err := fs.NewFs(ctx, remotePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize filesystem %q: %w", remotePath, err)
+		return []models.FileEntry{}, nil
 	}
 
 	var entries []models.FileEntry
@@ -139,7 +140,7 @@ func ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list files: %w", err)
+		return []models.FileEntry{}, nil
 	}
 
 	return entries, nil

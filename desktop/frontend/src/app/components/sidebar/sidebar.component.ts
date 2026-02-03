@@ -135,9 +135,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   isActive(page: PageName): boolean {
-    const current = this.navigationService.currentState.page;
-    if (page === "profiles" && current === "profile-edit") return true;
-    return current === page;
+    return this.navigationService.currentState.page === page;
   }
 
   showSection(item: SidebarItem): boolean {

@@ -18,9 +18,6 @@
       @case ('profiles') {
         <app-profiles></app-profiles>
       }
-      @case ('profile-edit') {
-        <app-profile-edit></app-profile-edit>
-      }
       @case ('remotes') {
         <app-remotes></app-remotes>
       }
@@ -62,4 +59,4 @@
 <p-toast></p-toast>
 
 <!-- PrimeNG Confirm Dialog -->
-<p-confirmdialog></p-confirmdialog>
+<p-confirmdialog [dismissableMask]="true"></p-confirmdialog>

@@ -17,7 +17,7 @@
         icon="pi pi-plus"
         label="Add Profile"
         size="small"
-        (onClick)="addProfile()"
+        (onClick)="openCreateDialog()"
       ></p-button>
     </ng-template>
   </p-toolbar>
@@ -31,7 +31,7 @@
           profile; let idx = $index) {
           <p-card
             styleClass="cursor-pointer hover:bg-gray-700 transition-colors duration-200"
-            (click)="editProfile(idx)"
+            (click)="openEditDialog(idx)"
           >
             <div
               class="flex items-center group"
@@ -83,10 +83,469 @@
         <p-button
           icon="pi pi-plus"
           label="Create First Profile"
-          (onClick)="addProfile()"
+          (onClick)="openCreateDialog()"
         ></p-button>
       </div>
       }
     </div>
   </div>
 </div>
+
+<!-- Profile Create/Edit Dialog -->
+<p-dialog
+  [header]="dialogHeader"
+  [(visible)]="showProfileDialog"
+  [modal]="true"
+  [dismissableMask]="true"
+  [style]="{ width: '48rem' }"
+  [closable]="true"
+  (onHide)="closeProfileDialog()"
+>
+  @if (editingProfile) {
+  <!-- Tab Navigation -->
+  <div class="flex border-b border-gray-700 mb-4 -mx-5">
+    @for (tab of editorTabs; track tab.id) {
+    <p-button
+      [label]="tab.label"
+      [icon]="tab.icon"
+      [text]="true"
+      [rounded]="false"
+      size="small"
+      [severity]="activeTab === tab.id ? 'primary' : 'secondary'"
+      [styleClass]="activeTab === tab.id
+        ? 'border-b-2 border-primary-400 rounded-none'
+        : 'rounded-none'"
+      (onClick)="activeTab = tab.id"
+    />
+    }
+  </div>
+
+  <!-- General Tab -->
+  @if (activeTab === 'general') {
+  <div class="space-y-4">
+    <!-- Profile Name -->
+    <div>
+      <label class="text-sm text-gray-400 mb-2 block">Profile Name <span class="text-red-400">*</span></label>
+      <input
+        pInputText
+        class="w-full"
+        [(ngModel)]="editingProfile.name"
+        (ngModelChange)="clearValidationError('name')"
+        placeholder="Enter profile name"
+        [class.ng-invalid]="validationErrors['name']"
+        [class.ng-dirty]="validationErrors['name']"
+      />
+      @if (validationErrors['name']) {
+      <small class="text-red-400 mt-1 block">{{ validationErrors['name'] }}</small>
+      }
+    </div>
+
+    <!-- Source Path -->
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-folder-open mr-2"></i>Source Path <span class="text-red-400">*</span>
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Remote</label>
+          <p-select
+            [options]="getRemoteOptions()"
+            [ngModel]="getFromRemote()"
+            (ngModelChange)="updateFromPath($event, getFromPath())"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Path</label>
+          <app-path-browser
+            [remoteName]="getFromRemote()"
+            [path]="getFromPath()"
+            (pathChange)="updateFromPath(getFromRemote(), $event)"
+            placeholder="/source/path"
+            filterMode="folder"
+          />
+        </div>
+      </div>
+      @if (validationErrors['from']) {
+      <small class="text-red-400 mt-1 block">{{ validationErrors['from'] }}</small>
+      }
+    </p-card>
+
+    <!-- Destination Path -->
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-folder mr-2"></i>Destination Path <span class="text-red-400">*</span>
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Remote</label>
+          <p-select
+            [options]="getRemoteOptions()"
+            [ngModel]="getToRemote()"
+            (ngModelChange)="updateToPath($event, getToPath())"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Path</label>
+          <app-path-browser
+            [remoteName]="getToRemote()"
+            [path]="getToPath()"
+            (pathChange)="updateToPath(getToRemote(), $event)"
+            placeholder="/destination/path"
+            filterMode="folder"
+          />
+        </div>
+      </div>
+      @if (validationErrors['to']) {
+      <small class="text-red-400 mt-1 block">{{ validationErrors['to'] }}</small>
+      }
+    </p-card>
+  </div>
+  }
+
+  <!-- Filters Tab -->
+  @if (activeTab === 'filters') {
+  <div class="space-y-4">
+    <!-- Include Paths -->
+    <p-card>
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-check text-green-400"></i>
+          <h3 class="text-sm font-medium text-gray-200">Include Paths</h3>
+        </div>
+        <p-button
+          label="Add"
+          icon="pi pi-plus"
+          severity="secondary"
+          size="small"
+          (onClick)="addIncludePath()"
+        />
+      </div>
+      @if (editingProfile.included_paths.length === 0) {
+      <p class="text-xs text-gray-500">All files included by default</p>
+      } @else { @for (path of editingProfile.included_paths; track $index; let i =
+      $index) {
+      <div class="flex items-center gap-2 mb-2">
+        <p-select
+          [options]="pathTypeOptions"
+          [ngModel]="getIncludePathType(i)"
+          (ngModelChange)="onIncludePathTypeChange(i, $event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-24!"
+        />
+        <app-path-browser
+          class="flex-1"
+          [remoteName]="getFromRemote()"
+          [path]="getIncludePathValue(i)"
+          (pathChange)="onIncludePathValueUpdate(i, $event)"
+          placeholder="path pattern"
+          filterMode="folder"
+        />
+        <p-button
+          icon="pi pi-minus"
+          [rounded]="true"
+          [text]="true"
+          severity="danger"
+          size="small"
+          (onClick)="removeIncludePath(i)"
+        />
+      </div>
+      } }
+    </p-card>
+
+    <!-- Exclude Paths -->
+    <p-card>
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-times text-red-400"></i>
+          <h3 class="text-sm font-medium text-gray-200">Exclude Paths</h3>
+        </div>
+        <p-button
+          label="Add"
+          icon="pi pi-plus"
+          severity="secondary"
+          size="small"
+          (onClick)="addExcludePath()"
+        />
+      </div>
+      @if (editingProfile.excluded_paths.length === 0) {
+      <p class="text-xs text-gray-500">No files excluded</p>
+      } @else { @for (path of editingProfile.excluded_paths; track $index; let i =
+      $index) {
+      <div class="flex items-center gap-2 mb-2">
+        <p-select
+          [options]="pathTypeOptions"
+          [ngModel]="getExcludePathType(i)"
+          (ngModelChange)="onExcludePathTypeChange(i, $event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-24!"
+        />
+        <app-path-browser
+          class="flex-1"
+          [remoteName]="getFromRemote()"
+          [path]="getExcludePathValue(i)"
+          (pathChange)="onExcludePathValueUpdate(i, $event)"
+          placeholder="path pattern"
+          filterMode="folder"
+        />
+        <p-button
+          icon="pi pi-minus"
+          [rounded]="true"
+          [text]="true"
+          severity="danger"
+          size="small"
+          (onClick)="removeExcludePath(i)"
+        />
+      </div>
+      } }
+    </p-card>
+
+    <!-- Size Filters -->
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Size Filters</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Min Size</label>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="editingProfile.min_size"
+            placeholder="e.g. 100k, 10M"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Max Size</label>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="editingProfile.max_size"
+            placeholder="e.g. 1G, 500M"
+          />
+        </div>
+      </div>
+    </p-card>
+
+    <!-- Advanced Filters -->
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Filters</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Filter From File</label>
+          <app-path-browser
+            remoteName=""
+            [path]="editingProfile.filter_from_file ?? ''"
+            (pathChange)="editingProfile.filter_from_file = $event"
+            placeholder="Path to filter rules file"
+            filterMode="file"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Exclude If Present</label>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="editingProfile.exclude_if_present"
+            placeholder="e.g. .nosync"
+          />
+        </div>
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-300">Use Regex</p>
+            <p class="text-xs text-gray-500">Use regex for include/exclude patterns</p>
+          </div>
+          <p-toggleswitch
+            [(ngModel)]="editingProfile.use_regex"
+          ></p-toggleswitch>
+        </div>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Performance Tab -->
+  @if (activeTab === 'performance') {
+  <div class="space-y-4">
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-bolt mr-2"></i>Transfer Settings
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Parallel Transfers</label>
+          <p-select
+            [options]="getNumberRangeOptions(1, 32)"
+            [(ngModel)]="editingProfile.parallel"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Bandwidth Limit (MB/s)</label>
+          <p-select
+            [options]="getNumberRangeOptions(1, 100)"
+            [(ngModel)]="editingProfile.bandwidth"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
+        </div>
+      </div>
+    </p-card>
+
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-cog mr-2"></i>Advanced Performance
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Multi-Thread Streams</label>
+          <p-inputnumber
+            [(ngModel)]="editingProfile.multi_thread_streams"
+            placeholder="4"
+            [min]="0"
+            [max]="64"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Buffer Size</label>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="editingProfile.buffer_size"
+            placeholder="e.g. 16M, 64M"
+          />
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Retries</label>
+          <p-inputnumber
+            [(ngModel)]="editingProfile.retries"
+            placeholder="3"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Low-Level Retries</label>
+          <p-inputnumber
+            [(ngModel)]="editingProfile.low_level_retries"
+            placeholder="10"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+      </div>
+      <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700">
+        <div>
+          <p class="text-sm text-gray-300">Fast List</p>
+          <p class="text-xs text-gray-500">Use recursive list if available (uses more memory)</p>
+        </div>
+        <p-toggleswitch
+          [(ngModel)]="editingProfile.fast_list"
+        ></p-toggleswitch>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Advanced Tab -->
+  @if (activeTab === 'advanced') {
+  <div class="space-y-4">
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-cog mr-2"></i>Safety Settings
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Backup Directory</label>
+          <app-path-browser
+            remoteName=""
+            [path]="editingProfile.backup_path"
+            (pathChange)="editingProfile.backup_path = $event"
+            placeholder="Path to backup deleted/modified files"
+            filterMode="folder"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Max Delete (files)</label>
+          <p-inputnumber
+            [(ngModel)]="editingProfile.max_delete"
+            placeholder="Unlimited"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+          <p class="text-xs text-gray-500 mt-1">Maximum number of files to delete. Leave empty for unlimited.</p>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Max Duration</label>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="editingProfile.max_duration"
+            placeholder="e.g. 1h30m, 45m"
+          />
+        </div>
+        <div class="flex items-center justify-between pt-3 border-t border-gray-700">
+          <div>
+            <p class="text-sm text-gray-300">Immutable</p>
+            <p class="text-xs text-gray-500">Do not modify files, fail if existing files differ</p>
+          </div>
+          <p-toggleswitch
+            [(ngModel)]="editingProfile.immutable"
+          ></p-toggleswitch>
+        </div>
+      </div>
+    </p-card>
+
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-cog mr-2"></i>Bi-Sync Settings
+      </h3>
+      <div>
+        <label class="text-xs text-gray-500 mb-1 block">Conflict Resolution</label>
+        <p-select
+          [options]="conflictResolutionOptions"
+          [(ngModel)]="editingProfile.conflict_resolution"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"
+        />
+        <p class="text-xs text-gray-500 mt-1">
+          How to resolve conflicts during bi-directional sync
+        </p>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Dialog Footer -->
+  <div class="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-700">
+    <p-button
+      type="button"
+      label="Cancel"
+      severity="secondary"
+      (onClick)="closeProfileDialog()"
+    ></p-button>
+    <p-button
+      [label]="(isSaving$ | async) ? 'Saving...' : 'Save'"
+      icon="pi pi-save"
+      [loading]="!!(isSaving$ | async)"
+      (onClick)="saveProfileDialog()"
+    ></p-button>
+  </div>
+  }
+</p-dialog>

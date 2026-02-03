@@ -6,7 +6,7 @@ export type NavigationState =
   | { page: "operations" }
   | { page: "file-browser" }
   | { page: "profiles" }
-  | { page: "profile-edit"; profileIndex: number }
+
   | { page: "remotes" }
   | { page: "schedules" }
   | { page: "history" }
@@ -30,15 +30,8 @@ export class NavigationService {
     return this.navigationState$.value;
   }
 
-  navigateTo(page: PageName, params?: { profileIndex?: number }) {
-    if (page === "profile-edit" && params?.profileIndex !== undefined) {
-      this.navigationState$.next({
-        page: "profile-edit",
-        profileIndex: params.profileIndex,
-      });
-    } else {
-      this.navigationState$.next({ page } as NavigationState);
-    }
+  navigateTo(page: PageName) {
+    this.navigationState$.next({ page } as NavigationState);
   }
 
   navigateToDashboard() {
@@ -55,10 +48,6 @@ export class NavigationService {
 
   navigateToProfiles() {
     this.navigationState$.next({ page: "profiles" });
-  }
-
-  navigateToProfileEdit(profileIndex: number) {
-    this.navigationState$.next({ page: "profile-edit", profileIndex });
   }
 
   navigateToRemotes() {
