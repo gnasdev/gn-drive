@@ -28,14 +28,14 @@ import {
   imports: [CommonModule, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    @if (activeErrors.length > 0) {
     <div
       class="fixed top-20 right-4 w-96 max-h-[calc(100vh-100px)] overflow-y-auto z-50 space-y-2"
-      *ngIf="activeErrors.length > 0"
     >
+      @for (error of activeErrors; track error.id) {
       <div
-        *ngFor="let error of activeErrors; trackBy: trackByErrorId"
         [class]="getErrorCardClasses(error.severity)"
-        class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border-l-4 p-4 animate-slide-in"
+        class="bg-gray-800 rounded-lg shadow-lg border-l-4 p-4 animate-slide-in"
       >
         <!-- Header -->
         <div class="flex items-start justify-between mb-3">
@@ -51,12 +51,12 @@ import {
             </div>
             <div class="flex-1 min-w-0">
               <h4
-                class="text-sm font-semibold text-gray-900 dark:text-gray-100"
+                class="text-sm font-semibold text-gray-100"
               >
                 {{ error.title }}
               </h4>
               <div class="flex items-center space-x-2 mt-1">
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{
+                <span class="text-xs text-gray-400">{{
                   error.timestamp | date : "short"
                 }}</span>
                 <span
@@ -70,7 +70,7 @@ import {
           </div>
           <button
             (click)="dismissError(error.id)"
-            class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-300 transition-colors"
             aria-label="Dismiss error"
           >
             <lucide-icon [img]="XIcon" [size]="16"></lucide-icon>
@@ -78,18 +78,16 @@ import {
         </div>
 
         <!-- Message -->
-        <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+        <p class="text-sm text-gray-300 mb-3">
           {{ error.message }}
         </p>
 
         <!-- Details (expandable) -->
-        <div
-          *ngIf="error.details"
-          class="border-t border-gray-200 dark:border-gray-600 pt-3"
-        >
+        @if (error.details) {
+        <div class="border-t border-gray-600 pt-3">
           <button
             (click)="toggleDetails(error.id)"
-            class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            class="flex items-center space-x-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
           >
             <span>Details</span>
             <lucide-icon
@@ -100,15 +98,19 @@ import {
             >
             </lucide-icon>
           </button>
+          @if (isDetailsExpanded(error.id)) {
           <div
-            *ngIf="isDetailsExpanded(error.id)"
-            class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded text-xs font-mono text-gray-600 dark:text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto"
+            class="mt-2 p-3 bg-gray-700 rounded text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto"
           >
             {{ error.details }}
           </div>
+          }
         </div>
+        }
       </div>
+      }
     </div>
+    }
   `,
   styles: [
     `
@@ -209,7 +211,7 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
       case ErrorSeverity.ERROR:
         return "border-l-red-500";
       case ErrorSeverity.CRITICAL:
-        return "border-l-purple-500 shadow-purple-200 dark:shadow-purple-900";
+        return "border-l-purple-500 shadow-purple-900";
       default:
         return "border-l-red-500";
     }
@@ -218,30 +220,30 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
   getIconClasses(severity: ErrorSeverity): string {
     switch (severity) {
       case ErrorSeverity.INFO:
-        return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300";
+        return "bg-blue-900 text-blue-300";
       case ErrorSeverity.WARNING:
-        return "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300";
+        return "bg-yellow-900 text-yellow-300";
       case ErrorSeverity.ERROR:
-        return "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300";
+        return "bg-red-900 text-red-300";
       case ErrorSeverity.CRITICAL:
-        return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300";
+        return "bg-purple-900 text-purple-300";
       default:
-        return "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300";
+        return "bg-red-900 text-red-300";
     }
   }
 
   getSeverityChipClasses(severity: ErrorSeverity): string {
     switch (severity) {
       case ErrorSeverity.INFO:
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+        return "bg-blue-900 text-blue-200";
       case ErrorSeverity.WARNING:
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+        return "bg-yellow-900 text-yellow-200";
       case ErrorSeverity.ERROR:
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        return "bg-red-900 text-red-200";
       case ErrorSeverity.CRITICAL:
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+        return "bg-purple-900 text-purple-200";
       default:
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        return "bg-red-900 text-red-200";
     }
   }
 

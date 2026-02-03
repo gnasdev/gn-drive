@@ -153,17 +153,10 @@
             <p class="text-sm text-gray-300">Dry Run</p>
             <p class="text-xs text-gray-500">Preview changes without executing</p>
           </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              [checked]="tab.dryRun || false"
-              class="sr-only peer"
-              (change)="toggleDryRun(tab.id)"
-            />
-            <div
-              class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-            ></div>
-          </label>
+          <p-toggleswitch
+            [ngModel]="tab.dryRun || false"
+            (onChange)="toggleDryRun(tab.id)"
+          ></p-toggleswitch>
         </div>
       </div>
 
@@ -247,40 +240,26 @@
   }
 </div>
 
-<!-- Rename Tab Modal -->
-@if (showRenameDialog) {
-<div
-  class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-  (click)="cancelRename()"
+<!-- Rename Tab Dialog (PrimeNG) -->
+<p-dialog
+  header="Rename Tab"
+  [(visible)]="showRenameDialog"
+  [modal]="true"
+  [style]="{ width: '24rem' }"
+  [closable]="true"
+  (onHide)="cancelRename()"
 >
-  <div
-    class="bg-gray-800 rounded-xl border border-gray-700 p-6 w-96 max-w-[90vw]"
-    (click)="$event.stopPropagation()"
-  >
-    <h2 class="text-lg font-semibold text-gray-100 mb-4">
-      Rename Tab
-    </h2>
-    <div class="mb-4">
-      <label class="text-sm text-gray-400 mb-1 block">Tab Name</label>
-      <input
-        type="text"
-        class="input-field"
-        [(ngModel)]="renameDialogData.newName"
-        (keydown.enter)="confirmRename()"
-      />
-    </div>
-    <div class="flex justify-end gap-2">
-      <button class="btn-secondary text-sm" (click)="cancelRename()">Cancel</button>
-      <button class="btn-primary text-sm" (click)="confirmRename()">Rename</button>
-    </div>
+  <div class="mb-4">
+    <label class="text-sm text-gray-400 mb-1 block">Tab Name</label>
+    <input
+      type="text"
+      class="input-field"
+      [(ngModel)]="renameDialogData.newName"
+      (keydown.enter)="confirmRename()"
+    />
   </div>
-</div>
-}
-
-<!-- Delete Tab Confirmation Dialog -->
-<app-confirm-dialog
-  [isOpen]="showDeleteTabConfirm"
-  [data]="deleteTabConfirmData"
-  (confirmed)="onDeleteTabConfirmed()"
-  (cancelled)="closeDeleteTabConfirm()"
-></app-confirm-dialog>
+  <div class="flex justify-end gap-2">
+    <button class="btn-secondary text-sm" (click)="cancelRename()">Cancel</button>
+    <button class="btn-primary text-sm" (click)="confirmRename()">Rename</button>
+  </div>
+</p-dialog>

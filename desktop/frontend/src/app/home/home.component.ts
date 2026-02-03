@@ -18,10 +18,9 @@ import {
 } from "./home.types";
 import { FormsModule } from "@angular/forms";
 import { SyncStatusComponent } from "../components/sync-status/sync-status.component";
-import {
-  ConfirmDialogComponent,
-  ConfirmDialogData,
-} from "../components/confirm-dialog/confirm-dialog.component";
+import { ToggleSwitch } from "primeng/toggleswitch";
+import { Dialog } from "primeng/dialog";
+import { ConfirmationService } from "primeng/api";
 import {
   LucideAngularModule,
   Settings,
@@ -52,7 +51,8 @@ import {
     FormsModule,
     LucideAngularModule,
     SyncStatusComponent,
-    ConfirmDialogComponent,
+    ToggleSwitch,
+    Dialog,
   ],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
@@ -100,16 +100,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private subscriptions = new Subscription();
   showRenameDialog = false;
-  showDeleteTabConfirm = false;
-  deleteTabConfirmData: ConfirmDialogData = {
-    title: "Delete Tab",
-    message: "",
-    confirmText: "Delete",
-    cancelText: "Cancel",
-    confirmButtonClass:
-      "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200",
-  };
-  pendingDeleteTabId: string | null = null;
 
   renameDialogData = {
     tabId: "",
@@ -120,7 +110,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   constructor(
     public readonly appService: AppService,
     public readonly tabService: TabService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly confirmationService: ConfirmationService
   ) {}
 
   ngOnInit(): void {
@@ -307,32 +298,23 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Check if tab has an active operation
     if (tab && tab.currentTaskId && tab.currentAction) {
-      this.pendingDeleteTabId = tabId;
-      this.deleteTabConfirmData = {
-        ...this.deleteTabConfirmData,
+      this.confirmationService.confirm({
         message: `This operation is currently running (${tab.currentAction}). Deleting this tab will stop the operation.`,
-        warning: "The running sync operation will be cancelled.",
-      };
-      this.showDeleteTabConfirm = true;
-      this.cdr.detectChanges();
+        header: "Delete Tab",
+        acceptButtonStyleClass:
+          "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors ml-2",
+        rejectButtonStyleClass:
+          "bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors",
+        accept: () => {
+          this.appService.stopCommandForTab(tabId);
+          this.tabService.deleteTab(tabId);
+          this.cdr.detectChanges();
+        },
+      });
       return;
     }
 
     this.tabService.deleteTab(tabId);
-  }
-
-  onDeleteTabConfirmed(): void {
-    if (this.pendingDeleteTabId) {
-      this.appService.stopCommandForTab(this.pendingDeleteTabId);
-      this.tabService.deleteTab(this.pendingDeleteTabId);
-    }
-    this.closeDeleteTabConfirm();
-  }
-
-  closeDeleteTabConfirm(): void {
-    this.showDeleteTabConfirm = false;
-    this.pendingDeleteTabId = null;
-    this.cdr.detectChanges();
   }
 
   setActiveTab(tabId: string): void {
@@ -473,17 +455,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     this.showRenameDialog = true;
-
-    // Focus the input after dialog opens
-    setTimeout(() => {
-      const input = document.querySelector(
-        'input[type="text"]'
-      ) as HTMLInputElement;
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }, 100);
   }
 
   confirmRename(): void {
@@ -508,7 +479,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.tabService.cancelRenameTab(tabId);
   }
 
-  // New methods for Material Design interface
   getActiveTabIndex(): number {
     const activeTabId = this.tabService.activeTabIdValue;
     if (!activeTabId) return 0;

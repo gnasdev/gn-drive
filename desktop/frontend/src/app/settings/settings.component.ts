@@ -10,11 +10,12 @@ import {
   FolderOpen,
   Info,
 } from "lucide-angular";
+import { ToggleSwitch } from "primeng/toggleswitch";
 
 @Component({
   selector: "app-settings",
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ToggleSwitch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
@@ -45,17 +46,10 @@ import {
                 Show notifications when operations complete or fail
               </p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="notificationsEnabled"
-                class="sr-only peer"
-                (change)="saveNotificationSetting()"
-              />
-              <div
-                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-              ></div>
-            </label>
+            <p-toggleswitch
+              [(ngModel)]="notificationsEnabled"
+              (onChange)="saveNotificationSetting()"
+            ></p-toggleswitch>
           </div>
         </div>
 
@@ -75,17 +69,10 @@ import {
                 Encrypt rclone configuration file with a password
               </p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="configEncrypted"
-                class="sr-only peer"
-                (change)="toggleConfigEncryption()"
-              />
-              <div
-                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-              ></div>
-            </label>
+            <p-toggleswitch
+              [(ngModel)]="configEncrypted"
+              (onChange)="toggleConfigEncryption()"
+            ></p-toggleswitch>
           </div>
         </div>
 
@@ -105,17 +92,10 @@ import {
                 Enable verbose logging for troubleshooting
               </p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="debugMode"
-                class="sr-only peer"
-                (change)="saveDebugSetting()"
-              />
-              <div
-                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-              ></div>
-            </label>
+            <p-toggleswitch
+              [(ngModel)]="debugMode"
+              (onChange)="saveDebugSetting()"
+            ></p-toggleswitch>
           </div>
         </div>
 

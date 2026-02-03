@@ -1,34 +1,34 @@
 <!-- Profiles List -->
 <div class="flex flex-col h-full">
-  <!-- Fixed Header -->
+  <!-- Header -->
   <div
-    class="fixed top-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+    class="flex items-center justify-between p-4 border-b border-gray-700"
   >
-    <div class="max-w-4xl mx-auto">
-      <div class="p-6">
-        <div class="flex items-center space-x-3 mb-2">
-          <lucide-icon
-            [img]="UsersIcon"
-            class="w-6 h-6 text-primary-600"
-          ></lucide-icon>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Sync Profiles
-          </h1>
-        </div>
-        <p class="text-gray-600 dark:text-gray-400">
-          {{ (appService.configInfo$ | async)?.profiles?.length || 0 }}
-          profile(s) configured
-        </p>
-      </div>
+    <div class="flex items-center gap-3">
+      <lucide-icon
+        [img]="UsersIcon"
+        class="w-5 h-5 text-primary-400"
+      ></lucide-icon>
+      <h1 class="text-lg font-semibold text-gray-100">Sync Profiles</h1>
+      <span class="text-sm text-gray-500">
+        {{ (appService.configInfo$ | async)?.profiles?.length || 0 }}
+        profile(s)
+      </span>
     </div>
+    <button
+      class="btn-primary flex items-center gap-1.5 text-sm"
+      (click)="addProfile()"
+    >
+      <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
+      Add Profile
+    </button>
   </div>
 
   <!-- Scrollable Content -->
-  <div class="flex-1 overflow-auto pt-32 sm:pt-36">
+  <div class="flex-1 overflow-auto">
     <div class="max-w-4xl mx-auto">
-      <!-- Profiles content -->
       @if ((appService.configInfo$ | async)?.profiles?.length) {
-      <div class="px-4 sm:px-6">
+      <div class="p-4">
         <div class="space-y-3" role="list" aria-label="Sync profiles list">
           @for ( profile of (appService.configInfo$ | async)?.profiles; track
           profile; let idx = $index) {
@@ -36,22 +36,22 @@
             type="button"
             (click)="editProfile(idx)"
             [attr.aria-label]="'Edit profile ' + (profile.name || 'Untitled')"
-            class="w-full flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 group text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            class="w-full flex items-center p-4 bg-gray-800 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors duration-200 group text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900"
           >
             <div class="flex-shrink-0 mr-4">
               <lucide-icon
                 [img]="FolderOpenIcon"
-                class="w-8 h-8 text-gray-600 dark:text-gray-400"
+                class="w-8 h-8 text-gray-400"
                 aria-hidden="true"
               ></lucide-icon>
             </div>
             <div class="flex-1 min-w-0">
               <h3
-                class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate"
+                class="text-lg font-medium text-gray-100 truncate"
               >
                 {{ profile.name || "Untitled Profile" }}
               </h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p class="text-sm text-gray-400 mt-1">
                 {{ getProfileDescription(profile) }}
               </p>
             </div>
@@ -59,7 +59,7 @@
               <button
                 type="button"
                 (click)="removeProfile(idx); $event.stopPropagation()"
-                class="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                class="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/50 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                 [attr.aria-label]="'Delete profile ' + (profile.name || 'Untitled')"
               >
                 <lucide-icon [img]="Trash2Icon" class="w-5 h-5" aria-hidden="true"></lucide-icon>
@@ -70,59 +70,36 @@
         </div>
       </div>
       } @else {
-      <div class="p-6">
-        <div class="card text-center">
-          <div class="mb-6">
-            <div class="flex justify-center mb-4">
-              <div
-                class="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
-              >
-                <div class="relative">
-                  <lucide-icon
-                    [img]="FolderOpenIcon"
-                    class="w-8 h-8 text-gray-400"
-                  ></lucide-icon>
-                  <lucide-icon
-                    [img]="XIcon"
-                    class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
-                  ></lucide-icon>
-                </div>
-              </div>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-              No Profiles Found
-            </h2>
-            <p class="text-gray-600 dark:text-gray-400 mb-6">
-              Create your first sync profile to get started
-            </p>
-          </div>
-          <div>
-            <p class="text-gray-700 dark:text-gray-300 mb-6">
-              Profiles allow you to configure different sync settings for
-              various directories and remotes.
-            </p>
-            <button class="btn-primary" (click)="addProfile()">
-              <div class="flex items-center space-x-2">
-                <lucide-icon
-                  [img]="PlusIcon"
-                  class="w-5 h-5 mr-2"
-                ></lucide-icon>
-                Create First Profile
-              </div>
-            </button>
+      <div class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500">
+        <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
+          <div class="relative">
+            <lucide-icon
+              [img]="FolderOpenIcon"
+              class="w-8 h-8 text-gray-400"
+            ></lucide-icon>
+            <lucide-icon
+              [img]="XIcon"
+              class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
+            ></lucide-icon>
           </div>
         </div>
+        <h2 class="text-xl font-bold text-gray-100 mb-2">
+          No Profiles Found
+        </h2>
+        <p class="text-gray-400 mb-6">
+          Create your first sync profile to get started
+        </p>
+        <button class="btn-primary" (click)="addProfile()">
+          <div class="flex items-center space-x-2">
+            <lucide-icon
+              [img]="PlusIcon"
+              class="w-5 h-5 mr-2"
+            ></lucide-icon>
+            Create First Profile
+          </div>
+        </button>
       </div>
       }
     </div>
   </div>
 </div>
-
-<!-- Floating Action Button -->
-<button
-  (click)="addProfile()"
-  class="fixed bottom-24 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
-  title="Add Profile"
->
-  <lucide-icon [img]="PlusIcon" class="w-6 h-6"></lucide-icon>
-</button>

@@ -10,6 +10,7 @@ import { AppService } from "../app.service";
 import { NavigationService } from "../navigation.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
+import { ToggleSwitch } from "primeng/toggleswitch";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   parseRemotePath,
@@ -41,7 +42,7 @@ import {
 
 @Component({
   selector: "app-profile-edit",
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ToggleSwitch],
   templateUrl: "./profile-edit.component.html",
   styleUrl: "./profile-edit.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,

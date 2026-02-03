@@ -10,21 +10,20 @@ import { FormsModule } from "@angular/forms";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
 import { AppService } from "../app.service";
 import { ErrorService } from "../services/error.service";
-
-// No Material imports needed anymore
+import { Dialog } from "primeng/dialog";
+import { ConfirmationService } from "primeng/api";
 
 // Type imports
 import {
   RemoteFormData,
   RemoteTypeOption,
-  RemoteInfo,
   REMOTE_TYPE_OPTIONS,
 } from "./remotes.types";
 import { LucideAngularModule, Cloud, Plus, X, Trash2 } from "lucide-angular";
 
 @Component({
   selector: "app-remotes",
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, Dialog],
   templateUrl: "./remotes.component.html",
   styleUrl: "./remotes.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,14 +46,13 @@ export class RemotesComponent implements OnInit, OnDestroy {
 
   // Modal state management
   showAddRemoteModal = false;
-  showDeleteConfirmModal = false;
-  remoteToDelete: RemoteInfo | null = null;
   addRemoteData: RemoteFormData = { name: "", type: "drive" };
 
   constructor(
     public readonly appService: AppService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly errorService: ErrorService
+    private readonly errorService: ErrorService,
+    private readonly confirmationService: ConfirmationService
   ) {}
 
   ngOnInit(): void {
@@ -147,8 +145,21 @@ export class RemotesComponent implements OnInit, OnDestroy {
   }
 
   confirmDeleteRemote(remote: { name: string; type: string }): void {
-    this.remoteToDelete = remote;
-    this.showDeleteConfirmModal = true;
+    const profileCount = this.getProfilesUsingRemote(remote.name);
+    let message = `Are you sure you want to delete remote "${remote.name}"?`;
+    if (profileCount > 0) {
+      message += ` This will also affect ${profileCount} profile${profileCount === 1 ? "" : "s"} that use this remote.`;
+    }
+
+    this.confirmationService.confirm({
+      message,
+      header: "Confirm Delete",
+      acceptButtonStyleClass:
+        "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors ml-2",
+      rejectButtonStyleClass:
+        "bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors",
+      accept: () => this.executeDeleteRemote(remote.name),
+    });
   }
 
   getProfilesUsingRemote(remoteName: string): number {
@@ -162,26 +173,18 @@ export class RemotesComponent implements OnInit, OnDestroy {
     }).length;
   }
 
-  closeDeleteConfirmModal(): void {
-    this.showDeleteConfirmModal = false;
-    this.remoteToDelete = null;
-    this.cdr.detectChanges();
-  }
-
-  async deleteRemote(): Promise<void> {
-    if (!this.remoteToDelete) return;
-
+  private async executeDeleteRemote(remoteName: string): Promise<void> {
     try {
-      await this.appService.deleteRemote(this.remoteToDelete.name);
-      console.log(`Remote "${this.remoteToDelete.name}" deleted successfully!`);
+      await this.appService.deleteRemote(remoteName);
+      console.log(`Remote "${remoteName}" deleted successfully!`);
       this.errorService.showSuccess(
-        `Remote "${this.remoteToDelete.name}" deleted successfully!`
+        `Remote "${remoteName}" deleted successfully!`
       );
     } catch (error) {
       console.error("Error deleting remote:", error);
       this.errorService.handleApiError(error, "delete_remote");
     } finally {
-      this.closeDeleteConfirmModal();
+      this.cdr.detectChanges();
     }
   }
 

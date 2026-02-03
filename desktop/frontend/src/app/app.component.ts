@@ -21,9 +21,10 @@ import { SettingsComponent } from "./settings/settings.component.js";
 
 import { NavigationService } from "./navigation.service.js";
 import { ErrorDisplayComponent } from "./components/error-display/error-display.component.js";
-import { ToastComponent } from "./components/toast/toast.component.js";
 import { LoggingService } from "./services/logging.service.js";
 import { ConsoleLoggerService } from "./services/console-logger.service.js";
+import { ToastModule } from "primeng/toast";
+import { ConfirmDialog } from "primeng/confirmdialog";
 
 @Component({
   selector: "app-root",
@@ -40,7 +41,8 @@ import { ConsoleLoggerService } from "./services/console-logger.service.js";
     HistoryComponent,
     SettingsComponent,
     ErrorDisplayComponent,
-    ToastComponent,
+    ToastModule,
+    ConfirmDialog,
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",

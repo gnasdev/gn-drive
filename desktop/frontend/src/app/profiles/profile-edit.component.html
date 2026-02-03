@@ -273,17 +273,10 @@
               <p class="text-sm text-gray-300">Use Regex</p>
               <p class="text-xs text-gray-500">Use regex for include/exclude patterns</p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="profile.use_regex"
-                (ngModelChange)="onProfileFieldChange()"
-                class="sr-only peer"
-              />
-              <div
-                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-              ></div>
-            </label>
+            <p-toggleswitch
+              [(ngModel)]="profile.use_regex"
+              (onChange)="onProfileFieldChange()"
+            ></p-toggleswitch>
           </div>
         </div>
       </div>
@@ -378,17 +371,10 @@
             <p class="text-sm text-gray-300">Fast List</p>
             <p class="text-xs text-gray-500">Use recursive list if available (uses more memory)</p>
           </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              [(ngModel)]="profile.fast_list"
-              (ngModelChange)="onProfileFieldChange()"
-              class="sr-only peer"
-            />
-            <div
-              class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-            ></div>
-          </label>
+          <p-toggleswitch
+            [(ngModel)]="profile.fast_list"
+            (onChange)="onProfileFieldChange()"
+          ></p-toggleswitch>
         </div>
       </div>
     </div>
@@ -437,17 +423,10 @@
               <p class="text-sm text-gray-300">Immutable</p>
               <p class="text-xs text-gray-500">Do not modify files, fail if existing files differ</p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="profile.immutable"
-                (ngModelChange)="onProfileFieldChange()"
-                class="sr-only peer"
-              />
-              <div
-                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
-              ></div>
-            </label>
+            <p-toggleswitch
+              [(ngModel)]="profile.immutable"
+              (onChange)="onProfileFieldChange()"
+            ></p-toggleswitch>
           </div>
         </div>
       </div>

@@ -7,9 +7,9 @@ import {
   Plus,
   Trash2,
   Play,
-  ToggleLeft,
-  ToggleRight,
 } from "lucide-angular";
+import { ToggleSwitch } from "primeng/toggleswitch";
+import { Dialog } from "primeng/dialog";
 
 interface ScheduleEntry {
   id: string;
@@ -25,7 +25,7 @@ interface ScheduleEntry {
 @Component({
   selector: "app-schedules",
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ToggleSwitch, Dialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
@@ -103,19 +103,10 @@ interface ScheduleEntry {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button
-              (click)="toggleSchedule(schedule)"
-              class="p-1 rounded hover:bg-gray-700 transition-colors"
-              [title]="schedule.enabled ? 'Disable' : 'Enable'"
-            >
-              <lucide-icon
-                [img]="schedule.enabled ? ToggleRightIcon : ToggleLeftIcon"
-                class="w-5 h-5"
-                [class]="
-                  schedule.enabled ? 'text-green-400' : 'text-gray-500'
-                "
-              ></lucide-icon>
-            </button>
+            <p-toggleswitch
+              [ngModel]="schedule.enabled"
+              (onChange)="toggleSchedule(schedule)"
+            ></p-toggleswitch>
             <button
               class="p-1 rounded hover:bg-gray-700 transition-colors"
               title="Run Now"
@@ -141,66 +132,57 @@ interface ScheduleEntry {
       </div>
 
       <!-- Add Schedule Modal -->
-      @if (showAddModal) {
-      <div
-        class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-        (click)="showAddModal = false"
+      <p-dialog
+        header="Add Schedule"
+        [(visible)]="showAddModal"
+        [modal]="true"
+        [style]="{ width: '24rem' }"
+        [closable]="true"
       >
-        <div
-          class="bg-gray-800 rounded-xl border border-gray-700 p-6 w-96 max-w-[90vw]"
-          (click)="$event.stopPropagation()"
-        >
-          <h2 class="text-lg font-semibold text-gray-100 mb-4">
-            Add Schedule
-          </h2>
-
-          <div class="space-y-3">
-            <div>
-              <label class="text-sm text-gray-400">Profile Name</label>
-              <input
-                type="text"
-                [(ngModel)]="newSchedule.profile_name"
-                class="input-field mt-1"
-                placeholder="my-backup"
-              />
-            </div>
-            <div>
-              <label class="text-sm text-gray-400">Action</label>
-              <select [(ngModel)]="newSchedule.action" class="select-field mt-1">
-                <option value="pull">Pull</option>
-                <option value="push">Push</option>
-                <option value="bi">Bi-Sync</option>
-                <option value="bi-resync">Bi-Resync</option>
-              </select>
-            </div>
-            <div>
-              <label class="text-sm text-gray-400">Cron Expression</label>
-              <input
-                type="text"
-                [(ngModel)]="newSchedule.cron_expr"
-                class="input-field mt-1"
-                placeholder="0 */6 * * *"
-              />
-              <p class="text-xs text-gray-500 mt-1">
-                Standard 5-field cron: min hour dom month dow
-              </p>
-            </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-sm text-gray-400">Profile Name</label>
+            <input
+              type="text"
+              [(ngModel)]="newSchedule.profile_name"
+              class="input-field mt-1"
+              placeholder="my-backup"
+            />
           </div>
-
-          <div class="flex justify-end gap-2 mt-5">
-            <button
-              (click)="showAddModal = false"
-              class="btn-secondary text-sm"
-            >
-              Cancel
-            </button>
-            <button (click)="addSchedule()" class="btn-primary text-sm">
-              Add
-            </button>
+          <div>
+            <label class="text-sm text-gray-400">Action</label>
+            <select [(ngModel)]="newSchedule.action" class="select-field mt-1">
+              <option value="pull">Pull</option>
+              <option value="push">Push</option>
+              <option value="bi">Bi-Sync</option>
+              <option value="bi-resync">Bi-Resync</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-400">Cron Expression</label>
+            <input
+              type="text"
+              [(ngModel)]="newSchedule.cron_expr"
+              class="input-field mt-1"
+              placeholder="0 */6 * * *"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              Standard 5-field cron: min hour dom month dow
+            </p>
           </div>
         </div>
-      </div>
-      }
+        <div class="flex justify-end gap-2 mt-5">
+          <button
+            (click)="showAddModal = false"
+            class="btn-secondary text-sm"
+          >
+            Cancel
+          </button>
+          <button (click)="addSchedule()" class="btn-primary text-sm">
+            Add
+          </button>
+        </div>
+      </p-dialog>
     </div>
   `,
 })
@@ -209,8 +191,6 @@ export class SchedulesComponent {
   readonly PlusIcon = Plus;
   readonly Trash2Icon = Trash2;
   readonly PlayIcon = Play;
-  readonly ToggleLeftIcon = ToggleLeft;
-  readonly ToggleRightIcon = ToggleRight;
 
   schedules: ScheduleEntry[] = [];
   showAddModal = false;

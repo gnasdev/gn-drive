@@ -26,7 +26,7 @@ export interface ConfirmDialogData {
       [attr.aria-labelledby]="'confirm-dialog-title'"
     >
       <div
-        class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4 shadow-xl"
+        class="bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4 shadow-xl"
         (click)="$event.stopPropagation()"
         (keydown)="$event.stopPropagation()"
         tabindex="-1"
@@ -34,19 +34,19 @@ export interface ConfirmDialogData {
       >
         <h2
           id="confirm-dialog-title"
-          class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4"
+          class="text-xl font-bold text-gray-100 mb-4"
         >
           {{ data.title }}
         </h2>
         <div class="mb-6">
-          <p class="text-gray-700 dark:text-gray-300">
+          <p class="text-gray-300">
             {{ data.message }}
           </p>
           @if (data.warning) {
           <div
-            class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-3"
+            class="bg-yellow-900/20 border border-yellow-800 rounded-lg p-3 mt-3"
           >
-            <p class="text-yellow-800 dark:text-yellow-200 text-sm">
+            <p class="text-yellow-200 text-sm">
               <strong>Warning:</strong> {{ data.warning }}
             </p>
           </div>

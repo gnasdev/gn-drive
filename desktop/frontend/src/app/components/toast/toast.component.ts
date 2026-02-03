@@ -1,98 +1,52 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-} from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, OnInit, OnDestroy } from "@angular/core";
 import { Subscription } from "rxjs";
 import {
   ErrorService,
-  ErrorNotification,
   ErrorSeverity,
 } from "../../services/error.service";
-import { LucideAngularModule, X } from "lucide-angular";
+import { MessageService } from "primeng/api";
 
+/**
+ * Toast bridge: subscribes to ErrorService and forwards notifications
+ * to PrimeNG MessageService. The <p-toast> in app.component.html renders them.
+ */
 @Component({
   selector: "app-toast",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="fixed top-4 right-4 z-50 space-y-2 w-80" *ngIf="toastNotifications.length > 0">
-      <div 
-        *ngFor="let notification of toastNotifications; trackBy: trackByNotificationId"
-        [class]="getToastClasses(notification.severity)"
-        class="flex items-center p-4 rounded-lg shadow-lg animate-slide-in">
-        
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-white">{{ notification.title }}</p>
-          <p class="text-sm text-white/90">{{ notification.message }}</p>
-        </div>
-        
-        <button 
-          (click)="dismissToast(notification.id)"
-          class="ml-3 text-white/70 hover:text-white transition-colors"
-          aria-label="Dismiss notification">
-          <lucide-icon [img]="XIcon" [size]="16"></lucide-icon>
-        </button>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .animate-slide-in {
-      animation: slideIn 0.3s ease-out;
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .fixed.top-4.right-4.w-80 {
-        width: calc(100vw - 2rem);
-        right: 1rem;
-        left: 1rem;
-      }
-    }
-  `]
+  template: "",
 })
 export class ToastComponent implements OnInit, OnDestroy {
-  toastNotifications: ErrorNotification[] = [];
   private subscription?: Subscription;
-
-  XIcon = X;
+  private shownIds = new Set<string>();
 
   constructor(
     private errorService: ErrorService,
-    private cdr: ChangeDetectorRef
+    private messageService: MessageService
   ) {}
 
   ngOnInit(): void {
-    this.subscription = this.errorService.errors$.subscribe(errors => {
-      // Only show auto-hide notifications as toasts
-      this.toastNotifications = errors.filter(
-        error => !error.dismissed && error.autoHide
+    this.subscription = this.errorService.errors$.subscribe((errors) => {
+      const toastNotifications = errors.filter(
+        (error) => !error.dismissed && error.autoHide
       );
-      
-      // Auto-hide toasts after their duration
-      this.toastNotifications.forEach(notification => {
+
+      for (const notification of toastNotifications) {
+        if (this.shownIds.has(notification.id)) continue;
+        this.shownIds.add(notification.id);
+
+        this.messageService.add({
+          severity: this.mapSeverity(notification.severity),
+          summary: notification.title,
+          detail: notification.message,
+          life: notification.duration || 3000,
+        });
+
         if (notification.duration && notification.duration > 0) {
           setTimeout(() => {
-            this.dismissToast(notification.id);
+            this.errorService.dismissError(notification.id);
           }, notification.duration);
         }
-      });
-      
-      this.cdr.detectChanges();
+      }
     });
   }
 
@@ -100,26 +54,20 @@ export class ToastComponent implements OnInit, OnDestroy {
     this.subscription?.unsubscribe();
   }
 
-  dismissToast(notificationId: string): void {
-    this.errorService.dismissError(notificationId);
-  }
-
-  getToastClasses(severity: ErrorSeverity): string {
+  private mapSeverity(
+    severity: ErrorSeverity
+  ): "success" | "info" | "warn" | "error" {
     switch (severity) {
       case ErrorSeverity.INFO:
-        return 'bg-blue-500';
+        return "info";
       case ErrorSeverity.WARNING:
-        return 'bg-yellow-500';
+        return "warn";
       case ErrorSeverity.ERROR:
-        return 'bg-red-500';
+        return "error";
       case ErrorSeverity.CRITICAL:
-        return 'bg-purple-500';
+        return "error";
       default:
-        return 'bg-gray-500';
+        return "info";
     }
-  }
-
-  trackByNotificationId(_index: number, notification: ErrorNotification): string {
-    return notification.id;
   }
 }
