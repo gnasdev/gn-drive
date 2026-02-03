@@ -19,6 +19,11 @@ func main() {
 	configService := services.NewConfigService(nil)
 	remoteService := services.NewRemoteService(nil)
 	tabService := services.NewTabService(nil)
+	operationService := services.NewOperationService(nil)
+	historyService := services.NewHistoryService(nil)
+	schedulerService := services.NewSchedulerService(nil)
+	notificationService := services.NewNotificationService(nil)
+	cryptService := services.NewCryptService(nil)
 
 	// Create application with all services registered
 	app := application.New(application.Options{
@@ -33,6 +38,11 @@ func main() {
 			application.NewService(configService),
 			application.NewService(remoteService),
 			application.NewService(tabService),
+			application.NewService(operationService),
+			application.NewService(historyService),
+			application.NewService(schedulerService),
+			application.NewService(notificationService),
+			application.NewService(cryptService),
 		},
 	})
 
@@ -42,6 +52,14 @@ func main() {
 	configService.SetApp(app)
 	remoteService.SetApp(app)
 	tabService.SetApp(app)
+	operationService.SetApp(app)
+	historyService.SetApp(app)
+	schedulerService.SetApp(app)
+	notificationService.SetApp(app)
+	cryptService.SetApp(app)
+
+	// Wire up service dependencies
+	schedulerService.SetSyncService(syncService)
 
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{

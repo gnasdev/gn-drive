@@ -97,3 +97,23 @@ func (b *WailsEventBus) EmitTabEvent(event *TabEvent) error {
 func (b *WailsEventBus) EmitErrorEvent(event *ErrorEvent) error {
 	return b.Emit(event)
 }
+
+// EmitOperationEvent is a convenience method for operation events
+func (b *WailsEventBus) EmitOperationEvent(event *OperationEvent) error {
+	return b.Emit(event)
+}
+
+// EmitScheduleEvent is a convenience method for schedule events
+func (b *WailsEventBus) EmitScheduleEvent(event *ScheduleEvent) error {
+	return b.Emit(event)
+}
+
+// EmitHistoryEvent is a convenience method for history events
+func (b *WailsEventBus) EmitHistoryEvent(event *HistoryEvent) error {
+	return b.Emit(event)
+}
+
+// EmitCryptEvent is a convenience method for crypt events
+func (b *WailsEventBus) EmitCryptEvent(event *CryptEvent) error {
+	return b.Emit(event)
+}

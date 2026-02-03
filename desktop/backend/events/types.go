@@ -33,6 +33,29 @@ const (
 
 	// Error Events
 	ErrorOccurred EventType = "error:occurred"
+
+	// Operation Events (non-sync operations: copy, move, check, dedupe, etc.)
+	OperationStarted   EventType = "operation:started"
+	OperationProgress  EventType = "operation:progress"
+	OperationCompleted EventType = "operation:completed"
+	OperationFailed    EventType = "operation:failed"
+
+	// File Browser Events
+	FileBrowserResult EventType = "filebrowser:result"
+
+	// Schedule Events
+	ScheduleAdded     EventType = "schedule:added"
+	ScheduleUpdated   EventType = "schedule:updated"
+	ScheduleDeleted   EventType = "schedule:deleted"
+	ScheduleTriggered EventType = "schedule:triggered"
+
+	// History Events
+	HistoryAdded   EventType = "history:added"
+	HistoryCleared EventType = "history:cleared"
+
+	// Crypt Events
+	CryptRemoteCreated EventType = "crypt:created"
+	CryptRemoteDeleted EventType = "crypt:deleted"
 )
 
 // BaseEvent represents the base structure for all events
@@ -158,5 +181,116 @@ func NewErrorEvent(code, message, details, tabId string) *ErrorEvent {
 		Message: message,
 		Details: details,
 		TabId:   tabId,
+	}
+}
+
+// OperationEvent represents non-sync operation events (copy, move, check, etc.)
+type OperationEvent struct {
+	BaseEvent
+	TabId     string `json:"tabId,omitempty"`
+	Operation string `json:"operation"` // "copy", "move", "check", "dedupe", "delete", "purge"
+	Status    string `json:"status"`
+	Message   string `json:"message,omitempty"`
+}
+
+// NewOperationEvent creates a new operation event
+func NewOperationEvent(eventType EventType, tabId, operation, status, message string) *OperationEvent {
+	return &OperationEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+		},
+		TabId:     tabId,
+		Operation: operation,
+		Status:    status,
+		Message:   message,
+	}
+}
+
+// DryRunResult contains preview of what a sync operation would do
+type DryRunResult struct {
+	FilesToTransfer []FileChange `json:"files_to_transfer"`
+	FilesToDelete   []FileChange `json:"files_to_delete"`
+	TotalBytes      int64        `json:"total_bytes"`
+	TotalFiles      int          `json:"total_files"`
+}
+
+// FileChange represents a single file change in a dry-run preview
+type FileChange struct {
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	Action  string `json:"action"` // "copy", "delete", "move", "update"
+	ModTime string `json:"mod_time"`
+}
+
+// CheckResult contains the result of a check/verify operation
+type CheckResult struct {
+	Matched     int        `json:"matched"`
+	Differences []FileDiff `json:"differences"`
+	Missing     []string   `json:"missing"`
+	Errors      int        `json:"errors"`
+}
+
+// FileDiff represents a difference between source and destination files
+type FileDiff struct {
+	Path       string `json:"path"`
+	SrcSize    int64  `json:"src_size"`
+	DstSize    int64  `json:"dst_size"`
+	SrcModTime string `json:"src_mod_time"`
+	DstModTime string `json:"dst_mod_time"`
+}
+
+// Note: QuotaInfo, FileEntry, and ListOptions are defined in models/file_entry.go
+// to avoid circular dependencies between events and models packages.
+
+// ScheduleEvent represents schedule-related events
+type ScheduleEvent struct {
+	BaseEvent
+	ScheduleId string `json:"scheduleId"`
+}
+
+// NewScheduleEvent creates a new schedule event
+func NewScheduleEvent(eventType EventType, scheduleId string, data interface{}) *ScheduleEvent {
+	return &ScheduleEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+			Data:      data,
+		},
+		ScheduleId: scheduleId,
+	}
+}
+
+// HistoryEvent represents history-related events
+type HistoryEvent struct {
+	BaseEvent
+}
+
+// NewHistoryEvent creates a new history event
+func NewHistoryEvent(eventType EventType, data interface{}) *HistoryEvent {
+	return &HistoryEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+			Data:      data,
+		},
+	}
+}
+
+// CryptEvent represents encryption-related events
+type CryptEvent struct {
+	BaseEvent
+	RemoteName string `json:"remoteName"`
+}
+
+// NewCryptEvent creates a new crypt event
+func NewCryptEvent(eventType EventType, remoteName string, data interface{}) *CryptEvent {
+	return &CryptEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+			Data:      data,
+		},
+		RemoteName: remoteName,
 	}
 }

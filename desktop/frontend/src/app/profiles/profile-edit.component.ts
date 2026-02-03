@@ -65,9 +65,17 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   readonly CheckIcon = Check;
   readonly XIcon = X;
 
-  saveBtnText$ = new BehaviorSubject<string>("Save ✓");
-  profileIndex = 0; // Will be set from navigation
+  saveBtnText$ = new BehaviorSubject<string>("Save");
+  profileIndex = 0;
   profile: models.Profile | null = null;
+  activeTab: 'general' | 'filters' | 'performance' | 'advanced' = 'general';
+
+  readonly editorTabs = [
+    { id: 'general' as const, label: 'General' },
+    { id: 'filters' as const, label: 'Filters' },
+    { id: 'performance' as const, label: 'Performance' },
+    { id: 'advanced' as const, label: 'Advanced' },
+  ];
 
   // Configuration options
   readonly bandwidthOptions = DEFAULT_BANDWIDTH_OPTIONS;

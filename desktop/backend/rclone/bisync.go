@@ -26,11 +26,14 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 	opt.CompareFlag = "size,modtime,checksum"
 	opt.Recover = true
 	opt.CreateEmptySrcDirs = true
-	// opt.Resilient = true
-	// opt.DryRun = true
 
-	if err = opt.ConflictResolve.Set(bisync.PreferNewer.String()); err != nil {
-		return err
+	// Conflict resolution: use profile setting or default to "newer"
+	conflictStrategy := profile.ConflictResolution
+	if conflictStrategy == "" {
+		conflictStrategy = bisync.PreferNewer.String()
+	}
+	if err = opt.ConflictResolve.Set(conflictStrategy); err != nil {
+		return fmt.Errorf("invalid conflict_resolution %q: %w", conflictStrategy, err)
 	}
 
 	if err = opt.ConflictLoser.Set(bisync.ConflictLoserDelete.String()); err != nil {
@@ -140,6 +143,13 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 	fsConfig.Transfers = profile.Parallel
 
 	fsConfig.Progress = true
+
+	// Apply advanced profile options (filtering, safety, performance)
+	ctx, err = ApplyProfileOptions(ctx, profile)
+	if err != nil {
+		return fmt.Errorf("failed to apply profile options: %w", err)
+	}
+
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}

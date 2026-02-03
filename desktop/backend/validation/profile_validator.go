@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // ProfileValidator handles profile validation
@@ -17,6 +18,21 @@ func NewProfileValidator() *ProfileValidator {
 
 // remoteNamePattern matches valid rclone remote names (alphanumeric, dash, underscore)
 var remoteNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// sizeSuffixPattern matches rclone size suffix format: number followed by optional unit
+var sizeSuffixPattern = regexp.MustCompile(`^(?i)(\d+(\.\d+)?)\s*([KMGTPE](i?B)?|B)?$|^(?i)off$`)
+
+// validConflictResolutions lists allowed bisync conflict resolution strategies
+var validConflictResolutions = map[string]bool{
+	"":        true, // empty = default (newer)
+	"none":    true,
+	"newer":   true,
+	"older":   true,
+	"larger":  true,
+	"smaller": true,
+	"path1":   true,
+	"path2":   true,
+}
 
 // ValidationError represents a validation error with field context
 type ValidationError struct {
@@ -51,6 +67,44 @@ func (v *ProfileValidator) ValidateProfile(profile models.Profile) error {
 	if err := v.ValidatePaths(profile.ExcludedPaths, "excluded_paths"); err != nil {
 		return err
 	}
+
+	// Validate new filtering fields
+	if err := v.ValidateSizeSuffix(profile.MinSize, "min_size"); err != nil {
+		return err
+	}
+	if err := v.ValidateSizeSuffix(profile.MaxSize, "max_size"); err != nil {
+		return err
+	}
+	if err := v.ValidateConflictResolution(profile.ConflictResolution); err != nil {
+		return err
+	}
+	if err := v.ValidateMaxDelete(profile.MaxDelete); err != nil {
+		return err
+	}
+	if err := v.ValidateSizeSuffix(profile.BufferSize, "buffer_size"); err != nil {
+		return err
+	}
+	if err := v.ValidateDuration(profile.MaxDuration, "max_duration"); err != nil {
+		return err
+	}
+	if err := v.ValidateMultiThreadStreams(profile.MultiThreadStreams); err != nil {
+		return err
+	}
+	if err := v.ValidateRetries(profile.Retries, "retries"); err != nil {
+		return err
+	}
+	if err := v.ValidateRetries(profile.LowLevelRetries, "low_level_retries"); err != nil {
+		return err
+	}
+	if profile.UseRegex {
+		if err := v.ValidateRegexPatterns(profile.IncludedPaths, "included_paths"); err != nil {
+			return err
+		}
+		if err := v.ValidateRegexPatterns(profile.ExcludedPaths, "excluded_paths"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -187,6 +241,97 @@ func ValidateRemoteName(name string) error {
 	}
 	if len(name) > 50 {
 		return &ValidationError{Field: "remote_name", Message: "too long (max 50 characters)"}
+	}
+	return nil
+}
+
+// ValidateSizeSuffix validates an rclone size suffix string (e.g. "100K", "10M", "1G", "off")
+func (v *ProfileValidator) ValidateSizeSuffix(value string, fieldName string) error {
+	if value == "" {
+		return nil
+	}
+	if !sizeSuffixPattern.MatchString(value) {
+		return &ValidationError{
+			Field:   fieldName,
+			Message: "invalid size format (use number with optional K/M/G/T/P suffix, e.g. '100K', '10M', '1G', or 'off')",
+		}
+	}
+	return nil
+}
+
+// ValidateDuration validates a Go duration string (e.g. "1h30m", "45s")
+func (v *ProfileValidator) ValidateDuration(value string, fieldName string) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := time.ParseDuration(value); err != nil {
+		return &ValidationError{
+			Field:   fieldName,
+			Message: fmt.Sprintf("invalid duration format (use Go duration syntax, e.g. '1h30m', '45s'): %v", err),
+		}
+	}
+	return nil
+}
+
+// ValidateConflictResolution validates a bisync conflict resolution strategy
+func (v *ProfileValidator) ValidateConflictResolution(value string) error {
+	if !validConflictResolutions[value] {
+		return &ValidationError{
+			Field:   "conflict_resolution",
+			Message: "must be one of: none, newer, older, larger, smaller, path1, path2",
+		}
+	}
+	return nil
+}
+
+// ValidateMaxDelete validates the max delete limit
+func (v *ProfileValidator) ValidateMaxDelete(value *int) error {
+	if value == nil {
+		return nil
+	}
+	if *value < -1 {
+		return &ValidationError{Field: "max_delete", Message: "cannot be less than -1 (-1 means unlimited)"}
+	}
+	return nil
+}
+
+// ValidateMultiThreadStreams validates the multi-thread streams setting
+func (v *ProfileValidator) ValidateMultiThreadStreams(value *int) error {
+	if value == nil {
+		return nil
+	}
+	if *value < 0 {
+		return &ValidationError{Field: "multi_thread_streams", Message: "cannot be negative"}
+	}
+	if *value > 64 {
+		return &ValidationError{Field: "multi_thread_streams", Message: "cannot exceed 64"}
+	}
+	return nil
+}
+
+// ValidateRetries validates retry count settings
+func (v *ProfileValidator) ValidateRetries(value *int, fieldName string) error {
+	if value == nil {
+		return nil
+	}
+	if *value < 0 {
+		return &ValidationError{Field: fieldName, Message: "cannot be negative"}
+	}
+	if *value > 100 {
+		return &ValidationError{Field: fieldName, Message: "cannot exceed 100"}
+	}
+	return nil
+}
+
+// ValidateRegexPatterns validates that patterns are valid regular expressions
+func (v *ProfileValidator) ValidateRegexPatterns(patterns []string, fieldName string) error {
+	for i, pattern := range patterns {
+		if _, err := regexp.Compile(pattern); err != nil {
+			return &ValidationError{
+				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
+				Message: fmt.Sprintf("invalid regex pattern: %v", err),
+			}
+		}
 	}
 	return nil
 }

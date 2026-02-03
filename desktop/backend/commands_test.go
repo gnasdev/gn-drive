@@ -2,6 +2,7 @@ package backend
 
 import (
 	"desktop/backend/models"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,7 +54,7 @@ func TestDeleteRemote_CascadeDeleteProfiles(t *testing.T) {
 	app.ConfigInfo.Profiles = testProfiles
 
 	// Save initial profiles to file
-	profilesJson, err := models.Profiles(app.ConfigInfo.Profiles).ToJSON()
+	profilesJson, err := json.Marshal(models.Profiles(app.ConfigInfo.Profiles))
 	if err != nil {
 		t.Fatalf("Failed to marshal profiles: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestDeleteRemote_NoProfilesAffected(t *testing.T) {
 	app.ConfigInfo.Profiles = testProfiles
 
 	// Save initial profiles to file
-	profilesJson, err := models.Profiles(app.ConfigInfo.Profiles).ToJSON()
+	profilesJson, err := json.Marshal(models.Profiles(app.ConfigInfo.Profiles))
 	if err != nil {
 		t.Fatalf("Failed to marshal profiles: %v", err)
 	}

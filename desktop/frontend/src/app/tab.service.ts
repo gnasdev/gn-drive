@@ -13,6 +13,9 @@ import { SyncEvent, CommandDTO } from "./models/events";
 // Maximum number of output lines to keep per tab to prevent memory leaks
 const MAX_OUTPUT_LINES = 1000;
 
+export type OperationType = 'sync' | 'copy' | 'move' | 'check' | 'dedupe';
+export type SyncDirection = 'pull' | 'push' | 'bi' | 'bi-resync';
+
 export interface Tab {
   id: string;
   name: string;
@@ -24,6 +27,9 @@ export interface Tab {
   isEditing: boolean;
   isStopping?: boolean;
   syncStatus?: SyncStatus | null;
+  operationType?: OperationType;
+  syncDirection?: SyncDirection;
+  dryRun?: boolean;
 }
 
 @Injectable({

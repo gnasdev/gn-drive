@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	beConfig "desktop/backend/config"
 	"desktop/backend/events"
 	"desktop/backend/models"
+	"desktop/backend/rclone"
+	"desktop/backend/utils"
 	"fmt"
 	"log"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -51,13 +53,14 @@ type SyncResult struct {
 	EndTime   *time.Time `json:"endTime,omitempty"`
 }
 
-// SyncService handles all sync operations
+// SyncService handles all sync operations using the rclone Go library
 type SyncService struct {
 	app         *application.App
 	eventBus    *events.WailsEventBus
 	activeTasks map[int]*SyncTask
 	taskCounter int
 	mutex       sync.RWMutex
+	envConfig   beConfig.Config
 }
 
 // SyncTask represents an active sync task
@@ -66,7 +69,6 @@ type SyncTask struct {
 	Action    SyncAction
 	Profile   models.Profile
 	TabId     string
-	Cmd       *exec.Cmd
 	Cancel    context.CancelFunc
 	StartTime time.Time
 	EndTime   *time.Time
@@ -88,6 +90,11 @@ func (s *SyncService) SetApp(app *application.App) {
 	// Initialize EventBus with the app
 	s.eventBus = events.NewEventBus(app)
 	SetSharedEventBus(s.eventBus)
+}
+
+// SetEnvConfig sets the environment configuration (needed for rclone init)
+func (s *SyncService) SetEnvConfig(config beConfig.Config) {
+	s.envConfig = config
 }
 
 // ServiceName returns the name of the service
@@ -176,16 +183,9 @@ func (s *SyncService) StopSync(ctx context.Context, taskId int) error {
 		return fmt.Errorf("task %d not found", taskId)
 	}
 
-	// Cancel the task
+	// Cancel the task context (this cancels the rclone Go library operation)
 	if task.Cancel != nil {
 		task.Cancel()
-	}
-
-	// Kill the process if it's running
-	if task.Cmd != nil && task.Cmd.Process != nil {
-		if err := task.Cmd.Process.Kill(); err != nil {
-			fmt.Printf("Warning: failed to kill process: %v\n", err)
-		}
 	}
 
 	// Update task status
@@ -214,7 +214,7 @@ func (s *SyncService) GetActiveTasks(ctx context.Context) (map[int]*SyncTask, er
 	return tasks, nil
 }
 
-// executeSyncTask executes the actual sync operation
+// executeSyncTask executes the sync operation using the rclone Go library
 func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	defer func() {
 		s.mutex.Lock()
@@ -222,23 +222,66 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		s.mutex.Unlock()
 	}()
 
-	// Build rclone command
-	args, err := s.buildRcloneArgs(task.Action, task.Profile)
+	// Initialize rclone config
+	ctx, err := rclone.InitConfig(ctx, s.envConfig.DebugMode)
 	if err != nil {
-		s.handleSyncError(task, fmt.Sprintf("Failed to build command: %v", err))
+		s.handleSyncError(task, fmt.Sprintf("Failed to initialize rclone config: %v", err))
 		return
 	}
 
-	// Create command with context
-	cmd := exec.CommandContext(ctx, "rclone", args...)
-	task.Cmd = cmd
+	// Create output log channel for progress reporting
+	outLog := make(chan string, 100)
+
+	// Start sync status reporting
+	stopSyncStatus := utils.StartSyncStatusReporting(nil, task.Id, string(task.Action), task.TabId)
+
+	// Register cancel function in the global command store
+	utils.AddCmd(task.Id, func() {
+		stopSyncStatus()
+		close(outLog)
+		task.Cancel()
+	})
+
+	if task.TabId != "" {
+		utils.AddTabMapping(task.Id, task.TabId)
+	}
+
+	// Goroutine to read output logs and emit progress events
+	go func() {
+		for logEntry := range outLog {
+			if s.eventBus != nil {
+				event := events.NewSyncEvent(events.SyncProgress, task.TabId, string(task.Action), "running", logEntry)
+				if emitErr := s.eventBus.EmitSyncEvent(event); emitErr != nil {
+					log.Printf("Failed to emit progress event: %v", emitErr)
+				}
+			}
+		}
+	}()
 
 	// Update task status
 	task.Status = "running"
 	s.emitSyncEvent(events.SyncProgress, task.TabId, string(task.Action), "running", "Sync operation in progress")
 
-	// Execute command
-	output, err := cmd.CombinedOutput()
+	// Execute the sync operation using rclone Go library
+	config := s.envConfig
+	switch task.Action {
+	case ActionPull:
+		err = rclone.Sync(ctx, config, "pull", task.Profile, outLog)
+	case ActionPush:
+		err = rclone.Sync(ctx, config, "push", task.Profile, outLog)
+	case ActionBi:
+		err = rclone.BiSync(ctx, config, task.Profile, false, outLog)
+	case ActionBiResync:
+		err = rclone.BiSync(ctx, config, task.Profile, true, outLog)
+	default:
+		err = fmt.Errorf("unknown sync action: %s", task.Action)
+	}
+
+	// Clean up
+	stopSyncStatus()
+	if task.TabId != "" {
+		utils.RemoveTabMapping(task.Id)
+	}
 
 	// Check if context was cancelled
 	select {
@@ -249,11 +292,10 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	default:
 	}
 
-	// Handle command result
+	// Handle result
 	if err != nil {
 		task.Status = "failed"
-		errorMsg := fmt.Sprintf("Sync failed: %v\nOutput: %s", err, string(output))
-		s.handleSyncError(task, errorMsg)
+		s.handleSyncError(task, fmt.Sprintf("Sync failed: %v", err))
 		return
 	}
 
@@ -263,46 +305,6 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	task.EndTime = &endTime
 
 	s.emitSyncEvent(events.SyncCompleted, task.TabId, string(task.Action), "completed", "Sync operation completed successfully")
-}
-
-// buildRcloneArgs builds the rclone command arguments
-func (s *SyncService) buildRcloneArgs(action SyncAction, profile models.Profile) ([]string, error) {
-	args := []string{}
-
-	switch action {
-	case ActionPull:
-		args = append(args, "copy", profile.To, profile.From)
-	case ActionPush:
-		args = append(args, "copy", profile.From, profile.To)
-	case ActionBi:
-		args = append(args, "bisync", profile.From, profile.To)
-	case ActionBiResync:
-		args = append(args, "bisync", profile.From, profile.To, "--resync")
-	default:
-		return nil, fmt.Errorf("unknown sync action: %s", action)
-	}
-
-	// Add common flags
-	if profile.Parallel > 0 {
-		args = append(args, "--transfers", fmt.Sprintf("%d", profile.Parallel))
-	}
-	if profile.Bandwidth > 0 {
-		args = append(args, "--bwlimit", fmt.Sprintf("%dM", profile.Bandwidth))
-	}
-
-	// Add include/exclude patterns
-	for _, include := range profile.IncludedPaths {
-		if include != "" {
-			args = append(args, "--include", include)
-		}
-	}
-	for _, exclude := range profile.ExcludedPaths {
-		if exclude != "" {
-			args = append(args, "--exclude", exclude)
-		}
-	}
-
-	return args, nil
 }
 
 // emitSyncEvent emits a sync event to the frontend via unified EventBus

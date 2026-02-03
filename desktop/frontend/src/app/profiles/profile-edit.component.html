@@ -1,445 +1,489 @@
-<!-- Fixed Header with Back Button -->
-<div
-  class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3"
->
-  <div class="flex items-center justify-between max-w-4xl mx-auto">
-    <div class="flex items-center space-x-3">
+<!-- Profile Editor -->
+<div class="flex flex-col h-full">
+  <!-- Header -->
+  <div
+    class="flex items-center justify-between p-4 border-b border-gray-700"
+  >
+    <div class="flex items-center gap-3">
       <button
         (click)="goBack()"
-        class="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200 whitespace-nowrap"
+        class="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
         title="Back to Profiles"
       >
-        <lucide-icon [img]="ArrowLeftIcon" class="w-6 h-6"></lucide-icon>
+        <lucide-icon [img]="ArrowLeftIcon" class="w-5 h-5"></lucide-icon>
       </button>
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Edit Profile
-      </h1>
+      <h1 class="text-lg font-semibold text-gray-100">Edit Profile</h1>
+      @if (profile) {
+      <span class="text-sm text-gray-500">{{ profile.name }}</span>
+      }
     </div>
-
-    <!-- Action Buttons in Header -->
     @if (profile) {
-    <div class="flex items-center space-x-3">
-      <button class="btn-primary flex items-center" (click)="saveProfile()">
-        <lucide-icon [img]="SaveIcon" class="w-5 h-5 mr-2"></lucide-icon>
-        {{ saveBtnText$ | async }}
-      </button>
-    </div>
+    <button
+      class="btn-primary flex items-center gap-1.5 text-sm"
+      (click)="saveProfile()"
+    >
+      <lucide-icon [img]="SaveIcon" class="w-4 h-4"></lucide-icon>
+      {{ saveBtnText$ | async }}
+    </button>
     }
   </div>
-</div>
 
-<!-- Content with top padding to account for fixed header -->
-@if (profile) {
-<div class="pt-[5.5rem] p-6 max-w-4xl mx-auto space-y-6">
-  <!-- Profile Form -->
-  <div class="card">
-    <div class="mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Basic Information
-      </h2>
-    </div>
-    <div>
-      <label
-        for="profile-name-input"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-      >
-        Profile Name
-      </label>
-      <div class="relative">
+  @if (profile) {
+  <!-- Tab Navigation -->
+  <div class="flex border-b border-gray-700 bg-gray-800/50">
+    @for (tab of editorTabs; track tab.id) {
+    <button
+      class="px-4 py-2.5 text-sm transition-colors"
+      [class]="
+        activeTab === tab.id
+          ? 'text-primary-400 border-b-2 border-primary-400 font-medium'
+          : 'text-gray-400 hover:text-gray-200'
+      "
+      (click)="activeTab = tab.id"
+    >
+      {{ tab.label }}
+    </button>
+    }
+  </div>
+
+  <!-- Tab Content -->
+  <div class="flex-1 overflow-auto p-4">
+    <!-- General Tab -->
+    @if (activeTab === 'general') {
+    <div class="space-y-4 max-w-2xl">
+      <div class="panel">
+        <label class="text-sm text-gray-400 mb-2 block">Profile Name</label>
         <input
-          id="profile-name-input"
           type="text"
-          class="input-field pr-10"
+          class="input-field"
           [(ngModel)]="profile.name"
           (ngModelChange)="onProfileFieldChange()"
           placeholder="Enter profile name"
         />
-        <div
-          class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-        >
-          <lucide-icon
-            [img]="EditIcon"
-            class="w-5 h-5 text-gray-400"
-          ></lucide-icon>
-        </div>
       </div>
-    </div>
-  </div>
-  <!-- Path Configuration -->
-  <div class="card">
-    <div class="mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Path Configuration
-      </h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-        Configure source and destination paths
-      </p>
-    </div>
-    <div class="space-y-8">
-      <!-- From Path -->
-      <div>
-        <h3 class="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Source Path
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <!-- Source Path -->
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Source Path</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label
-              for="from-remote-select"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Remote
-            </label>
+            <label class="text-xs text-gray-500 mb-1 block">Remote</label>
             <select
-              id="from-remote-select"
               class="select-field"
               [ngModel]="getFromRemote()"
               (ngModelChange)="updateFromPath($event, getFromPath())"
             >
               <option value="">Local</option>
               @for (remote of appService.remotes$ | async; track remote) {
-              <option [value]="remote.name">
-                {{ remote.name }}
-              </option>
+              <option [value]="remote.name">{{ remote.name }}</option>
               }
             </select>
           </div>
           <div>
-            <label
-              for="from-path-input"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Path
-            </label>
-            <div class="relative">
-              <input
-                id="from-path-input"
-                type="text"
-                class="input-field pr-10"
-                [ngModel]="getFromPath()"
-                (ngModelChange)="updateFromPath(getFromRemote(), $event)"
-                placeholder="/source/path"
-              />
-              <div
-                class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-              >
-                <lucide-icon
-                  [img]="FolderOpenIcon"
-                  class="w-5 h-5 text-gray-400"
-                ></lucide-icon>
-              </div>
-            </div>
+            <label class="text-xs text-gray-500 mb-1 block">Path</label>
+            <input
+              type="text"
+              class="input-field"
+              [ngModel]="getFromPath()"
+              (ngModelChange)="updateFromPath(getFromRemote(), $event)"
+              placeholder="/source/path"
+            />
           </div>
         </div>
       </div>
-      <!-- To Path -->
-      <div>
-        <h3 class="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Destination Path
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <!-- Destination Path -->
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Destination Path</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label
-              for="to-remote-select"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Remote
-            </label>
+            <label class="text-xs text-gray-500 mb-1 block">Remote</label>
             <select
-              id="to-remote-select"
               class="select-field"
               [ngModel]="getToRemote()"
               (ngModelChange)="updateToPath($event, getToPath())"
             >
               <option value="">Local</option>
               @for (remote of appService.remotes$ | async; track remote) {
-              <option [value]="remote.name">
-                {{ remote.name }}
-              </option>
+              <option [value]="remote.name">{{ remote.name }}</option>
               }
             </select>
           </div>
           <div>
-            <label
-              for="to-path-input"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Path
-            </label>
-            <div class="relative">
+            <label class="text-xs text-gray-500 mb-1 block">Path</label>
+            <input
+              type="text"
+              class="input-field"
+              [ngModel]="getToPath()"
+              (ngModelChange)="updateToPath(getToRemote(), $event)"
+              placeholder="/destination/path"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+    }
+
+    <!-- Filters Tab -->
+    @if (activeTab === 'filters') {
+    <div class="space-y-4 max-w-2xl">
+      <!-- Include Paths -->
+      <div class="panel">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <lucide-icon [img]="CheckIcon" class="w-4 h-4 text-green-400"></lucide-icon>
+            <h3 class="text-sm font-medium text-gray-200">Include Paths</h3>
+          </div>
+          <button
+            class="btn-secondary text-xs flex items-center gap-1"
+            (click)="addIncludePath()"
+          >
+            <lucide-icon [img]="PlusIcon" class="w-3 h-3"></lucide-icon>
+            Add
+          </button>
+        </div>
+        @if (profile.included_paths.length === 0) {
+        <p class="text-xs text-gray-500">All files included by default</p>
+        } @else { @for (path of profile.included_paths; track $index; let i =
+        $index) {
+        <div class="flex items-center gap-2 mb-2">
+          <select
+            class="select-field !w-24 text-sm"
+            [value]="getIncludePathType(i)"
+            (change)="onIncludePathTypeChange(i, $event)"
+          >
+            <option value="file">File</option>
+            <option value="folder">Folder</option>
+          </select>
+          <input
+            type="text"
+            class="input-field flex-1 text-sm"
+            [value]="getIncludePathValue(i)"
+            (input)="onIncludePathValueChange(i, $event)"
+            placeholder="path pattern"
+          />
+          <button
+            class="p-1 rounded hover:bg-red-900/50 text-gray-500 hover:text-red-400"
+            (click)="removeIncludePath(i)"
+          >
+            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+        } }
+      </div>
+
+      <!-- Exclude Paths -->
+      <div class="panel">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <lucide-icon [img]="XIcon" class="w-4 h-4 text-red-400"></lucide-icon>
+            <h3 class="text-sm font-medium text-gray-200">Exclude Paths</h3>
+          </div>
+          <button
+            class="btn-secondary text-xs flex items-center gap-1"
+            (click)="addExcludePath()"
+          >
+            <lucide-icon [img]="PlusIcon" class="w-3 h-3"></lucide-icon>
+            Add
+          </button>
+        </div>
+        @if (profile.excluded_paths.length === 0) {
+        <p class="text-xs text-gray-500">No files excluded</p>
+        } @else { @for (path of profile.excluded_paths; track $index; let i =
+        $index) {
+        <div class="flex items-center gap-2 mb-2">
+          <select
+            class="select-field !w-24 text-sm"
+            [value]="getExcludePathType(i)"
+            (change)="onExcludePathTypeChange(i, $event)"
+          >
+            <option value="file">File</option>
+            <option value="folder">Folder</option>
+          </select>
+          <input
+            type="text"
+            class="input-field flex-1 text-sm"
+            [value]="getExcludePathValue(i)"
+            (input)="onExcludePathValueChange(i, $event)"
+            placeholder="path pattern"
+          />
+          <button
+            class="p-1 rounded hover:bg-red-900/50 text-gray-500 hover:text-red-400"
+            (click)="removeExcludePath(i)"
+          >
+            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+        } }
+      </div>
+
+      <!-- Size Filters -->
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Size Filters</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Min Size</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.min_size"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="e.g. 100k, 10M"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Max Size</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.max_size"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="e.g. 1G, 500M"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Filters -->
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Filters</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Filter From File</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.filter_from_file"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="Path to filter rules file"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Exclude If Present</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.exclude_if_present"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="e.g. .nosync"
+            />
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-300">Use Regex</p>
+              <p class="text-xs text-gray-500">Use regex for include/exclude patterns</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
               <input
-                id="to-path-input"
-                type="text"
-                class="input-field pr-10"
-                [ngModel]="getToPath()"
-                (ngModelChange)="updateToPath(getToRemote(), $event)"
-                placeholder="/destination/path"
+                type="checkbox"
+                [(ngModel)]="profile.use_regex"
+                (ngModelChange)="onProfileFieldChange()"
+                class="sr-only peer"
               />
               <div
-                class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-              >
-                <lucide-icon
-                  [img]="FolderOpenIcon"
-                  class="w-5 h-5 text-gray-400"
-                ></lucide-icon>
-              </div>
-            </div>
+                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
+              ></div>
+            </label>
           </div>
         </div>
       </div>
     </div>
-  </div>
-  <!-- Include/Exclude Paths -->
-  <div class="card">
-    <div class="mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Filter Settings
-      </h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-        Configure which files and folders to include or exclude from sync
-      </p>
-    </div>
-    <!-- Include Paths -->
-    <div class="mb-8">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="CheckIcon"
-            class="w-5 h-5 text-green-600"
-          ></lucide-icon>
-          <h3 class="text-md font-medium text-gray-900 dark:text-gray-100">
-            Include Paths
-          </h3>
-        </div>
-        <button
-          type="button"
-          class="btn-secondary flex items-center space-x-2"
-          (click)="addIncludePath()"
-        >
-          <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
-          <span>Add Path</span>
-        </button>
-      </div>
-      @if (profile.included_paths.length === 0) {
-      <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-        <lucide-icon
-          [img]="CheckIcon"
-          class="w-12 h-12 mx-auto mb-2 opacity-50"
-        ></lucide-icon>
-        <p>No include paths configured</p>
-        <p class="text-sm">All files will be included by default</p>
-      </div>
-      } @if (profile.included_paths.length > 0) {
-      <div class="space-y-3">
-        @for (path of profile.included_paths; track $index; let i = $index) {
-        <div
-          class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-        >
-          <!-- Path Type Selector -->
-          <div class="flex-shrink-0">
-            <select
-              class="select-field w-24"
-              [value]="getIncludePathType(i)"
-              (change)="onIncludePathTypeChange(i, $event)"
-            >
-              <option value="file">File</option>
-              <option value="folder">Folder</option>
-            </select>
-          </div>
-          <!-- Path Input -->
-          <div class="flex-1 relative">
-            <input
-              type="text"
-              class="input-field pr-10"
-              [value]="getIncludePathValue(i)"
-              (input)="onIncludePathValueChange(i, $event)"
-              placeholder="Enter path pattern"
-            />
-            <div
-              class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-            >
-              <lucide-icon
-                [img]="getIncludePathType(i) === 'file' ? FileIcon : FolderIcon"
-                class="w-4 h-4 text-gray-400"
-              ></lucide-icon>
-            </div>
-          </div>
-          <!-- Remove Button -->
-          <button
-            type="button"
-            class="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:!bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
-            (click)="removeIncludePath(i)"
-            title="Remove path"
-          >
-            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
-          </button>
-        </div>
-        }
-      </div>
-      }
-    </div>
-    <!-- Exclude Paths -->
-    <div class="mb-6">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center space-x-2">
-          <lucide-icon [img]="XIcon" class="w-5 h-5 text-red-600"></lucide-icon>
-          <h3 class="text-md font-medium text-gray-900 dark:text-gray-100">
-            Exclude Paths
-          </h3>
-        </div>
-        <button
-          type="button"
-          class="btn-secondary flex items-center space-x-2"
-          (click)="addExcludePath()"
-        >
-          <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
-          <span>Add Path</span>
-        </button>
-      </div>
-      @if (profile.excluded_paths.length === 0) {
-      <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-        <lucide-icon
-          [img]="XIcon"
-          class="w-12 h-12 mx-auto mb-2 opacity-50"
-        ></lucide-icon>
-        <p>No exclude paths configured</p>
-        <p class="text-sm">No files will be excluded</p>
-      </div>
-      } @if (profile.excluded_paths.length > 0) {
-      <div class="space-y-3">
-        @for (path of profile.excluded_paths; track $index; let i = $index) {
-        <div
-          class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-        >
-          <!-- Path Type Selector -->
-          <div class="flex-shrink-0">
-            <select
-              class="select-field w-24"
-              [value]="getExcludePathType(i)"
-              (change)="onExcludePathTypeChange(i, $event)"
-            >
-              <option value="file">File</option>
-              <option value="folder">Folder</option>
-            </select>
-          </div>
-          <!-- Path Input -->
-          <div class="flex-1 relative">
-            <input
-              type="text"
-              class="input-field pr-10"
-              [value]="getExcludePathValue(i)"
-              (input)="onExcludePathValueChange(i, $event)"
-              placeholder="Enter path pattern"
-            />
-            <div
-              class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-            >
-              <lucide-icon
-                [img]="getExcludePathType(i) === 'file' ? FileIcon : FolderIcon"
-                class="w-4 h-4 text-gray-400"
-              ></lucide-icon>
-            </div>
-          </div>
-          <!-- Remove Button -->
-          <button
-            type="button"
-            class="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:!bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
-            (click)="removeExcludePath(i)"
-            title="Remove path"
-          >
-            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
-          </button>
-        </div>
-        }
-      </div>
-      }
-    </div>
-  </div>
-  <!-- Performance Settings -->
-  <div class="card">
-    <div class="mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Performance Settings
-      </h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-        Configure parallel transfers and bandwidth limits
-      </p>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div>
-        <label
-          for="parallel-select"
-          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-        >
-          Parallel Transfers
-        </label>
-        <div class="relative">
-          <select
-            id="parallel-select"
-            class="select-field pr-10"
-            [(ngModel)]="profile.parallel"
-            (ngModelChange)="onProfileFieldChange()"
-          >
-            @for (num of getNumberRange(1, 32); track num) {
-            <option [value]="num">
-              {{ num }}
-            </option>
-            }
-          </select>
-          <div
-            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-          >
-            <lucide-icon
-              [img]="ZapIcon"
-              class="w-5 h-5 text-gray-400"
-            ></lucide-icon>
-          </div>
-        </div>
-      </div>
-      <div>
-        <label
-          for="bandwidth-select"
-          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-        >
-          Bandwidth Limit (MB/s)
-        </label>
-        <div class="relative">
-          <select
-            id="bandwidth-select"
-            class="select-field pr-10"
-            [(ngModel)]="profile.bandwidth"
-            (ngModelChange)="onProfileFieldChange()"
-          >
-            @for (num of getNumberRange(1, 100); track num) {
-            <option [value]="num">
-              {{ num }}
-            </option>
-            }
-          </select>
-          <div
-            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-          >
-            <lucide-icon
-              [img]="WifiIcon"
-              class="w-5 h-5 text-gray-400"
-            ></lucide-icon>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-}
+    }
 
-<!-- Loading State -->
-@if (!profile) {
-<div class="p-6 max-w-4xl mx-auto">
-  <div class="card text-center">
-    <div class="flex justify-center mb-4">
-      <div
-        class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
-      ></div>
+    <!-- Performance Tab -->
+    @if (activeTab === 'performance') {
+    <div class="space-y-4 max-w-2xl">
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Transfer Settings</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Parallel Transfers</label>
+            <select
+              class="select-field"
+              [(ngModel)]="profile.parallel"
+              (ngModelChange)="onProfileFieldChange()"
+            >
+              @for (num of getNumberRange(1, 32); track num) {
+              <option [value]="num">{{ num }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Bandwidth Limit (MB/s)</label>
+            <select
+              class="select-field"
+              [(ngModel)]="profile.bandwidth"
+              (ngModelChange)="onProfileFieldChange()"
+            >
+              @for (num of getNumberRange(1, 100); track num) {
+              <option [value]="num">{{ num }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Performance</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Multi-Thread Streams</label>
+            <input
+              type="number"
+              class="input-field text-sm"
+              [(ngModel)]="profile.multi_thread_streams"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="4"
+              min="0"
+              max="64"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Buffer Size</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.buffer_size"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="e.g. 16M, 64M"
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Retries</label>
+            <input
+              type="number"
+              class="input-field text-sm"
+              [(ngModel)]="profile.retries"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="3"
+              min="0"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Low-Level Retries</label>
+            <input
+              type="number"
+              class="input-field text-sm"
+              [(ngModel)]="profile.low_level_retries"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="10"
+              min="0"
+            />
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700">
+          <div>
+            <p class="text-sm text-gray-300">Fast List</p>
+            <p class="text-xs text-gray-500">Use recursive list if available (uses more memory)</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              [(ngModel)]="profile.fast_list"
+              (ngModelChange)="onProfileFieldChange()"
+              class="sr-only peer"
+            />
+            <div
+              class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
+            ></div>
+          </label>
+        </div>
+      </div>
     </div>
-    <p class="text-gray-600 dark:text-gray-400">Loading profile...</p>
+    }
+
+    <!-- Advanced Tab -->
+    @if (activeTab === 'advanced') {
+    <div class="space-y-4 max-w-2xl">
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Safety Settings</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Backup Directory</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.backup_path"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="Path to backup deleted/modified files"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Max Delete (files)</label>
+            <input
+              type="number"
+              class="input-field text-sm"
+              [(ngModel)]="profile.max_delete"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="Unlimited"
+              min="0"
+            />
+            <p class="text-xs text-gray-500 mt-1">Maximum number of files to delete. Leave empty for unlimited.</p>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Max Duration</label>
+            <input
+              type="text"
+              class="input-field text-sm"
+              [(ngModel)]="profile.max_duration"
+              (ngModelChange)="onProfileFieldChange()"
+              placeholder="e.g. 1h30m, 45m"
+            />
+          </div>
+          <div class="flex items-center justify-between pt-3 border-t border-gray-700">
+            <div>
+              <p class="text-sm text-gray-300">Immutable</p>
+              <p class="text-xs text-gray-500">Do not modify files, fail if existing files differ</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                [(ngModel)]="profile.immutable"
+                (ngModelChange)="onProfileFieldChange()"
+                class="sr-only peer"
+              />
+              <div
+                class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"
+              ></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="text-sm font-medium text-gray-200 mb-3">Bi-Sync Settings</h3>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Conflict Resolution</label>
+          <select
+            class="select-field"
+            [(ngModel)]="profile.conflict_resolution"
+            (ngModelChange)="onProfileFieldChange()"
+          >
+            <option value="">Default (newer wins)</option>
+            <option value="newer">Newer</option>
+            <option value="older">Older</option>
+            <option value="larger">Larger</option>
+            <option value="smaller">Smaller</option>
+            <option value="path1">Path1 (Source)</option>
+            <option value="path2">Path2 (Destination)</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            How to resolve conflicts during bi-directional sync
+          </p>
+        </div>
+      </div>
+    </div>
+    }
   </div>
+  } @else {
+  <!-- Loading State -->
+  <div class="flex flex-col items-center justify-center flex-1 text-gray-500">
+    <div
+      class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-3"
+    ></div>
+    <p class="text-sm">Loading profile...</p>
+  </div>
+  }
 </div>
-}

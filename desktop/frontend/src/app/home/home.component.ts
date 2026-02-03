@@ -8,7 +8,7 @@ import {
 } from "@angular/core";
 import { map, Subscription } from "rxjs";
 import { Action, AppService } from "../app.service";
-import { TabService, Tab } from "../tab.service";
+import { TabService, Tab, OperationType, SyncDirection } from "../tab.service";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   isValidProfileIndex,
@@ -82,6 +82,21 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly StopCircleIcon = StopCircle;
   readonly ClockIcon = Clock;
   readonly EraseIcon = Eraser;
+
+  readonly operationTypes: { value: OperationType; label: string }[] = [
+    { value: 'sync', label: 'Sync' },
+    { value: 'copy', label: 'Copy' },
+    { value: 'move', label: 'Move' },
+    { value: 'check', label: 'Check' },
+    { value: 'dedupe', label: 'Dedupe' },
+  ];
+
+  readonly syncDirections: { value: SyncDirection; label: string; icon: any }[] = [
+    { value: 'pull', label: 'Pull', icon: Download },
+    { value: 'push', label: 'Push', icon: Upload },
+    { value: 'bi', label: 'Bi-Sync', icon: RefreshCw },
+    { value: 'bi-resync', label: 'Resync', icon: RotateCcw },
+  ];
 
   private subscriptions = new Subscription();
   showRenameDialog = false;
@@ -618,6 +633,74 @@ export class HomeComponent implements OnInit, OnDestroy {
       isActive: tab.isActive,
     });
     return value;
+  }
+
+  setOperationType(tabId: string, type: OperationType): void {
+    this.tabService.updateTab(tabId, { operationType: type });
+    this.cdr.detectChanges();
+  }
+
+  setSyncDirection(tabId: string, direction: SyncDirection): void {
+    this.tabService.updateTab(tabId, { syncDirection: direction });
+    this.cdr.detectChanges();
+  }
+
+  toggleDryRun(tabId: string): void {
+    const tab = this.tabService.getTab(tabId);
+    if (tab) {
+      this.tabService.updateTab(tabId, { dryRun: !tab.dryRun });
+      this.cdr.detectChanges();
+    }
+  }
+
+  startOperation(tab: Tab): void {
+    if (!this.validateTabProfileIndex(tab)) return;
+
+    const profile =
+      this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
+    const opType = tab.operationType || 'sync';
+
+    if (opType === 'sync') {
+      const direction = tab.syncDirection || 'push';
+      switch (direction) {
+        case 'pull':
+          this.appService.pullWithTab(profile, tab.id);
+          break;
+        case 'push':
+          this.appService.pushWithTab(profile, tab.id);
+          break;
+        case 'bi':
+          this.appService.biWithTab(profile, tab.id);
+          break;
+        case 'bi-resync':
+          this.appService.biWithTab(profile, tab.id, true);
+          break;
+      }
+    }
+    // TODO: Wire Copy, Move, Check, Dedupe to OperationService bindings
+    this.cdr.detectChanges();
+  }
+
+  getOperationLabel(tab: Tab): string {
+    const opType = tab.operationType || 'sync';
+    if (opType === 'sync') {
+      const dir = tab.syncDirection || 'push';
+      const labels: Record<SyncDirection, string> = {
+        'pull': 'Pull',
+        'push': 'Push',
+        'bi': 'Bi-Sync',
+        'bi-resync': 'Resync',
+      };
+      return labels[dir];
+    }
+    const labels: Record<OperationType, string> = {
+      'sync': 'Sync',
+      'copy': 'Copy',
+      'move': 'Move',
+      'check': 'Check',
+      'dedupe': 'Dedupe',
+    };
+    return labels[opType];
   }
 
   private updateSelectElementValue(tab: Tab): void {

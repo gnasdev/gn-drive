@@ -35,7 +35,3 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* Fixed header offset for scrollable content */
-.fixed-header-offset {
-  padding-top: 160px;
-}

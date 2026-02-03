@@ -34,10 +34,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 	fsConfig.Transfers = profile.Parallel
 	fsConfig.Checkers = profile.Parallel
 
-	var err error
-
 	switch task {
-	// case "pull":
 	case "push":
 		profile.From, profile.To = profile.To, profile.From
 	}
@@ -59,7 +56,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		}
 	}
 
-	// Set up filter rules
+	// Set up filter rules (include/exclude patterns)
 	filterOpt := filter.GetConfig(ctx).Opt
 	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
 	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
@@ -68,6 +65,12 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		ctx = filter.ReplaceConfig(ctx, newFilter)
 	}); err != nil {
 		return err
+	}
+
+	// Apply advanced profile options (filtering, safety, performance)
+	ctx, err = ApplyProfileOptions(ctx, profile)
+	if err != nil {
+		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
 
 	if err := fsConfig.Reload(ctx); err != nil {
