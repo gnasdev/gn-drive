@@ -311,6 +311,51 @@ func (a *App) GetOAuthURL(remoteType string) (string, *dto.AppError) {
 	}
 }
 
+func (a *App) ReauthRemote(remoteName string) *dto.AppError {
+	if !a.initialized {
+		a.initializeConfig()
+	}
+
+	// Find current remote to get its type
+	remotes := fsConfig.GetRemotes()
+	var remoteType string
+	found := false
+	for _, r := range remotes {
+		if r.Name == remoteName {
+			remoteType = r.Type
+			found = true
+			break
+		}
+	}
+	if !found {
+		return dto.NewAppError(fmt.Errorf("remote %q not found", remoteName))
+	}
+
+	// iCloud requires manual re-authentication via terminal
+	if remoteType == "iclouddrive" {
+		return dto.NewAppError(fmt.Errorf("iCloud Drive requires manual re-authentication via terminal: rclone config reconnect %s:", remoteName))
+	}
+
+	// Call CreateRemote with existing name to trigger OAuth re-authentication
+	ctx := context.Background()
+	configParams := rc.Params{
+		"config_is_local": "true",
+	}
+
+	_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, configParams, fsConfig.UpdateRemoteOpt{
+		NonInteractive: false,
+		NoObscure:      false,
+	})
+	if err != nil {
+		a.errorHandler.HandleError(err, "reauth_remote", remoteType, remoteName)
+		// Do NOT delete remote on failure — preserve existing config
+		return dto.NewAppError(err)
+	}
+
+	a.invalidateRemotesCache()
+	return nil
+}
+
 func (a *App) StopAddingRemote() *dto.AppError {
 	const OAUTH_REDIRECT_URL = oauthutil.RedirectURL
 	resp, err := http.Get(OAUTH_REDIRECT_URL)

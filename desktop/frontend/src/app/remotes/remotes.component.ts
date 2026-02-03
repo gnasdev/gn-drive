@@ -43,6 +43,9 @@ export class RemotesComponent implements OnInit, OnDestroy {
   // Remote type options for the UI
   readonly remoteTypeOptions: RemoteTypeOption[] = REMOTE_TYPE_OPTIONS;
 
+  // Re-auth state
+  isReauthenticating: string | null = null;
+
   // Modal state management
   showAddRemoteModal = false;
   addRemoteData: RemoteFormData = { name: "", type: "drive" };
@@ -96,6 +99,23 @@ export class RemotesComponent implements OnInit, OnDestroy {
 
   stopAddingRemote(): void {
     this.appService.stopAddingRemote();
+  }
+
+  async reauthRemote(remote: { name: string; type: string }): Promise<void> {
+    this.isReauthenticating = remote.name;
+    this.cdr.detectChanges();
+    try {
+      await this.appService.reauthRemote(remote.name);
+      this.errorService.showSuccess(
+        `Remote "${remote.name}" re-authenticated successfully!`
+      );
+    } catch (error) {
+      console.error("Error re-authenticating remote:", error);
+      this.errorService.handleApiError(error, "reauth_remote");
+    } finally {
+      this.isReauthenticating = null;
+      this.cdr.detectChanges();
+    }
   }
 
   saveConfigInfo(): void {

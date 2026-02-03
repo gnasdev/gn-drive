@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from "@angular/
 import { FormsModule } from "@angular/forms";
 import { ButtonModule } from "primeng/button";
 import { InputText } from "primeng/inputtext";
+import { Toolbar } from "primeng/toolbar";
 
 interface FileEntry {
   path: string;
@@ -16,18 +17,45 @@ interface FileEntry {
 @Component({
   selector: "app-file-browser",
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, InputText],
+  imports: [CommonModule, FormsModule, ButtonModule, InputText, Toolbar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
       <!-- Header -->
-      <div class="p-4 border-b border-gray-700">
-        <div class="flex items-center gap-3 mb-3">
-          <i class="pi pi-folder-open text-primary-400" style="font-size: 1.25rem"></i>
-          <h1 class="text-lg font-semibold text-gray-100">File Browser</h1>
-        </div>
+      <p-toolbar>
+        <ng-template #start>
+          <div class="flex items-center gap-3">
+            <i class="pi pi-folder-open text-primary-400"></i>
+            <h1 class="text-lg font-semibold text-gray-100">File Browser</h1>
+          </div>
+        </ng-template>
+        <ng-template #end>
+          <div class="flex gap-2">
+            <p-button
+              (click)="refresh()"
+              icon="pi pi-sync"
+              label="Refresh"
+              severity="secondary"
+              size="small"
+            ></p-button>
+            <p-button
+              icon="pi pi-plus"
+              label="New Folder"
+              severity="secondary"
+              size="small"
+            ></p-button>
+            <p-button
+              icon="pi pi-trash"
+              label="Delete"
+              severity="secondary"
+              size="small"
+            ></p-button>
+          </div>
+        </ng-template>
+      </p-toolbar>
 
-        <!-- Remote selector + path -->
+      <!-- Path bar -->
+      <div class="px-4 py-3 border-b border-gray-700">
         <div class="flex gap-2">
           <input
             type="text"
@@ -55,29 +83,6 @@ interface FileEntry {
           } }
         </div>
         }
-
-        <!-- Toolbar -->
-        <div class="flex gap-2 mt-2">
-          <p-button
-            (click)="refresh()"
-            icon="pi pi-sync"
-            label="Refresh"
-            severity="secondary"
-            size="small"
-          ></p-button>
-          <p-button
-            icon="pi pi-plus"
-            label="New Folder"
-            severity="secondary"
-            size="small"
-          ></p-button>
-          <p-button
-            icon="pi pi-trash"
-            label="Delete"
-            severity="secondary"
-            size="small"
-          ></p-button>
-        </div>
       </div>
 
       <!-- File list -->
@@ -87,8 +92,8 @@ interface FileEntry {
           <p>Loading...</p>
         </div>
         } @else if (entries.length === 0) {
-        <div class="flex flex-col items-center justify-center h-48 text-gray-500">
-          <i class="pi pi-folder-open mb-3 opacity-30" style="font-size: 3rem"></i>
+        <div class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500">
+          <i class="pi pi-folder-open text-5xl mb-3 opacity-30"></i>
           <p class="text-sm">Enter a remote path above to browse files</p>
         </div>
         } @else {

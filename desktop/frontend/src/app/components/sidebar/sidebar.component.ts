@@ -1,13 +1,17 @@
 import { CommonModule } from "@angular/common";
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   HostListener,
+  OnDestroy,
+  OnInit,
 } from "@angular/core";
 import {
   NavigationService,
   PageName,
 } from "../../navigation.service.js";
+import { Subscription } from "rxjs";
 
 interface SidebarItem {
   page: PageName;
@@ -29,10 +33,14 @@ interface SidebarItem {
       <!-- Logo -->
       <div class="flex items-center h-14 px-3 border-b border-gray-800">
         <div class="flex items-center gap-2 min-w-0">
-          <span class="text-primary-400 font-bold text-lg shrink-0">NS</span>
+          <img
+            src="assets/appicon.png"
+            alt="NS Drive"
+            class="w-8 h-8 rounded-full shrink-0"
+          />
           @if (!collapsed) {
           <span class="text-gray-200 font-semibold text-sm truncate"
-            >Drive</span
+            >NS Drive</span
           >
           }
         </div>
@@ -56,8 +64,8 @@ interface SidebarItem {
           (click)="navigate(item.page)"
           [class]="
             isActive(item.page)
-              ? 'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-primary-400 bg-primary-400/10 cursor-pointer'
-              : 'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 cursor-pointer transition-colors'
+              ? 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-primary-400 bg-primary-400/10 cursor-pointer'
+              : 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 cursor-pointer transition-colors'
           "
           [title]="item.label"
         >
@@ -71,8 +79,9 @@ interface SidebarItem {
     </aside>
   `,
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit, OnDestroy {
   collapsed = false;
+  private subscription?: Subscription;
 
   readonly menuItems: SidebarItem[] = [
     { page: "dashboard", label: "Dashboard", icon: "pi pi-th-large" },
@@ -99,8 +108,21 @@ export class SidebarComponent {
     { page: "settings", label: "Settings", icon: "pi pi-cog" },
   ];
 
-  constructor(public readonly navigationService: NavigationService) {
+  constructor(
+    public readonly navigationService: NavigationService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {
     this.checkWidth(window.innerWidth);
+  }
+
+  ngOnInit(): void {
+    this.subscription = this.navigationService.currentState$.subscribe(() => {
+      this.cdr.markForCheck();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
   }
 
   @HostListener("window:resize", ["$event"])

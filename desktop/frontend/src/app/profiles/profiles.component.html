@@ -23,10 +23,9 @@
   </p-toolbar>
 
   <!-- Scrollable Content -->
-  <div class="flex-1 overflow-auto">
+  <div class="flex-1 overflow-auto p-4">
     <div class="max-w-4xl mx-auto">
       @if ((appService.configInfo$ | async)?.profiles?.length) {
-      <div class="p-4">
         <div class="space-y-3" role="list" aria-label="Sync profiles list">
           @for ( profile of (appService.configInfo$ | async)?.profiles; track
           profile; let idx = $index) {
@@ -67,7 +66,6 @@
           </p-card>
           }
         </div>
-      </div>
       } @else {
       <div class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500">
         <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">

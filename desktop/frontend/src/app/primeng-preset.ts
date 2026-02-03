@@ -88,6 +88,7 @@ const NsDrivePreset = definePreset(Aura, {
     toolbar: {
       root: {
         padding: "0.75rem 1.25rem",
+        borderRadius: "0",
       },
       colorScheme: {
         dark: {

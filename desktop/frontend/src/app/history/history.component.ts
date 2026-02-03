@@ -32,7 +32,7 @@ interface HistoryEntry {
       <p-toolbar>
         <ng-template #start>
           <div class="flex items-center gap-3">
-            <i class="pi pi-history text-primary-400 text-xl"></i>
+            <i class="pi pi-history text-primary-400"></i>
             <h1 class="text-lg font-semibold text-gray-100">History</h1>
             <span class="text-sm text-gray-500"
               >{{ entries.length }} entr{{
@@ -93,7 +93,7 @@ interface HistoryEntry {
       <div class="flex-1 overflow-auto p-4">
         @if (filteredEntries.length === 0) {
         <div
-          class="flex flex-col items-center justify-center h-48 text-gray-500"
+          class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500"
         >
           <i class="pi pi-history text-5xl mb-3 opacity-30"></i>
           <p class="text-sm">No history entries</p>

@@ -97,3 +97,9 @@ body {
 .p-sidebar-mask {
   z-index: 50 !important;
 }
+
+/* Dialog backdrop */
+.p-dialog-mask {
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(4px);
+}

@@ -14,6 +14,7 @@ import {
   GetRemotes,
   DeleteRemote,
   AddRemote,
+  ReauthRemote,
   StopAddingRemote,
 } from "../../wailsjs/desktop/backend/app";
 import { Events } from "@wailsio/runtime";
@@ -457,6 +458,21 @@ export class AppService implements OnDestroy {
     } catch (error) {
       console.error("Error stopping add remote:", error);
       this.errorService.handleApiError(error, "stop_adding_remote");
+      throw error;
+    }
+  }
+
+  async reauthRemote(name: string): Promise<void> {
+    if (!name) {
+      throw new Error("Remote name is required");
+    }
+
+    try {
+      await ReauthRemote(name);
+      await this.getRemotes();
+    } catch (error) {
+      console.error("Error re-authenticating remote:", error);
+      this.errorService.handleApiError(error, "reauth_remote");
       throw error;
     }
   }

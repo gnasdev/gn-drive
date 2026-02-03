@@ -25,6 +25,7 @@ import { ButtonModule } from "primeng/button";
 import { Card } from "primeng/card";
 import { InputText } from "primeng/inputtext";
 import { Select } from "primeng/select";
+import { Toolbar } from "primeng/toolbar";
 
 @Component({
   selector: "app-home",
@@ -38,6 +39,7 @@ import { Select } from "primeng/select";
     Card,
     InputText,
     Select,
+    Toolbar,
   ],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",

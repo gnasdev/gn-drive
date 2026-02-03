@@ -1,25 +1,27 @@
 <!-- Operations Dashboard -->
 <div class="flex flex-col h-full">
   <!-- Header -->
-  <div
-    class="flex items-center justify-between p-4 border-b border-gray-700"
-  >
-    <div class="flex items-center gap-3">
-      <i class="pi pi-play text-primary-400"></i>
-      <h1 class="text-lg font-semibold text-gray-100">Operations</h1>
-      <span class="text-sm text-gray-500"
-        >{{ tabService.tabsValue.length }} tab{{
-          tabService.tabsValue.length !== 1 ? "s" : ""
-        }}</span
-      >
-    </div>
-    <p-button
-      label="New Tab"
-      icon="pi pi-plus"
-      size="small"
-      (onClick)="createTab()"
-    />
-  </div>
+  <p-toolbar>
+    <ng-template #start>
+      <div class="flex items-center gap-3">
+        <i class="pi pi-play text-primary-400"></i>
+        <h1 class="text-lg font-semibold text-gray-100">Operations</h1>
+        <span class="text-sm text-gray-500"
+          >{{ tabService.tabsValue.length }} tab{{
+            tabService.tabsValue.length !== 1 ? "s" : ""
+          }}</span
+        >
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <p-button
+        label="New Tab"
+        icon="pi pi-plus"
+        size="small"
+        (onClick)="createTab()"
+      />
+    </ng-template>
+  </p-toolbar>
 
   @if (tabService.tabsValue.length === 0) {
   <!-- Empty State -->

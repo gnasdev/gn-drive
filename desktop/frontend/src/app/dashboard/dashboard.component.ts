@@ -2,24 +2,34 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component } from "@angular/core";
 import { Card } from "primeng/card";
 import { ButtonModule } from "primeng/button";
+import { Toolbar } from "primeng/toolbar";
 import { NavigationService } from "../navigation.service.js";
 
 @Component({
   selector: "app-dashboard",
   standalone: true,
-  imports: [CommonModule, Card, ButtonModule],
+  imports: [CommonModule, Card, ButtonModule, Toolbar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-6 space-y-6">
-      <h1 class="text-2xl font-bold text-gray-100">Dashboard</h1>
+    <div class="flex flex-col h-full">
+      <!-- Header -->
+      <p-toolbar>
+        <ng-template #start>
+          <div class="flex items-center gap-3">
+            <i class="pi pi-th-large text-primary-400"></i>
+            <h1 class="text-lg font-semibold text-gray-100">Dashboard</h1>
+          </div>
+        </ng-template>
+      </p-toolbar>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="flex-1 overflow-auto p-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Quick Actions -->
         <p-card>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
             Quick Actions
           </h2>
-          <div class="space-y-3">
+          <div class="flex flex-col gap-3">
             <p-button
               styleClass="w-full"
               severity="secondary"
@@ -79,6 +89,7 @@ import { NavigationService } from "../navigation.service.js";
             </div>
           </div>
         </p-card>
+      </div>
       </div>
     </div>
   `,
