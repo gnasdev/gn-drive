@@ -1,77 +1,55 @@
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { CommonModule } from "@angular/common";
+import { ButtonModule } from "primeng/button";
+import { Dialog } from "primeng/dialog";
 
 export interface ConfirmDialogData {
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
-  confirmButtonClass?: string;
+  confirmSeverity?: string;
   warning?: string;
 }
 
 @Component({
   selector: "app-confirm-dialog",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ButtonModule, Dialog],
   template: `
-    @if (isOpen) {
-    <div
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      (click)="onCancel()"
-      (keyup.escape)="onCancel()"
-      tabindex="0"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-labelledby]="'confirm-dialog-title'"
+    <p-dialog
+      [header]="data.title"
+      [(visible)]="isOpen"
+      [modal]="true"
+      [closable]="true"
+      [style]="{ width: '24rem' }"
+      (onHide)="onCancel()"
     >
-      <div
-        class="bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4 shadow-xl"
-        (click)="$event.stopPropagation()"
-        (keydown)="$event.stopPropagation()"
-        tabindex="-1"
-        role="document"
-      >
-        <h2
-          id="confirm-dialog-title"
-          class="text-xl font-bold text-gray-100 mb-4"
+      <div class="mb-4">
+        <p class="text-gray-300">{{ data.message }}</p>
+        @if (data.warning) {
+        <div
+          class="bg-yellow-900/20 border border-yellow-800 rounded-lg p-3 mt-3"
         >
-          {{ data.title }}
-        </h2>
-        <div class="mb-6">
-          <p class="text-gray-300">
-            {{ data.message }}
+          <p class="text-yellow-200 text-sm">
+            <strong>Warning:</strong> {{ data.warning }}
           </p>
-          @if (data.warning) {
-          <div
-            class="bg-yellow-900/20 border border-yellow-800 rounded-lg p-3 mt-3"
-          >
-            <p class="text-yellow-200 text-sm">
-              <strong>Warning:</strong> {{ data.warning }}
-            </p>
-          </div>
-          }
         </div>
-        <div class="flex justify-end space-x-3">
-          <button
-            type="button"
-            class="btn-secondary"
-            (click)="onCancel()"
-            #cancelButton
-          >
-            {{ data.cancelText || "Cancel" }}
-          </button>
-          <button
-            type="button"
-            [class]="data.confirmButtonClass || 'btn-primary'"
-            (click)="onConfirm()"
-          >
-            {{ data.confirmText || "Confirm" }}
-          </button>
-        </div>
+        }
       </div>
-    </div>
-    }
+      <div class="flex justify-end gap-3">
+        <p-button
+          [label]="data.cancelText || 'Cancel'"
+          severity="secondary"
+          (onClick)="onCancel()"
+        />
+        <p-button
+          [label]="data.confirmText || 'Confirm'"
+          [severity]="(data.confirmSeverity as any) || 'primary'"
+          (onClick)="onConfirm()"
+        />
+      </div>
+    </p-dialog>
   `,
 })
 export class ConfirmDialogComponent {

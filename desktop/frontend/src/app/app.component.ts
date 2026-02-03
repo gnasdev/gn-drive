@@ -18,7 +18,6 @@ import { FileBrowserComponent } from "./file-browser/file-browser.component.js";
 import { SchedulesComponent } from "./schedules/schedules.component.js";
 import { HistoryComponent } from "./history/history.component.js";
 import { SettingsComponent } from "./settings/settings.component.js";
-
 import { NavigationService } from "./navigation.service.js";
 import { ErrorDisplayComponent } from "./components/error-display/error-display.component.js";
 import { LoggingService } from "./services/logging.service.js";

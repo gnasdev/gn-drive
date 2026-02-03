@@ -1,42 +1,33 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import {
-  LucideAngularModule,
-  Settings,
-  Bell,
-  Lock,
-  Bug,
-  FolderOpen,
-  Info,
-} from "lucide-angular";
+import { Card } from "primeng/card";
+import { Toolbar } from "primeng/toolbar";
 import { ToggleSwitch } from "primeng/toggleswitch";
 
 @Component({
   selector: "app-settings",
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ToggleSwitch],
+  imports: [CommonModule, FormsModule, Card, Toolbar, ToggleSwitch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
       <!-- Header -->
-      <div class="flex items-center gap-3 p-4 border-b border-gray-700">
-        <lucide-icon
-          [img]="SettingsIcon"
-          class="w-5 h-5 text-primary-400"
-        ></lucide-icon>
-        <h1 class="text-lg font-semibold text-gray-100">Settings</h1>
-      </div>
+      <p-toolbar>
+        <ng-template #start>
+          <div class="flex items-center gap-3">
+            <i class="pi pi-cog text-primary-400"></i>
+            <h1 class="text-lg font-semibold text-gray-100">Settings</h1>
+          </div>
+        </ng-template>
+      </p-toolbar>
 
       <!-- Settings sections -->
       <div class="flex-1 overflow-auto p-4 space-y-4">
         <!-- Notifications -->
-        <div class="panel">
+        <p-card>
           <div class="flex items-center gap-2 mb-3">
-            <lucide-icon
-              [img]="BellIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-bell text-gray-400"></i>
             <h2 class="text-sm font-semibold text-gray-200">Notifications</h2>
           </div>
           <div class="flex items-center justify-between">
@@ -51,15 +42,12 @@ import { ToggleSwitch } from "primeng/toggleswitch";
               (onChange)="saveNotificationSetting()"
             ></p-toggleswitch>
           </div>
-        </div>
+        </p-card>
 
         <!-- Security -->
-        <div class="panel">
+        <p-card>
           <div class="flex items-center gap-2 mb-3">
-            <lucide-icon
-              [img]="LockIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-lock text-gray-400"></i>
             <h2 class="text-sm font-semibold text-gray-200">Security</h2>
           </div>
           <div class="flex items-center justify-between">
@@ -74,15 +62,12 @@ import { ToggleSwitch } from "primeng/toggleswitch";
               (onChange)="toggleConfigEncryption()"
             ></p-toggleswitch>
           </div>
-        </div>
+        </p-card>
 
         <!-- Debug -->
-        <div class="panel">
+        <p-card>
           <div class="flex items-center gap-2 mb-3">
-            <lucide-icon
-              [img]="BugIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-wrench text-gray-400"></i>
             <h2 class="text-sm font-semibold text-gray-200">Debug</h2>
           </div>
           <div class="flex items-center justify-between">
@@ -97,15 +82,12 @@ import { ToggleSwitch } from "primeng/toggleswitch";
               (onChange)="saveDebugSetting()"
             ></p-toggleswitch>
           </div>
-        </div>
+        </p-card>
 
         <!-- Paths -->
-        <div class="panel">
+        <p-card>
           <div class="flex items-center gap-2 mb-3">
-            <lucide-icon
-              [img]="FolderOpenIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-folder-open text-gray-400"></i>
             <h2 class="text-sm font-semibold text-gray-200">Configuration Paths</h2>
           </div>
           <div class="space-y-2">
@@ -134,15 +116,12 @@ import { ToggleSwitch } from "primeng/toggleswitch";
               >
             </div>
           </div>
-        </div>
+        </p-card>
 
         <!-- About -->
-        <div class="panel">
+        <p-card>
           <div class="flex items-center gap-2 mb-3">
-            <lucide-icon
-              [img]="InfoIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-info-circle text-gray-400"></i>
             <h2 class="text-sm font-semibold text-gray-200">About</h2>
           </div>
           <div class="space-y-2">
@@ -155,19 +134,12 @@ import { ToggleSwitch } from "primeng/toggleswitch";
               <span class="text-gray-300">rclone + Wails v3</span>
             </div>
           </div>
-        </div>
+        </p-card>
       </div>
     </div>
   `,
 })
 export class SettingsComponent {
-  readonly SettingsIcon = Settings;
-  readonly BellIcon = Bell;
-  readonly LockIcon = Lock;
-  readonly BugIcon = Bug;
-  readonly FolderOpenIcon = FolderOpen;
-  readonly InfoIcon = Info;
-
   notificationsEnabled = true;
   configEncrypted = false;
   debugMode = false;

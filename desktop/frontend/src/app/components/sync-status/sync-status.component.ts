@@ -1,30 +1,14 @@
 import { Component, Input, ChangeDetectionStrategy } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import {
-  LucideAngularModule,
-  Download,
-  Upload,
-  RotateCw,
-  CheckCircle,
-  XCircle,
-  StopCircle,
-  FileText,
-  HardDrive,
-  Check,
-  Trash2,
-  AlertCircle,
-  FolderOpen,
-  Moon,
-  Zap,
-  Clock,
-  Timer,
-} from "lucide-angular";
+import { Card } from "primeng/card";
+import { ProgressBar } from "primeng/progressbar";
+import { Tag } from "primeng/tag";
 import { SyncStatus } from "../../models/sync-status.interface";
 
 @Component({
   selector: "app-sync-status",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, Card, ProgressBar, Tag],
   templateUrl: "./sync-status.component.html",
   styleUrl: "./sync-status.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,24 +16,6 @@ import { SyncStatus } from "../../models/sync-status.interface";
 export class SyncStatusComponent {
   @Input() syncStatus: SyncStatus | null = null;
   @Input() showTitle = true;
-
-  // Lucide icons
-  readonly DownloadIcon = Download;
-  readonly UploadIcon = Upload;
-  readonly RotateCwIcon = RotateCw;
-  readonly CheckCircleIcon = CheckCircle;
-  readonly XCircleIcon = XCircle;
-  readonly StopCircleIcon = StopCircle;
-  readonly FileTextIcon = FileText;
-  readonly HardDriveIcon = HardDrive;
-  readonly CheckIcon = Check;
-  readonly Trash2Icon = Trash2;
-  readonly AlertCircleIcon = AlertCircle;
-  readonly FolderOpenIcon = FolderOpen;
-  readonly MoonIcon = Moon;
-  readonly ZapIcon = Zap;
-  readonly ClockIcon = Clock;
-  readonly TimerIcon = Timer;
 
   getStatusColor(): string {
     if (!this.syncStatus) return "primary";
@@ -68,36 +34,36 @@ export class SyncStatusComponent {
     }
   }
 
-  getStatusIcon() {
-    if (!this.syncStatus) return this.RotateCwIcon;
+  getStatusIcon(): string {
+    if (!this.syncStatus) return "pi pi-sync";
 
     switch (this.syncStatus.status) {
       case "running":
-        return this.RotateCwIcon;
+        return "pi pi-sync";
       case "completed":
-        return this.CheckCircleIcon;
+        return "pi pi-check-circle";
       case "error":
-        return this.XCircleIcon;
+        return "pi pi-times-circle";
       case "stopped":
-        return this.StopCircleIcon;
+        return "pi pi-stop-circle";
       default:
-        return this.RotateCwIcon;
+        return "pi pi-sync";
     }
   }
 
-  getActionIcon() {
-    if (!this.syncStatus) return this.RotateCwIcon;
+  getActionIcon(): string {
+    if (!this.syncStatus) return "pi pi-sync";
 
     switch (this.syncStatus.action) {
       case "pull":
-        return this.DownloadIcon;
+        return "pi pi-download";
       case "push":
-        return this.UploadIcon;
+        return "pi pi-upload";
       case "bi":
       case "bi-resync":
-        return this.RotateCwIcon;
+        return "pi pi-sync";
       default:
-        return this.RotateCwIcon;
+        return "pi pi-sync";
     }
   }
 

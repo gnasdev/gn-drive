@@ -1,14 +1,11 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from "@angular/core";
-import {
-  LucideAngularModule,
-  History,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Filter,
-} from "lucide-angular";
+import { FormsModule } from "@angular/forms";
+import { Card } from "primeng/card";
+import { Toolbar } from "primeng/toolbar";
+import { Tag } from "primeng/tag";
+import { ButtonModule } from "primeng/button";
+import { Select } from "primeng/select";
 
 interface HistoryEntry {
   id: string;
@@ -27,70 +24,68 @@ interface HistoryEntry {
 @Component({
   selector: "app-history",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, Card, Toolbar, Tag, ButtonModule, Select],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
       <!-- Header -->
-      <div
-        class="flex items-center justify-between p-4 border-b border-gray-700"
-      >
-        <div class="flex items-center gap-3">
-          <lucide-icon
-            [img]="HistoryIcon"
-            class="w-5 h-5 text-primary-400"
-          ></lucide-icon>
-          <h1 class="text-lg font-semibold text-gray-100">History</h1>
-          <span class="text-sm text-gray-500"
-            >{{ entries.length }} entr{{
-              entries.length !== 1 ? "ies" : "y"
-            }}</span
-          >
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            (click)="showFilters = !showFilters"
-            class="btn-secondary flex items-center gap-1.5 text-sm"
-            [class.!bg-primary-600/20]="showFilters"
-          >
-            <lucide-icon [img]="FilterIcon" class="w-4 h-4"></lucide-icon>
-            Filter
-          </button>
-          @if (entries.length > 0) {
-          <button
-            (click)="clearHistory()"
-            class="p-2 rounded hover:bg-gray-700 transition-colors text-gray-400 hover:text-red-400"
-            title="Clear History"
-          >
-            <lucide-icon [img]="Trash2Icon" class="w-4 h-4"></lucide-icon>
-          </button>
-          }
-        </div>
-      </div>
+      <p-toolbar>
+        <ng-template #start>
+          <div class="flex items-center gap-3">
+            <i class="pi pi-history text-primary-400 text-xl"></i>
+            <h1 class="text-lg font-semibold text-gray-100">History</h1>
+            <span class="text-sm text-gray-500"
+              >{{ entries.length }} entr{{
+                entries.length !== 1 ? "ies" : "y"
+              }}</span
+            >
+          </div>
+        </ng-template>
+        <ng-template #end>
+          <div class="flex items-center gap-2">
+            <p-button
+              (click)="showFilters = !showFilters"
+              [outlined]="!showFilters"
+              severity="secondary"
+              size="small"
+            >
+              <i class="pi pi-filter mr-1.5"></i>
+              Filter
+            </p-button>
+            @if (entries.length > 0) {
+            <p-button
+              (click)="clearHistory()"
+              [text]="true"
+              severity="danger"
+              size="small"
+              pTooltip="Clear History"
+            >
+              <i class="pi pi-trash"></i>
+            </p-button>
+            }
+          </div>
+        </ng-template>
+      </p-toolbar>
 
       <!-- Filter bar -->
       @if (showFilters) {
       <div class="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-gray-800/50">
-        <select
-          class="select-field !w-auto text-sm"
-          (change)="filterStatus = $any($event.target).value"
-        >
-          <option value="">All Statuses</option>
-          <option value="success">Success</option>
-          <option value="failed">Failed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select
-          class="select-field !w-auto text-sm"
-          (change)="filterAction = $any($event.target).value"
-        >
-          <option value="">All Actions</option>
-          <option value="pull">Pull</option>
-          <option value="push">Push</option>
-          <option value="bi">Bi-Sync</option>
-          <option value="copy">Copy</option>
-          <option value="move">Move</option>
-        </select>
+        <p-select
+          [options]="statusOptions"
+          [(ngModel)]="filterStatus"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Statuses"
+          [style]="{ 'min-width': '10rem' }"
+        ></p-select>
+        <p-select
+          [options]="actionOptions"
+          [(ngModel)]="filterAction"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Actions"
+          [style]="{ 'min-width': '10rem' }"
+        ></p-select>
       </div>
       }
 
@@ -100,37 +95,33 @@ interface HistoryEntry {
         <div
           class="flex flex-col items-center justify-center h-48 text-gray-500"
         >
-          <lucide-icon
-            [img]="HistoryIcon"
-            class="w-12 h-12 mb-3 opacity-30"
-          ></lucide-icon>
+          <i class="pi pi-history text-5xl mb-3 opacity-30"></i>
           <p class="text-sm">No history entries</p>
         </div>
         } @else { @for (entry of filteredEntries; track entry.id) {
-        <div
-          class="panel mb-2 cursor-pointer hover:border-gray-600 transition-colors"
+        <p-card
+          class="mb-2 block cursor-pointer"
+          [style]="{ 'margin-bottom': '0.5rem' }"
           (click)="toggleExpand(entry.id)"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3 min-w-0">
-              <lucide-icon
-                [img]="entry.status === 'success' ? CheckCircleIcon : XCircleIcon"
-                class="w-4 h-4 shrink-0"
-                [class]="
-                  entry.status === 'success'
-                    ? 'text-green-400'
-                    : 'text-red-400'
-                "
-              ></lucide-icon>
+              <i
+                class="shrink-0"
+                [ngClass]="{
+                  'pi pi-check-circle text-green-400': entry.status === 'success',
+                  'pi pi-times-circle text-red-400': entry.status !== 'success'
+                }"
+              ></i>
               <div class="min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="text-gray-200 font-medium text-sm">{{
                     entry.profile_name
                   }}</span>
-                  <span
-                    class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400"
-                    >{{ entry.action }}</span
-                  >
+                  <p-tag
+                    [value]="entry.action"
+                    severity="secondary"
+                  ></p-tag>
                 </div>
                 <div class="text-xs text-gray-500 mt-0.5">
                   {{ entry.start_time }}
@@ -139,16 +130,16 @@ interface HistoryEntry {
             </div>
             <div class="flex items-center gap-4 text-xs text-gray-500 shrink-0">
               <div class="flex items-center gap-1">
-                <lucide-icon
-                  [img]="ClockIcon"
-                  class="w-3 h-3"
-                ></lucide-icon>
+                <i class="pi pi-clock text-xs"></i>
                 {{ entry.duration }}
               </div>
               <span>{{ entry.files_transferred }} files</span>
               <span>{{ formatBytes(entry.bytes_transferred) }}</span>
               @if (entry.errors > 0) {
-              <span class="text-red-400">{{ entry.errors }} errors</span>
+              <p-tag
+                [value]="entry.errors + ' errors'"
+                severity="danger"
+              ></p-tag>
               }
             </div>
           </div>
@@ -160,25 +151,34 @@ interface HistoryEntry {
             {{ entry.error_message }}
           </div>
           }
-        </div>
+        </p-card>
         } }
       </div>
     </div>
   `,
 })
 export class HistoryComponent {
-  readonly HistoryIcon = History;
-  readonly Trash2Icon = Trash2;
-  readonly CheckCircleIcon = CheckCircle;
-  readonly XCircleIcon = XCircle;
-  readonly ClockIcon = Clock;
-  readonly FilterIcon = Filter;
-
   entries: HistoryEntry[] = [];
   showFilters = false;
   filterStatus = "";
   filterAction = "";
   expandedId: string | null = null;
+
+  statusOptions = [
+    { label: "All Statuses", value: "" },
+    { label: "Success", value: "success" },
+    { label: "Failed", value: "failed" },
+    { label: "Cancelled", value: "cancelled" },
+  ];
+
+  actionOptions = [
+    { label: "All Actions", value: "" },
+    { label: "Pull", value: "pull" },
+    { label: "Push", value: "push" },
+    { label: "Bi-Sync", value: "bi" },
+    { label: "Copy", value: "copy" },
+    { label: "Move", value: "move" },
+  ];
 
   constructor(private readonly cdr: ChangeDetectorRef) {}
 

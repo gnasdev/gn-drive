@@ -175,11 +175,22 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 	slog.SetDefault(customLogger)
 
 	// Intercept output from functions such as HashLister to stdout
+	// Throttle to avoid flooding the channel - only send at most once per 500ms
 	oldSyncPrint := operations.SyncPrintf
+	var lastSyncPrint time.Time
+	var syncPrintMu sync.Mutex
 	operations.SyncPrintf = func(format string, a ...interface{}) {
 		defer statusClosedRecover()
 		if !isStatusClosed {
-			// Still send formatted output for compatibility
+			syncPrintMu.Lock()
+			now := time.Now()
+			if now.Sub(lastSyncPrint) < 500*time.Millisecond {
+				syncPrintMu.Unlock()
+				return
+			}
+			lastSyncPrint = now
+			syncPrintMu.Unlock()
+
 			logMsg := fmt.Sprintf(format, a...)
 			statusChannel <- []byte(formatToProgressCompat(logMsg))
 		}

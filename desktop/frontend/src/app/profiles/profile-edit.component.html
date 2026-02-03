@@ -1,48 +1,37 @@
 <!-- Profile Editor -->
 <div class="flex flex-col h-full">
-  <!-- Header -->
-  <div
-    class="flex items-center justify-between p-4 border-b border-gray-700"
-  >
-    <div class="flex items-center gap-3">
-      <button
-        (click)="goBack()"
-        class="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
-        title="Back to Profiles"
-      >
-        <lucide-icon [img]="ArrowLeftIcon" class="w-5 h-5"></lucide-icon>
-      </button>
-      <h1 class="text-lg font-semibold text-gray-100">Edit Profile</h1>
+  <!-- Header Toolbar -->
+  <p-toolbar>
+    <ng-template #start>
+      <p-button icon="pi pi-arrow-left" [text]="true" [rounded]="true" (onClick)="goBack()" />
+      <span class="text-lg font-semibold text-gray-100 ml-2">Edit Profile</span>
       @if (profile) {
-      <span class="text-sm text-gray-500">{{ profile.name }}</span>
+      <span class="text-sm text-gray-500 ml-2">{{ profile.name }}</span>
       }
-    </div>
-    @if (profile) {
-    <button
-      class="btn-primary flex items-center gap-1.5 text-sm"
-      (click)="saveProfile()"
-    >
-      <lucide-icon [img]="SaveIcon" class="w-4 h-4"></lucide-icon>
-      {{ saveBtnText$ | async }}
-    </button>
-    }
-  </div>
+    </ng-template>
+    <ng-template #end>
+      @if (profile) {
+      <p-button [label]="(saveBtnText$ | async) ?? 'Save'" icon="pi pi-save" (onClick)="saveProfile()" size="small" />
+      }
+    </ng-template>
+  </p-toolbar>
 
   @if (profile) {
   <!-- Tab Navigation -->
   <div class="flex border-b border-gray-700 bg-gray-800/50">
     @for (tab of editorTabs; track tab.id) {
-    <button
-      class="px-4 py-2.5 text-sm transition-colors"
-      [class]="
-        activeTab === tab.id
-          ? 'text-primary-400 border-b-2 border-primary-400 font-medium'
-          : 'text-gray-400 hover:text-gray-200'
-      "
-      (click)="activeTab = tab.id"
-    >
-      {{ tab.label }}
-    </button>
+    <p-button
+      [label]="tab.label"
+      [icon]="tab.icon"
+      [text]="true"
+      [rounded]="false"
+      size="small"
+      [severity]="activeTab === tab.id ? 'primary' : 'secondary'"
+      [styleClass]="activeTab === tab.id
+        ? 'border-b-2 border-primary-400 rounded-none'
+        : 'rounded-none'"
+      (onClick)="activeTab = tab.id"
+    />
     }
   </div>
 
@@ -51,76 +40,76 @@
     <!-- General Tab -->
     @if (activeTab === 'general') {
     <div class="space-y-4 max-w-2xl">
-      <div class="panel">
+      <p-card>
         <label class="text-sm text-gray-400 mb-2 block">Profile Name</label>
         <input
-          type="text"
-          class="input-field"
+          pInputText
+          class="w-full"
           [(ngModel)]="profile.name"
           (ngModelChange)="onProfileFieldChange()"
           placeholder="Enter profile name"
         />
-      </div>
+      </p-card>
 
       <!-- Source Path -->
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Source Path</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-folder-open mr-2"></i>Source Path
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Remote</label>
-            <select
-              class="select-field"
+            <p-select
+              [options]="getRemoteOptions()"
               [ngModel]="getFromRemote()"
               (ngModelChange)="updateFromPath($event, getFromPath())"
-            >
-              <option value="">Local</option>
-              @for (remote of appService.remotes$ | async; track remote) {
-              <option [value]="remote.name">{{ remote.name }}</option>
-              }
-            </select>
+              optionLabel="label"
+              optionValue="value"
+              styleClass="w-full"
+            />
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Path</label>
             <input
-              type="text"
-              class="input-field"
+              pInputText
+              class="w-full"
               [ngModel]="getFromPath()"
               (ngModelChange)="updateFromPath(getFromRemote(), $event)"
               placeholder="/source/path"
             />
           </div>
         </div>
-      </div>
+      </p-card>
 
       <!-- Destination Path -->
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Destination Path</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-folder mr-2"></i>Destination Path
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Remote</label>
-            <select
-              class="select-field"
+            <p-select
+              [options]="getRemoteOptions()"
               [ngModel]="getToRemote()"
               (ngModelChange)="updateToPath($event, getToPath())"
-            >
-              <option value="">Local</option>
-              @for (remote of appService.remotes$ | async; track remote) {
-              <option [value]="remote.name">{{ remote.name }}</option>
-              }
-            </select>
+              optionLabel="label"
+              optionValue="value"
+              styleClass="w-full"
+            />
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Path</label>
             <input
-              type="text"
-              class="input-field"
+              pInputText
+              class="w-full"
               [ngModel]="getToPath()"
               (ngModelChange)="updateToPath(getToRemote(), $event)"
               placeholder="/destination/path"
             />
           </div>
         </div>
-      </div>
+      </p-card>
     </div>
     }
 
@@ -128,104 +117,108 @@
     @if (activeTab === 'filters') {
     <div class="space-y-4 max-w-2xl">
       <!-- Include Paths -->
-      <div class="panel">
+      <p-card>
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
-            <lucide-icon [img]="CheckIcon" class="w-4 h-4 text-green-400"></lucide-icon>
+            <i class="pi pi-check text-green-400"></i>
             <h3 class="text-sm font-medium text-gray-200">Include Paths</h3>
           </div>
-          <button
-            class="btn-secondary text-xs flex items-center gap-1"
-            (click)="addIncludePath()"
-          >
-            <lucide-icon [img]="PlusIcon" class="w-3 h-3"></lucide-icon>
-            Add
-          </button>
+          <p-button
+            label="Add"
+            icon="pi pi-plus"
+            severity="secondary"
+            size="small"
+            (onClick)="addIncludePath()"
+          />
         </div>
         @if (profile.included_paths.length === 0) {
         <p class="text-xs text-gray-500">All files included by default</p>
         } @else { @for (path of profile.included_paths; track $index; let i =
         $index) {
         <div class="flex items-center gap-2 mb-2">
-          <select
-            class="select-field !w-24 text-sm"
-            [value]="getIncludePathType(i)"
-            (change)="onIncludePathTypeChange(i, $event)"
-          >
-            <option value="file">File</option>
-            <option value="folder">Folder</option>
-          </select>
+          <p-select
+            [options]="pathTypeOptions"
+            [ngModel]="getIncludePathType(i)"
+            (ngModelChange)="onIncludePathTypeChange(i, $event)"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-24!"
+          />
           <input
-            type="text"
-            class="input-field flex-1 text-sm"
+            pInputText
+            class="flex-1"
             [value]="getIncludePathValue(i)"
             (input)="onIncludePathValueChange(i, $event)"
             placeholder="path pattern"
           />
-          <button
-            class="p-1 rounded hover:bg-red-900/50 text-gray-500 hover:text-red-400"
-            (click)="removeIncludePath(i)"
-          >
-            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
-          </button>
+          <p-button
+            icon="pi pi-minus"
+            [rounded]="true"
+            [text]="true"
+            severity="danger"
+            size="small"
+            (onClick)="removeIncludePath(i)"
+          />
         </div>
         } }
-      </div>
+      </p-card>
 
       <!-- Exclude Paths -->
-      <div class="panel">
+      <p-card>
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
-            <lucide-icon [img]="XIcon" class="w-4 h-4 text-red-400"></lucide-icon>
+            <i class="pi pi-times text-red-400"></i>
             <h3 class="text-sm font-medium text-gray-200">Exclude Paths</h3>
           </div>
-          <button
-            class="btn-secondary text-xs flex items-center gap-1"
-            (click)="addExcludePath()"
-          >
-            <lucide-icon [img]="PlusIcon" class="w-3 h-3"></lucide-icon>
-            Add
-          </button>
+          <p-button
+            label="Add"
+            icon="pi pi-plus"
+            severity="secondary"
+            size="small"
+            (onClick)="addExcludePath()"
+          />
         </div>
         @if (profile.excluded_paths.length === 0) {
         <p class="text-xs text-gray-500">No files excluded</p>
         } @else { @for (path of profile.excluded_paths; track $index; let i =
         $index) {
         <div class="flex items-center gap-2 mb-2">
-          <select
-            class="select-field !w-24 text-sm"
-            [value]="getExcludePathType(i)"
-            (change)="onExcludePathTypeChange(i, $event)"
-          >
-            <option value="file">File</option>
-            <option value="folder">Folder</option>
-          </select>
+          <p-select
+            [options]="pathTypeOptions"
+            [ngModel]="getExcludePathType(i)"
+            (ngModelChange)="onExcludePathTypeChange(i, $event)"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-24!"
+          />
           <input
-            type="text"
-            class="input-field flex-1 text-sm"
+            pInputText
+            class="flex-1"
             [value]="getExcludePathValue(i)"
             (input)="onExcludePathValueChange(i, $event)"
             placeholder="path pattern"
           />
-          <button
-            class="p-1 rounded hover:bg-red-900/50 text-gray-500 hover:text-red-400"
-            (click)="removeExcludePath(i)"
-          >
-            <lucide-icon [img]="MinusIcon" class="w-4 h-4"></lucide-icon>
-          </button>
+          <p-button
+            icon="pi pi-minus"
+            [rounded]="true"
+            [text]="true"
+            severity="danger"
+            size="small"
+            (onClick)="removeExcludePath(i)"
+          />
         </div>
         } }
-      </div>
+      </p-card>
 
       <!-- Size Filters -->
-      <div class="panel">
+      <p-card>
         <h3 class="text-sm font-medium text-gray-200 mb-3">Size Filters</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Min Size</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.min_size"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="e.g. 100k, 10M"
@@ -234,25 +227,25 @@
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Max Size</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.max_size"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="e.g. 1G, 500M"
             />
           </div>
         </div>
-      </div>
+      </p-card>
 
       <!-- Advanced Filters -->
-      <div class="panel">
+      <p-card>
         <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Filters</h3>
         <div class="space-y-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Filter From File</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.filter_from_file"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="Path to filter rules file"
@@ -261,8 +254,8 @@
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Exclude If Present</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.exclude_if_present"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="e.g. .nosync"
@@ -279,63 +272,65 @@
             ></p-toggleswitch>
           </div>
         </div>
-      </div>
+      </p-card>
     </div>
     }
 
     <!-- Performance Tab -->
     @if (activeTab === 'performance') {
     <div class="space-y-4 max-w-2xl">
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Transfer Settings</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-bolt mr-2"></i>Transfer Settings
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Parallel Transfers</label>
-            <select
-              class="select-field"
+            <p-select
+              [options]="getNumberRangeOptions(1, 32)"
               [(ngModel)]="profile.parallel"
               (ngModelChange)="onProfileFieldChange()"
-            >
-              @for (num of getNumberRange(1, 32); track num) {
-              <option [value]="num">{{ num }}</option>
-              }
-            </select>
+              optionLabel="label"
+              optionValue="value"
+              styleClass="w-full"
+            />
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Bandwidth Limit (MB/s)</label>
-            <select
-              class="select-field"
+            <p-select
+              [options]="getNumberRangeOptions(1, 100)"
               [(ngModel)]="profile.bandwidth"
               (ngModelChange)="onProfileFieldChange()"
-            >
-              @for (num of getNumberRange(1, 100); track num) {
-              <option [value]="num">{{ num }}</option>
-              }
-            </select>
+              optionLabel="label"
+              optionValue="value"
+              styleClass="w-full"
+            />
           </div>
         </div>
-      </div>
+      </p-card>
 
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Performance</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-cog mr-2"></i>Advanced Performance
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Multi-Thread Streams</label>
-            <input
-              type="number"
-              class="input-field text-sm"
+            <p-inputnumber
               [(ngModel)]="profile.multi_thread_streams"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="4"
-              min="0"
-              max="64"
+              [min]="0"
+              [max]="64"
+              [showButtons]="true"
+              styleClass="w-full"
             />
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Buffer Size</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.buffer_size"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="e.g. 16M, 64M"
@@ -345,24 +340,24 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Retries</label>
-            <input
-              type="number"
-              class="input-field text-sm"
+            <p-inputnumber
               [(ngModel)]="profile.retries"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="3"
-              min="0"
+              [min]="0"
+              [showButtons]="true"
+              styleClass="w-full"
             />
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Low-Level Retries</label>
-            <input
-              type="number"
-              class="input-field text-sm"
+            <p-inputnumber
               [(ngModel)]="profile.low_level_retries"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="10"
-              min="0"
+              [min]="0"
+              [showButtons]="true"
+              styleClass="w-full"
             />
           </div>
         </div>
@@ -376,21 +371,23 @@
             (onChange)="onProfileFieldChange()"
           ></p-toggleswitch>
         </div>
-      </div>
+      </p-card>
     </div>
     }
 
     <!-- Advanced Tab -->
     @if (activeTab === 'advanced') {
     <div class="space-y-4 max-w-2xl">
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Safety Settings</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-cog mr-2"></i>Safety Settings
+        </h3>
         <div class="space-y-3">
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Backup Directory</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.backup_path"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="Path to backup deleted/modified files"
@@ -398,21 +395,21 @@
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Max Delete (files)</label>
-            <input
-              type="number"
-              class="input-field text-sm"
+            <p-inputnumber
               [(ngModel)]="profile.max_delete"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="Unlimited"
-              min="0"
+              [min]="0"
+              [showButtons]="true"
+              styleClass="w-full"
             />
             <p class="text-xs text-gray-500 mt-1">Maximum number of files to delete. Leave empty for unlimited.</p>
           </div>
           <div>
             <label class="text-xs text-gray-500 mb-1 block">Max Duration</label>
             <input
-              type="text"
-              class="input-field text-sm"
+              pInputText
+              class="w-full"
               [(ngModel)]="profile.max_duration"
               (ngModelChange)="onProfileFieldChange()"
               placeholder="e.g. 1h30m, 45m"
@@ -429,30 +426,27 @@
             ></p-toggleswitch>
           </div>
         </div>
-      </div>
+      </p-card>
 
-      <div class="panel">
-        <h3 class="text-sm font-medium text-gray-200 mb-3">Bi-Sync Settings</h3>
+      <p-card>
+        <h3 class="text-sm font-medium text-gray-200 mb-3">
+          <i class="pi pi-cog mr-2"></i>Bi-Sync Settings
+        </h3>
         <div>
           <label class="text-xs text-gray-500 mb-1 block">Conflict Resolution</label>
-          <select
-            class="select-field"
+          <p-select
+            [options]="conflictResolutionOptions"
             [(ngModel)]="profile.conflict_resolution"
             (ngModelChange)="onProfileFieldChange()"
-          >
-            <option value="">Default (newer wins)</option>
-            <option value="newer">Newer</option>
-            <option value="older">Older</option>
-            <option value="larger">Larger</option>
-            <option value="smaller">Smaller</option>
-            <option value="path1">Path1 (Source)</option>
-            <option value="path2">Path2 (Destination)</option>
-          </select>
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
           <p class="text-xs text-gray-500 mt-1">
             How to resolve conflicts during bi-directional sync
           </p>
         </div>
-      </div>
+      </p-card>
     </div>
     }
   </div>

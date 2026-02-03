@@ -1,28 +1,26 @@
 <!-- Profiles List -->
 <div class="flex flex-col h-full">
   <!-- Header -->
-  <div
-    class="flex items-center justify-between p-4 border-b border-gray-700"
-  >
-    <div class="flex items-center gap-3">
-      <lucide-icon
-        [img]="UsersIcon"
-        class="w-5 h-5 text-primary-400"
-      ></lucide-icon>
-      <h1 class="text-lg font-semibold text-gray-100">Sync Profiles</h1>
-      <span class="text-sm text-gray-500">
-        {{ (appService.configInfo$ | async)?.profiles?.length || 0 }}
-        profile(s)
-      </span>
-    </div>
-    <button
-      class="btn-primary flex items-center gap-1.5 text-sm"
-      (click)="addProfile()"
-    >
-      <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
-      Add Profile
-    </button>
-  </div>
+  <p-toolbar>
+    <ng-template #start>
+      <div class="flex items-center gap-3">
+        <i class="pi pi-users text-primary-400"></i>
+        <h1 class="text-lg font-semibold text-gray-100">Sync Profiles</h1>
+        <span class="text-sm text-gray-500">
+          {{ (appService.configInfo$ | async)?.profiles?.length || 0 }}
+          profile(s)
+        </span>
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <p-button
+        icon="pi pi-plus"
+        label="Add Profile"
+        size="small"
+        (onClick)="addProfile()"
+      ></p-button>
+    </ng-template>
+  </p-toolbar>
 
   <!-- Scrollable Content -->
   <div class="flex-1 overflow-auto">
@@ -32,40 +30,41 @@
         <div class="space-y-3" role="list" aria-label="Sync profiles list">
           @for ( profile of (appService.configInfo$ | async)?.profiles; track
           profile; let idx = $index) {
-          <button
-            type="button"
+          <p-card
+            styleClass="cursor-pointer hover:bg-gray-700 transition-colors duration-200"
             (click)="editProfile(idx)"
-            [attr.aria-label]="'Edit profile ' + (profile.name || 'Untitled')"
-            class="w-full flex items-center p-4 bg-gray-800 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors duration-200 group text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900"
           >
-            <div class="flex-shrink-0 mr-4">
-              <lucide-icon
-                [img]="FolderOpenIcon"
-                class="w-8 h-8 text-gray-400"
-                aria-hidden="true"
-              ></lucide-icon>
+            <div
+              class="flex items-center group"
+              [attr.aria-label]="'Edit profile ' + (profile.name || 'Untitled')"
+            >
+              <div class="flex-shrink-0 mr-4">
+                <i
+                  class="pi pi-folder-open text-3xl text-gray-400"
+                  aria-hidden="true"
+                ></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-lg font-medium text-gray-100 truncate">
+                  {{ profile.name || "Untitled Profile" }}
+                </h3>
+                <p class="text-sm text-gray-400 mt-1">
+                  {{ getProfileDescription(profile) }}
+                </p>
+              </div>
+              <div class="flex-shrink-0 ml-4">
+                <p-button
+                  icon="pi pi-trash"
+                  severity="danger"
+                  [text]="true"
+                  [rounded]="true"
+                  styleClass="opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  (onClick)="removeProfile(idx); $event.stopPropagation()"
+                  [attr.aria-label]="'Delete profile ' + (profile.name || 'Untitled')"
+                ></p-button>
+              </div>
             </div>
-            <div class="flex-1 min-w-0">
-              <h3
-                class="text-lg font-medium text-gray-100 truncate"
-              >
-                {{ profile.name || "Untitled Profile" }}
-              </h3>
-              <p class="text-sm text-gray-400 mt-1">
-                {{ getProfileDescription(profile) }}
-              </p>
-            </div>
-            <div class="flex-shrink-0 ml-4">
-              <button
-                type="button"
-                (click)="removeProfile(idx); $event.stopPropagation()"
-                class="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/50 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                [attr.aria-label]="'Delete profile ' + (profile.name || 'Untitled')"
-              >
-                <lucide-icon [img]="Trash2Icon" class="w-5 h-5" aria-hidden="true"></lucide-icon>
-              </button>
-            </div>
-          </button>
+          </p-card>
           }
         </div>
       </div>
@@ -73,14 +72,8 @@
       <div class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500">
         <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
           <div class="relative">
-            <lucide-icon
-              [img]="FolderOpenIcon"
-              class="w-8 h-8 text-gray-400"
-            ></lucide-icon>
-            <lucide-icon
-              [img]="XIcon"
-              class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
-            ></lucide-icon>
+            <i class="pi pi-folder-open text-3xl text-gray-400"></i>
+            <i class="pi pi-times text-sm text-gray-400 absolute -top-1 -right-1"></i>
           </div>
         </div>
         <h2 class="text-xl font-bold text-gray-100 mb-2">
@@ -89,15 +82,11 @@
         <p class="text-gray-400 mb-6">
           Create your first sync profile to get started
         </p>
-        <button class="btn-primary" (click)="addProfile()">
-          <div class="flex items-center space-x-2">
-            <lucide-icon
-              [img]="PlusIcon"
-              class="w-5 h-5 mr-2"
-            ></lucide-icon>
-            Create First Profile
-          </div>
-        </button>
+        <p-button
+          icon="pi pi-plus"
+          label="Create First Profile"
+          (onClick)="addProfile()"
+        ></p-button>
       </div>
       }
     </div>

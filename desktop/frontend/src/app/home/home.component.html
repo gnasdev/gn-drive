@@ -5,10 +5,7 @@
     class="flex items-center justify-between p-4 border-b border-gray-700"
   >
     <div class="flex items-center gap-3">
-      <lucide-icon
-        [img]="PlayIcon"
-        class="w-5 h-5 text-primary-400"
-      ></lucide-icon>
+      <i class="pi pi-play text-primary-400"></i>
       <h1 class="text-lg font-semibold text-gray-100">Operations</h1>
       <span class="text-sm text-gray-500"
         >{{ tabService.tabsValue.length }} tab{{
@@ -16,13 +13,12 @@
         }}</span
       >
     </div>
-    <button
-      class="btn-primary flex items-center gap-1.5 text-sm"
-      (click)="createTab()"
-    >
-      <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
-      New Tab
-    </button>
+    <p-button
+      label="New Tab"
+      icon="pi pi-plus"
+      size="small"
+      (onClick)="createTab()"
+    />
   </div>
 
   @if (tabService.tabsValue.length === 0) {
@@ -30,14 +26,13 @@
   <div
     class="flex flex-col items-center justify-center flex-1 text-gray-500"
   >
-    <lucide-icon
-      [img]="PlayIcon"
-      class="w-12 h-12 mb-3 opacity-30"
-    ></lucide-icon>
+    <i class="pi pi-play text-5xl mb-3 opacity-30"></i>
     <p class="text-sm mb-3">No operations configured</p>
-    <button class="btn-primary text-sm" (click)="createTab()">
-      Create First Operation
-    </button>
+    <p-button
+      label="Create First Operation"
+      size="small"
+      (onClick)="createTab()"
+    />
   </div>
   } @else {
   <!-- Tab Bar -->
@@ -48,8 +43,8 @@
       <button
         [class]="
           getActiveTabIndex() === i
-            ? 'tab-button-active whitespace-nowrap'
-            : 'tab-button whitespace-nowrap'
+            ? 'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-blue-400 text-blue-400 bg-transparent whitespace-nowrap'
+            : 'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 whitespace-nowrap'
         "
         (click)="onTabChange(i)"
       >
@@ -62,14 +57,14 @@
               (click)="$event.stopPropagation(); startRenameTab(tab.id)"
               title="Rename"
             >
-              <lucide-icon [img]="EditIcon" class="w-3 h-3"></lucide-icon>
+              <i class="pi pi-pencil text-xs"></i>
             </button>
             <button
               class="p-0.5 rounded hover:bg-red-900/50 text-gray-500 hover:text-red-400"
               (click)="$event.stopPropagation(); deleteTab(tab.id)"
               title="Delete"
             >
-              <lucide-icon [img]="Trash2Icon" class="w-3 h-3"></lucide-icon>
+              <i class="pi pi-trash text-xs"></i>
             </button>
           </div>
           }
@@ -85,30 +80,22 @@
     $index) { @if (getActiveTabIndex() === i) {
     <div class="space-y-4">
       <!-- Profile Selection -->
-      <div class="panel">
+      <p-card>
         <label class="text-sm text-gray-400 mb-2 block">Sync Profile</label>
-        <select
-          id="profile-select-{{ tab?.id }}"
-          class="select-field"
-          [value]="getTabProfileValue(tab)"
-          (change)="onProfileChange($event, tab?.id)"
+        <p-select
+          [options]="getProfileOptions()"
+          [ngModel]="getTabProfileValue(tab)"
+          (ngModelChange)="onProfileChange($event, tab?.id)"
+          optionLabel="label"
+          optionValue="value"
           [disabled]="!tab || !tab.id"
-        >
-          <option [value]="null">No profile selected</option>
-          @for (profile of appService.configInfo$.value.profiles; track
-          profile; let idx = $index) {
-          <option
-            [value]="idx"
-            [selected]="tab?.selectedProfileIndex === idx"
-          >
-            {{ profile.name }}
-          </option>
-          }
-        </select>
-      </div>
+          styleClass="w-full"
+          placeholder="No profile selected"
+        />
+      </p-card>
 
       <!-- Operation Type Selector -->
-      <div class="panel">
+      <p-card>
         <label class="text-sm text-gray-400 mb-2 block">Operation Type</label>
         <div class="flex rounded-lg bg-gray-900 p-1 gap-1">
           @for (opType of operationTypes; track opType.value) {
@@ -140,7 +127,7 @@
             "
             (click)="setSyncDirection(tab.id, dir.value)"
           >
-            <lucide-icon [img]="dir.icon" class="w-4 h-4"></lucide-icon>
+            <i [class]="dir.icon" class="text-sm"></i>
             {{ dir.label }}
           </button>
           }
@@ -158,41 +145,34 @@
             (onChange)="toggleDryRun(tab.id)"
           ></p-toggleswitch>
         </div>
-      </div>
+      </p-card>
 
       <!-- Start/Stop Button -->
       @if (validateTabProfileIndex(tab)) {
       <div class="flex gap-3">
-        <button
-          class="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors text-sm"
-          [class]="
-            tab.currentAction
-              ? 'bg-red-600 hover:bg-red-700 text-white'
-              : 'bg-primary-600 hover:bg-primary-700 text-white'
-          "
-          [disabled]="tab.isStopping"
-          (click)="tab.currentAction ? stopCommandTab(tab.id) : startOperation(tab)"
-        >
-          <lucide-icon
-            [img]="
-              tab.isStopping
-                ? ClockIcon
-                : tab.currentAction
-                ? StopCircleIcon
-                : PlayIcon
-            "
-            class="w-5 h-5"
-          ></lucide-icon>
-          {{
+        <p-button
+          class="flex-1"
+          styleClass="w-full"
+          [label]="
             tab.isStopping
-              ? "Stopping..."
+              ? 'Stopping...'
               : tab.currentAction
-              ? "Stop"
-              : (tab.dryRun ? "Dry Run" : "Start") +
-                " " +
+              ? 'Stop'
+              : (tab.dryRun ? 'Dry Run' : 'Start') +
+                ' ' +
                 getOperationLabel(tab)
-          }}
-        </button>
+          "
+          [icon]="
+            tab.isStopping
+              ? 'pi pi-clock'
+              : tab.currentAction
+              ? 'pi pi-stop-circle'
+              : 'pi pi-play'
+          "
+          [severity]="tab.currentAction ? 'danger' : 'primary'"
+          [disabled]="tab.isStopping"
+          (onClick)="tab.currentAction ? stopCommandTab(tab.id) : startOperation(tab)"
+        />
       </div>
       }
 
@@ -204,13 +184,10 @@
 
       <!-- Operation Log -->
       @if (tab.data && tab.data.length > 0) {
-      <div class="panel">
+      <p-card>
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
-            <lucide-icon
-              [img]="TerminalIcon"
-              class="w-4 h-4 text-gray-400"
-            ></lucide-icon>
+            <i class="pi pi-code text-gray-400"></i>
             <span class="text-sm font-medium text-gray-300">
               Operation Log
             </span>
@@ -220,7 +197,7 @@
             (click)="clearTabOutput(tab.id)"
             title="Clear output"
           >
-            <lucide-icon [img]="EraseIcon" class="w-4 h-4"></lucide-icon>
+            <i class="pi pi-eraser"></i>
           </button>
         </div>
         <div
@@ -232,7 +209,7 @@
             }
           </div>
         </div>
-      </div>
+      </p-card>
       }
     </div>
     } }
@@ -252,14 +229,24 @@
   <div class="mb-4">
     <label class="text-sm text-gray-400 mb-1 block">Tab Name</label>
     <input
+      pInputText
       type="text"
-      class="input-field"
+      class="w-full"
       [(ngModel)]="renameDialogData.newName"
       (keydown.enter)="confirmRename()"
     />
   </div>
   <div class="flex justify-end gap-2">
-    <button class="btn-secondary text-sm" (click)="cancelRename()">Cancel</button>
-    <button class="btn-primary text-sm" (click)="confirmRename()">Rename</button>
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      size="small"
+      (onClick)="cancelRename()"
+    />
+    <p-button
+      label="Rename"
+      size="small"
+      (onClick)="confirmRename()"
+    />
   </div>
 </p-dialog>

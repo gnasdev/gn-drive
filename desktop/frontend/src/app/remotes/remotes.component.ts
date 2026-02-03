@@ -12,6 +12,11 @@ import { AppService } from "../app.service";
 import { ErrorService } from "../services/error.service";
 import { Dialog } from "primeng/dialog";
 import { ConfirmationService } from "primeng/api";
+import { Card } from "primeng/card";
+import { Toolbar } from "primeng/toolbar";
+import { ButtonModule } from "primeng/button";
+import { InputText } from "primeng/inputtext";
+import { Select } from "primeng/select";
 
 // Type imports
 import {
@@ -19,11 +24,10 @@ import {
   RemoteTypeOption,
   REMOTE_TYPE_OPTIONS,
 } from "./remotes.types";
-import { LucideAngularModule, Cloud, Plus, X, Trash2 } from "lucide-angular";
 
 @Component({
   selector: "app-remotes",
-  imports: [CommonModule, FormsModule, LucideAngularModule, Dialog],
+  imports: [CommonModule, FormsModule, Dialog, Card, Toolbar, ButtonModule, InputText, Select],
   templateUrl: "./remotes.component.html",
   styleUrl: "./remotes.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,11 +35,6 @@ import { LucideAngularModule, Cloud, Plus, X, Trash2 } from "lucide-angular";
 export class RemotesComponent implements OnInit, OnDestroy {
   Date = Date;
 
-  // Lucide Icons
-  readonly CloudIcon = Cloud;
-  readonly PlusIcon = Plus;
-  readonly XIcon = X;
-  readonly Trash2Icon = Trash2;
   private subscriptions = new Subscription();
   readonly isAddingRemote$ = new BehaviorSubject<boolean>(false);
 
@@ -129,9 +128,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       await this.appService.addRemote({
         name: this.addRemoteData.name,
         type: this.addRemoteData.type,
-      });
-      console.log(`Remote "${this.addRemoteData.name}" added successfully!`);
-      this.errorService.showSuccess(
+      });      this.errorService.showSuccess(
         `Remote "${this.addRemoteData.name}" added successfully!`
       );
       this.closeAddRemoteModal();
@@ -175,9 +172,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
 
   private async executeDeleteRemote(remoteName: string): Promise<void> {
     try {
-      await this.appService.deleteRemote(remoteName);
-      console.log(`Remote "${remoteName}" deleted successfully!`);
-      this.errorService.showSuccess(
+      await this.appService.deleteRemote(remoteName);      this.errorService.showSuccess(
         `Remote "${remoteName}" deleted successfully!`
       );
     } catch (error) {

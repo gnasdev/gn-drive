@@ -1,31 +1,21 @@
 @if (syncStatus) {
-<div
-  class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4"
->
+<p-card>
   @if (showTitle) {
   <div
     class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700"
   >
     <div class="flex items-center space-x-2">
-      <lucide-icon
-        [img]="getStatusIcon()"
-        class="w-5 h-5 text-blue-600"
-      ></lucide-icon>
+      <i [class]="getStatusIcon()" class="text-xl text-blue-600"></i>
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
         Sync Status
       </h3>
     </div>
-    <div
-      class="flex items-center space-x-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300"
-    >
-      <lucide-icon [img]="getActionIcon()" class="w-4 h-4"></lucide-icon>
-      <span>{{ getActionLabel() }}</span>
-    </div>
+    <p-tag [icon]="getActionIcon()" [value]="getActionLabel()" severity="secondary" [rounded]="true" />
   </div>
   }
 
   <!-- Progress Section -->
-  <div class="space-y-3">
+  <div class="space-y-3 mt-4">
     <div class="flex items-center justify-between">
       <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
         >Progress</span
@@ -34,21 +24,16 @@
         >{{ getProgressValue().toFixed(1) }}%</span
       >
     </div>
-    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-      <div
-        class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-        [style.width.%]="getProgressValue()"
-      ></div>
-    </div>
+    <p-progressbar [value]="getProgressValue()" [showValue]="false" [style]="{ height: '0.5rem' }" />
     <div
       class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
     >
       <div class="flex items-center space-x-1">
-        <lucide-icon [img]="ZapIcon" class="w-3 h-3"></lucide-icon>
+        <i class="pi pi-bolt text-xs"></i>
         <span>{{ syncStatus.speed }}</span>
       </div>
       <div class="flex items-center space-x-1">
-        <lucide-icon [img]="TimerIcon" class="w-3 h-3"></lucide-icon>
+        <i class="pi pi-clock text-xs"></i>
         <span>{{ syncStatus.elapsed_time }}</span>
       </div>
     </div>
@@ -56,17 +41,14 @@
 
   <!-- Transfer Statistics -->
   @if (hasTransferData()) {
-  <div class="space-y-3">
+  <div class="space-y-3 mt-4">
     <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
       Transfer Statistics
     </h4>
     <div class="grid grid-cols-2 gap-3">
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="FileTextIcon"
-            class="w-5 h-5 text-blue-500"
-          ></lucide-icon>
+          <i class="pi pi-file text-xl text-blue-500"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Files
@@ -81,10 +63,7 @@
       </div>
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="HardDriveIcon"
-            class="w-5 h-5 text-green-500"
-          ></lucide-icon>
+          <i class="pi pi-server text-xl text-green-500"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Data
@@ -103,7 +82,7 @@
 
   <!-- Activity Statistics -->
   @if (hasActivityData()) {
-  <div class="space-y-3">
+  <div class="space-y-3 mt-4">
     <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
       Activity
     </h4>
@@ -111,10 +90,7 @@
       @if (syncStatus.checks > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="CheckIcon"
-            class="w-5 h-5 text-blue-500"
-          ></lucide-icon>
+          <i class="pi pi-check-circle text-xl text-blue-500"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Checks
@@ -128,10 +104,7 @@
       } @if (syncStatus.deletes > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="Trash2Icon"
-            class="w-5 h-5 text-red-500"
-          ></lucide-icon>
+          <i class="pi pi-trash text-xl text-red-500"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Deletes
@@ -145,10 +118,7 @@
       } @if (syncStatus.errors > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <lucide-icon
-            [img]="AlertCircleIcon"
-            class="w-5 h-5 text-red-500"
-          ></lucide-icon>
+          <i class="pi pi-exclamation-circle text-xl text-red-500"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Errors
@@ -166,33 +136,25 @@
 
   <!-- Current File -->
   @if (syncStatus.current_file) {
-  <div class="space-y-2">
+  <div class="space-y-2 mt-4">
     <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
       Current File
     </h4>
     <div
       class="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
     >
-      <lucide-icon
-        [img]="FolderOpenIcon"
-        class="w-4 h-4 text-blue-500"
-      ></lucide-icon>
+      <i class="pi pi-folder-open text-base text-blue-500"></i>
       <span class="text-sm text-gray-900 dark:text-white truncate">{{
         syncStatus.current_file
       }}</span>
     </div>
   </div>
   }
-</div>
+</p-card>
 } @else {
-<div
-  class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
->
+<p-card>
   <div class="text-center py-8">
-    <lucide-icon
-      [img]="MoonIcon"
-      class="w-12 h-12 mx-auto mb-4 text-gray-400"
-    ></lucide-icon>
+    <i class="pi pi-moon text-5xl mb-4 text-gray-400"></i>
     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
       Ready to Sync
     </h3>
@@ -200,5 +162,5 @@
       No sync operation running
     </p>
   </div>
-</div>
+</p-card>
 }

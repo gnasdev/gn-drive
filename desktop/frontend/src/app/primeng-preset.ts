@@ -73,7 +73,87 @@ const NsDrivePreset = definePreset(Aura, {
         borderRadius: "0.75rem",
       },
     },
+    card: {
+      root: {
+        background: "{surface.800}",
+      },
+      colorScheme: {
+        dark: {
+          root: {
+            background: "{surface.800}",
+          },
+        },
+      },
+    },
+    toolbar: {
+      root: {
+        padding: "0.75rem 1.25rem",
+      },
+      colorScheme: {
+        dark: {
+          root: {
+            background: "{surface.800}",
+          },
+        },
+      },
+    },
+    tabs: {
+      colorScheme: {
+        dark: {
+          tablist: {
+            background: "transparent",
+          },
+          tab: {
+            background: "transparent",
+            hoverBackground: "{surface.800}",
+            activeBackground: "transparent",
+            color: "{surface.400}",
+            hoverColor: "{surface.100}",
+            activeColor: "{primary.400}",
+          },
+        },
+      },
+    },
+    datatable: {
+      colorScheme: {
+        dark: {
+          header: {
+            background: "{surface.800}",
+          },
+          row: {
+            background: "{surface.800}",
+            hoverBackground: "{surface.700}",
+          },
+        },
+      },
+    },
+    progressbar: {
+      root: {
+        height: "0.5rem",
+      },
+      colorScheme: {
+        dark: {
+          root: {
+            background: "{surface.700}",
+          },
+          value: {
+            background: "{primary.500}",
+          },
+        },
+      },
+    },
+    tag: {
+      root: {
+        fontSize: "0.75rem",
+        padding: "0.25rem 0.5rem",
+      },
+    },
+    selectbutton: {
+      root: {
+        borderRadius: "0.5rem",
+      },
+    },
   },
-});
+} as any);
 
 export default NsDrivePreset;

@@ -282,8 +282,12 @@ func (t *TabService) AddTabOutput(ctx context.Context, tabId string, output stri
 		return fmt.Errorf("tab with ID '%s' not found", tabId)
 	}
 
-	// Add output
+	// Add output with size cap to prevent unbounded memory growth
 	tab.Output = append(tab.Output, output)
+	const maxTabOutput = 1000
+	if len(tab.Output) > maxTabOutput {
+		tab.Output = tab.Output[len(tab.Output)-maxTabOutput:]
+	}
 	tab.UpdatedAt = time.Now()
 
 	// Emit tab output event

@@ -40,23 +40,11 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 		j, _ = utils.NewCommandStartedDTO(id, task).ToJSON()
 	}
 
-	if a.oc != nil {
-		a.oc <- j
-	} else {
-		log.Printf("ERROR: Event channel is nil, cannot send events")
-		// Initialize the event channel if it's nil
-		a.oc = make(chan []byte, 100) // buffered channel
-		go func() {
-			for data := range a.oc {
-				if a.app != nil {
-					a.app.Event.Emit("tofe", string(data))
-				}
-			}
-		}()
-		// Try sending the event again
-		a.oc <- j
-		log.Printf("Event channel initialized and event sent")
+	if a.oc == nil {
+		log.Printf("ERROR: Event channel is nil, skipping event send")
+		return 0
 	}
+	a.oc <- j
 
 	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
 	if err != nil {
@@ -71,7 +59,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 		return 0
 	}
 
-	outLog := make(chan string)
+	outLog := make(chan string, 100)
 
 	// Start sync status reporting
 	stopSyncStatus := utils.StartSyncStatusReporting(a.oc, id, task, tabId)
@@ -137,7 +125,6 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 		}
 		a.oc <- j
 
-		log.Println("Sync stopped!")
 	}()
 
 	return id
@@ -171,11 +158,9 @@ func (a *App) StopCommand(id int) {
 }
 
 func (a *App) GetConfigInfo() models.ConfigInfo {
-	// Initialize configuration if not already done
-	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+	if !a.initialized {
 		a.initializeConfig()
 	}
-
 	return a.ConfigInfo
 }
 
@@ -198,27 +183,15 @@ func (a *App) UpdateProfiles(profiles models.Profiles) *dto.AppError {
 }
 
 func (a *App) GetRemotes() []fsConfig.Remote {
-	// Initialize configuration if not already done
-	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
-		log.Printf("DEBUG: GetRemotes - initializing config")
+	if !a.initialized {
 		a.initializeConfig()
 	}
 
-	// Debug: Check current working directory and config path
-	wd, _ := os.Getwd()
-	log.Printf("DEBUG: GetRemotes - current working directory: %s", wd)
-	log.Printf("DEBUG: GetRemotes - rclone config path: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
-
-	// Check if config file exists
-	if _, err := os.Stat(a.ConfigInfo.EnvConfig.RcloneFilePath); os.IsNotExist(err) {
-		log.Printf("DEBUG: GetRemotes - rclone config file does not exist: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
-	} else {
-		log.Printf("DEBUG: GetRemotes - rclone config file exists: %s", a.ConfigInfo.EnvConfig.RcloneFilePath)
+	if a.cachedRemotes != nil {
+		return a.cachedRemotes
 	}
-
-	remotes := fsConfig.GetRemotes()
-	log.Printf("DEBUG: GetRemotes - found %d remotes", len(remotes))
-	return remotes
+	a.cachedRemotes = fsConfig.GetRemotes()
+	return a.cachedRemotes
 }
 
 func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
@@ -230,17 +203,22 @@ func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[s
 	}
 
 	// Handle special cases for providers that need interactive setup
+	var err *dto.AppError
 	switch remoteType {
 	case "iclouddrive":
-		return a.addICloudRemote(ctx, remoteName, remoteConfig)
+		err = a.addICloudRemote(ctx, remoteName, remoteConfig)
 	default:
 		// Standard OAuth flow for other providers
-		return a.addOAuthRemote(ctx, remoteName, remoteType, remoteConfig)
+		err = a.addOAuthRemote(ctx, remoteName, remoteType, remoteConfig)
 	}
+
+	if err == nil {
+		a.invalidateRemotesCache()
+	}
+	return err
 }
 
 func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
-	log.Printf("Creating OAuth remote: name=%s, type=%s", remoteName, remoteType)
 
 	// Prepare configuration parameters
 	configParams := rc.Params{}
@@ -264,26 +242,22 @@ func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType 
 		})
 
 		if err != nil {
-			log.Printf("Error creating OAuth remote %s (%s): %v", remoteName, remoteType, err)
 			a.errorHandler.HandleError(err, "add_oauth_remote", remoteType, remoteName)
 			a.DeleteRemote(remoteName) // Clean up on failure
 			return dto.NewAppError(err)
 		}
 
-		log.Printf("Successfully created OAuth remote: %s (%s)", remoteName, remoteType)
 		return nil
 
 	default:
 		// For non-OAuth providers, use standard creation
 		_, err := fsConfig.CreateRemote(ctx, remoteName, remoteType, configParams, fsConfig.UpdateRemoteOpt{})
 		if err != nil {
-			log.Printf("Error creating remote %s (%s): %v", remoteName, remoteType, err)
 			a.errorHandler.HandleError(err, "add_remote", remoteType, remoteName)
 			a.DeleteRemote(remoteName)
 			return dto.NewAppError(err)
 		}
 
-		log.Printf("Successfully created remote: %s (%s)", remoteName, remoteType)
 		return nil
 	}
 }
@@ -353,8 +327,7 @@ func (a *App) StopAddingRemote() *dto.AppError {
 }
 
 func (a *App) DeleteRemote(remoteName string) *dto.AppError {
-	// Initialize configuration if not already done
-	if a.ConfigInfo.EnvConfig.ProfileFilePath == "" {
+	if !a.initialized {
 		a.initializeConfig()
 	}
 
@@ -382,7 +355,6 @@ func (a *App) DeleteRemote(remoteName string) *dto.AppError {
 			profilesToKeep = append(profilesToKeep, profile)
 		} else {
 			deletedProfileCount++
-			log.Printf("Deleting profile '%s' because it uses remote '%s'", profile.Name, remoteName)
 		}
 	}
 
@@ -403,13 +375,12 @@ func (a *App) DeleteRemote(remoteName string) *dto.AppError {
 			return dto.NewAppError(err)
 		}
 
-		log.Printf("Deleted %d profiles that were using remote '%s'", deletedProfileCount, remoteName)
 	}
 
 	// Delete the remote from rclone config
 	fsConfig.DeleteRemote(remoteName)
+	a.invalidateRemotesCache()
 
-	log.Printf("Remote '%s' deleted successfully", remoteName)
 	return nil
 }
 

@@ -29,8 +29,6 @@ export class ThemeService {
     body.classList.add("dark-theme");
     html.classList.add("dark-theme");
 
-    console.log("ThemeService: Applied dark theme (permanent)");
-
     // Force repaint to ensure styles are applied
     setTimeout(() => {
       body.style.display = "none";

@@ -39,9 +39,7 @@ export class TabService {
   private tabs$ = new BehaviorSubject<Tab[]>([]);
   private activeTabId$ = new BehaviorSubject<string | null>(null);
 
-  constructor() {
-    console.log("TabService constructor called");
-  }
+  constructor() {  }
 
   get tabs() {
     return this.tabs$.asObservable();
@@ -163,27 +161,12 @@ export class TabService {
     this.updateTab(tabId, { isEditing: false });
   }
 
-  handleCommandEvent(data: CommandDTO): void {
-    console.log("TabService handleCommandEvent called with data:", data);
-
-    if (!data.tab_id) {
-      console.log("TabService: No tab_id in event data");
-      return;
+  handleCommandEvent(data: CommandDTO): void {    if (!data.tab_id) {      return;
     }
 
     const tab = this.getTab(data.tab_id);
-    if (!tab) {
-      console.log("TabService: Tab not found for id:", data.tab_id);
-      return;
-    }
-
-    console.log(
-      "TabService: Processing command:",
-      data.command,
-      "for tab:",
-      data.tab_id
-    );
-    switch (data.command) {
+    if (!tab) {      return;
+    }    switch (data.command) {
       case "command_started":
         // Clear previous data when a new command starts
         this.updateTab(data.tab_id, {
@@ -264,20 +247,12 @@ export class TabService {
 
   // Handle new typed sync events from backend
   handleTypedSyncEvent(event: SyncEvent): void {
-    if (!event.tabId) {
-      console.log("TabService: No tabId in sync event");
-      return;
+    if (!event.tabId) {      return;
     }
 
     const tab = this.getTab(event.tabId);
-    if (!tab) {
-      console.log("TabService: Tab not found for id:", event.tabId);
-      return;
-    }
-
-    console.log("TabService: Processing typed sync event:", event.type, "for tab:", event.tabId);
-
-    switch (event.type) {
+    if (!tab) {      return;
+    }    switch (event.type) {
       case "sync:started":
         this.updateTab(event.tabId, {
           data: [`Sync started: ${event.message || ""}`],

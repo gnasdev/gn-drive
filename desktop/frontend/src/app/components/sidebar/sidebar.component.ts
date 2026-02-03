@@ -8,35 +8,23 @@ import {
   NavigationService,
   PageName,
 } from "../../navigation.service.js";
-import {
-  LucideAngularModule,
-  LayoutDashboard,
-  Play,
-  FolderTree,
-  Users,
-  Cloud,
-  Calendar,
-  History,
-  Settings,
-} from "lucide-angular";
 
 interface SidebarItem {
   page: PageName;
   label: string;
-  icon: any;
+  icon: string;
   section?: string;
 }
 
 @Component({
   selector: "app-sidebar",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside
-      class="sidebar"
-      [class.sidebar-collapsed]="collapsed"
-      [class.sidebar-expanded]="!collapsed"
+      class="flex flex-col h-screen bg-gray-950 border-r border-gray-800 transition-all duration-200"
+      [style.width]="collapsed ? '3.5rem' : '13rem'"
     >
       <!-- Logo -->
       <div class="flex items-center h-14 px-3 border-b border-gray-800">
@@ -67,14 +55,13 @@ interface SidebarItem {
         <button
           (click)="navigate(item.page)"
           [class]="
-            isActive(item.page) ? 'sidebar-item sidebar-item-active' : 'sidebar-item'
+            isActive(item.page)
+              ? 'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-primary-400 bg-primary-400/10 cursor-pointer'
+              : 'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 cursor-pointer transition-colors'
           "
           [title]="item.label"
         >
-          <lucide-icon
-            [img]="item.icon"
-            class="w-5 h-5 shrink-0"
-          ></lucide-icon>
+          <i [class]="item.icon" class="w-5 h-5 shrink-0"></i>
           @if (!collapsed) {
           <span class="text-sm truncate">{{ item.label }}</span>
           }
@@ -88,28 +75,28 @@ export class SidebarComponent {
   collapsed = false;
 
   readonly menuItems: SidebarItem[] = [
-    { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { page: "operations", label: "Operations", icon: Play },
+    { page: "dashboard", label: "Dashboard", icon: "pi pi-th-large" },
+    { page: "operations", label: "Operations", icon: "pi pi-play" },
     {
       page: "file-browser",
       label: "File Browser",
-      icon: FolderTree,
+      icon: "pi pi-folder-open",
     },
     {
       page: "profiles",
       label: "Profiles",
-      icon: Users,
+      icon: "pi pi-users",
       section: "Configuration",
     },
-    { page: "remotes", label: "Remotes", icon: Cloud },
-    { page: "schedules", label: "Schedules", icon: Calendar },
+    { page: "remotes", label: "Remotes", icon: "pi pi-cloud" },
+    { page: "schedules", label: "Schedules", icon: "pi pi-calendar" },
     {
       page: "history",
       label: "History",
-      icon: History,
+      icon: "pi pi-history",
       section: "Activity",
     },
-    { page: "settings", label: "Settings", icon: Settings },
+    { page: "settings", label: "Settings", icon: "pi pi-cog" },
   ];
 
   constructor(public readonly navigationService: NavigationService) {

@@ -11,6 +11,12 @@ import { NavigationService } from "../navigation.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
 import { ToggleSwitch } from "primeng/toggleswitch";
+import { ButtonModule } from "primeng/button";
+import { Card } from "primeng/card";
+import { Toolbar } from "primeng/toolbar";
+import { InputText } from "primeng/inputtext";
+import { InputNumber } from "primeng/inputnumber";
+import { Select } from "primeng/select";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   parseRemotePath,
@@ -21,28 +27,20 @@ import {
   DEFAULT_BANDWIDTH_OPTIONS,
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
-import {
-  LucideAngularModule,
-  ArrowLeft,
-  Edit,
-  FolderOpen,
-  Zap,
-  Wifi,
-  Save,
-  Trash,
-  Plus,
-  Minus,
-  File,
-  Folder,
-  Check,
-  X,
-} from "lucide-angular";
-
-// No Material imports needed anymore
 
 @Component({
   selector: "app-profile-edit",
-  imports: [CommonModule, FormsModule, LucideAngularModule, ToggleSwitch],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ToggleSwitch,
+    ButtonModule,
+    Card,
+    Toolbar,
+    InputText,
+    InputNumber,
+    Select,
+  ],
   templateUrl: "./profile-edit.component.html",
   styleUrl: "./profile-edit.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,36 +49,38 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   Date = Date;
   private subscriptions = new Subscription();
 
-  // Lucide Icons
-  readonly ArrowLeftIcon = ArrowLeft;
-  readonly EditIcon = Edit;
-  readonly FolderOpenIcon = FolderOpen;
-  readonly ZapIcon = Zap;
-  readonly WifiIcon = Wifi;
-  readonly SaveIcon = Save;
-  readonly TrashIcon = Trash;
-  readonly PlusIcon = Plus;
-  readonly MinusIcon = Minus;
-  readonly FileIcon = File;
-  readonly FolderIcon = Folder;
-  readonly CheckIcon = Check;
-  readonly XIcon = X;
-
   saveBtnText$ = new BehaviorSubject<string>("Save");
   profileIndex = 0;
   profile: models.Profile | null = null;
   activeTab: 'general' | 'filters' | 'performance' | 'advanced' = 'general';
 
   readonly editorTabs = [
-    { id: 'general' as const, label: 'General' },
-    { id: 'filters' as const, label: 'Filters' },
-    { id: 'performance' as const, label: 'Performance' },
-    { id: 'advanced' as const, label: 'Advanced' },
+    { id: 'general' as const, label: 'General', icon: 'pi pi-folder-open' },
+    { id: 'filters' as const, label: 'Filters', icon: 'pi pi-file' },
+    { id: 'performance' as const, label: 'Performance', icon: 'pi pi-bolt' },
+    { id: 'advanced' as const, label: 'Advanced', icon: 'pi pi-cog' },
   ];
 
   // Configuration options
   readonly bandwidthOptions = DEFAULT_BANDWIDTH_OPTIONS;
   readonly parallelOptions = DEFAULT_PARALLEL_OPTIONS;
+
+  // Options for path type select
+  readonly pathTypeOptions = [
+    { label: 'File', value: 'file' },
+    { label: 'Folder', value: 'folder' },
+  ];
+
+  // Options for conflict resolution select
+  readonly conflictResolutionOptions = [
+    { label: 'Default (newer wins)', value: '' },
+    { label: 'Newer', value: 'newer' },
+    { label: 'Older', value: 'older' },
+    { label: 'Larger', value: 'larger' },
+    { label: 'Smaller', value: 'smaller' },
+    { label: 'Path1 (Source)', value: 'path1' },
+    { label: 'Path2 (Destination)', value: 'path2' },
+  ];
 
   constructor(
     public readonly appService: AppService,
@@ -120,7 +120,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     }
     this.appService.saveConfigInfo();
     this.saveBtnText$.next("Saved ~");
-    setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
+    setTimeout(() => this.saveBtnText$.next("Save"), 1000);
     this.cdr.detectChanges();
   }
 
@@ -138,6 +138,14 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   // Helper method to generate number ranges for selectors
   getNumberRange(start: number, end: number): number[] {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+
+  // Helper to generate options for number range selects
+  getNumberRangeOptions(start: number, end: number): { label: string; value: number }[] {
+    return Array.from({ length: end - start + 1 }, (_, i) => ({
+      label: String(start + i),
+      value: start + i,
+    }));
   }
 
   // From path helpers
@@ -179,8 +187,6 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     this.appService.updateProfile(this.profileIndex, this.profile);
     this.cdr.detectChanges();
   }
-
-  // Event handlers for new Tailwind form elements - removed as we now use ngModel
 
   // Include path methods
   addIncludePath(): void {
@@ -303,9 +309,8 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   }
 
   // Event handlers for include paths
-  onIncludePathTypeChange(index: number, event: Event): void {
-    const target = event.target as HTMLSelectElement;
-    this.updateIncludePathType(index, target.value);
+  onIncludePathTypeChange(index: number, value: string): void {
+    this.updateIncludePathType(index, value);
   }
 
   onIncludePathValueChange(index: number, event: Event): void {
@@ -314,14 +319,21 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
   }
 
   // Event handlers for exclude paths
-  onExcludePathTypeChange(index: number, event: Event): void {
-    const target = event.target as HTMLSelectElement;
-    this.updateExcludePathType(index, target.value);
+  onExcludePathTypeChange(index: number, value: string): void {
+    this.updateExcludePathType(index, value);
   }
 
   onExcludePathValueChange(index: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     this.updateExcludePathValue(index, target.value);
+  }
+
+  getRemoteOptions(): { label: string; value: string }[] {
+    const remotes = this.appService.remotes$.value || [];
+    return [
+      { label: 'Local', value: '' },
+      ...remotes.map(r => ({ label: r.name, value: r.name })),
+    ];
   }
 
   // Track by function for ngFor

@@ -1,27 +1,25 @@
 <!-- Remotes List -->
 <div class="flex flex-col h-full">
   <!-- Header -->
-  <div
-    class="flex items-center justify-between p-4 border-b border-gray-700"
-  >
-    <div class="flex items-center gap-3">
-      <lucide-icon
-        [img]="CloudIcon"
-        class="w-5 h-5 text-primary-400"
-      ></lucide-icon>
-      <h1 class="text-lg font-semibold text-gray-100">Connected Remotes</h1>
-      <span class="text-sm text-gray-500">
-        {{ (appService.remotes$ | async)?.length || 0 }} remote(s)
-      </span>
-    </div>
-    <button
-      class="btn-primary flex items-center gap-1.5 text-sm"
-      (click)="openAddRemoteDialog()"
-    >
-      <lucide-icon [img]="PlusIcon" class="w-4 h-4"></lucide-icon>
-      Add Remote
-    </button>
-  </div>
+  <p-toolbar>
+    <ng-template #start>
+      <div class="flex items-center gap-3">
+        <i class="pi pi-cloud text-primary-400 text-xl"></i>
+        <h1 class="text-lg font-semibold text-gray-100">Connected Remotes</h1>
+        <span class="text-sm text-gray-500">
+          {{ (appService.remotes$ | async)?.length || 0 }} remote(s)
+        </span>
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <p-button
+        label="Add Remote"
+        icon="pi pi-plus"
+        (onClick)="openAddRemoteDialog()"
+        size="small"
+      ></p-button>
+    </ng-template>
+  </p-toolbar>
 
   <!-- Scrollable Content -->
   <div class="flex-1 overflow-auto">
@@ -30,38 +28,32 @@
       <div class="p-4">
         <div class="space-y-3" role="list" aria-label="Connected remotes list">
           @for (remote of appService.remotes$ | async; track remote) {
-          <article
-            class="flex items-center p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors duration-200 group"
-            [attr.aria-label]="'Remote: ' + remote.name"
-          >
-            <div class="flex-shrink-0 mr-4">
-              <lucide-icon
-                [img]="CloudIcon"
-                class="w-8 h-8 text-gray-400"
-                aria-hidden="true"
-              ></lucide-icon>
+          <p-card [attr.aria-label]="'Remote: ' + remote.name" styleClass="group hover:bg-gray-700 transition-colors duration-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0 mr-4">
+                <i class="pi pi-cloud text-3xl text-gray-400" aria-hidden="true"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-lg font-medium text-gray-100 truncate">
+                  {{ remote.name }}
+                </h3>
+                <p class="text-sm text-gray-400 mt-1">
+                  {{ getRemoteTypeLabel(remote.type) }}
+                </p>
+              </div>
+              <div class="flex-shrink-0 ml-4">
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="confirmDeleteRemote(remote)"
+                  [attr.aria-label]="'Delete remote ' + remote.name"
+                  styleClass="opacity-0 group-hover:opacity-100 focus:opacity-100"
+                ></p-button>
+              </div>
             </div>
-            <div class="flex-1 min-w-0">
-              <h3
-                class="text-lg font-medium text-gray-100 truncate"
-              >
-                {{ remote.name }}
-              </h3>
-              <p class="text-sm text-gray-400 mt-1">
-                {{ getRemoteTypeLabel(remote.type) }}
-              </p>
-            </div>
-            <div class="flex-shrink-0 ml-4">
-              <button
-                type="button"
-                (click)="confirmDeleteRemote(remote)"
-                class="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/50 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                [attr.aria-label]="'Delete remote ' + remote.name"
-              >
-                <lucide-icon [img]="Trash2Icon" class="w-5 h-5" aria-hidden="true"></lucide-icon>
-              </button>
-            </div>
-          </article>
+          </p-card>
           }
         </div>
       </div>
@@ -69,14 +61,8 @@
       <div class="flex flex-col items-center justify-center flex-1 py-16 text-gray-500">
         <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
           <div class="relative">
-            <lucide-icon
-              [img]="CloudIcon"
-              class="w-8 h-8 text-gray-400"
-            ></lucide-icon>
-            <lucide-icon
-              [img]="XIcon"
-              class="w-4 h-4 text-gray-400 absolute -top-1 -right-1"
-            ></lucide-icon>
+            <i class="pi pi-cloud text-3xl text-gray-400"></i>
+            <i class="pi pi-times text-sm text-gray-400 absolute -top-1 -right-1"></i>
           </div>
         </div>
         <h2 class="text-xl font-bold text-gray-100 mb-2">
@@ -85,15 +71,11 @@
         <p class="text-gray-400 mb-6">
           Add your first cloud storage connection
         </p>
-        <button class="btn-primary" (click)="openAddRemoteDialog()">
-          <div class="flex items-center space-x-2">
-            <lucide-icon
-              [img]="PlusIcon"
-              class="w-5 h-5 mr-2"
-            ></lucide-icon>
-            Add First Remote
-          </div>
-        </button>
+        <p-button
+          label="Add First Remote"
+          icon="pi pi-plus"
+          (onClick)="openAddRemoteDialog()"
+        ></p-button>
       </div>
       }
     </div>
@@ -120,11 +102,12 @@
       <input
         id="remote-name-input"
         type="text"
-        class="input-field"
+        pInputText
         [(ngModel)]="addRemoteData.name"
         name="name"
         placeholder="Enter remote name"
         required
+        class="w-full"
       />
     </div>
     <div>
@@ -134,48 +117,34 @@
       >
         Remote Type
       </label>
-      <select
+      <p-select
         id="remote-type-select"
-        class="select-field"
         [(ngModel)]="addRemoteData.type"
         name="type"
-        required
-      >
-        <option value="drive">Google Drive</option>
-        <option value="dropbox">Dropbox</option>
-        <option value="onedrive">OneDrive</option>
-        <option value="yandex">Yandex Disk</option>
-        <option value="gphotos">Google Photos</option>
-      </select>
+        [options]="remoteTypeOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Select a remote type"
+        styleClass="w-full"
+      ></p-select>
     </div>
     <div class="flex justify-end space-x-3 pt-4">
-      <button
+      <p-button
         type="button"
-        class="btn-secondary"
-        (click)="closeAddRemoteModal()"
-      >
-        Cancel
-      </button>
-      <button
+        label="Cancel"
+        severity="secondary"
+        (onClick)="closeAddRemoteModal()"
+      ></p-button>
+      <p-button
         type="submit"
-        class="btn-primary"
+        [label]="(isAddingRemote$ | async) ? 'Adding...' : 'Add Remote'"
         [disabled]="
           !addRemoteData.name ||
           !addRemoteData.type ||
           (isAddingRemote$ | async)
         "
-      >
-        @if ((isAddingRemote$ | async) === false) {
-        <span>Add Remote</span>
-        } @if (isAddingRemote$ | async) {
-        <span class="flex items-center">
-          <div
-            class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
-          ></div>
-          Adding...
-        </span>
-        }
-      </button>
+        [loading]="!!(isAddingRemote$ | async)"
+      ></p-button>
     </div>
   </form>
 </p-dialog>

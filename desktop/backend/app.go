@@ -25,6 +25,7 @@ type App struct {
 	frontendLogger *errors.FrontendLogger
 	initialized    bool
 	initMutex      sync.Mutex
+	cachedRemotes  []fsConfig.Remote
 }
 
 // NewApp creates a new App application struct
@@ -46,7 +47,6 @@ func NewAppWithApplication(app *application.App) *App {
 
 // SetApp sets the application reference for events
 func (a *App) SetApp(app *application.App) {
-	log.Printf("SetApp called with app: %v", app != nil)
 	a.app = app
 }
 
@@ -58,18 +58,10 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	// Note: In Wails v3, we don't have direct access to the application instance from ServiceOptions
 	// We'll need to handle events differently or get the app reference another way
 
-	// Debug: Log initial working directory
-	initialWd, _ := os.Getwd()
-	log.Printf("DEBUG: Initial working directory: %s", initialWd)
-
 	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
 		a.errorHandler.HandleError(err, "startup", "working_directory")
 		utils.LogErrorAndExit(err)
 	}
-
-	// Debug: Log working directory after normalization
-	normalizedWd, _ := os.Getwd()
-	log.Printf("DEBUG: Working directory after normalization: %s", normalizedWd)
 
 	// Migrate config files from old location to new home directory location
 	if err := utils.MigrateConfigFiles(); err != nil {
@@ -77,7 +69,6 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	}
 
 	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
-	log.Printf("DEBUG: Loaded env config: %+v", a.ConfigInfo.EnvConfig)
 
 	// Load working directory
 	wd, err := os.Getwd()
@@ -90,13 +81,9 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	// Load profiles
 	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
-		log.Printf("DEBUG: Error loading profiles: %v", err)
 		a.errorHandler.HandleError(err, "startup", "load_profiles")
-		// Initialize with empty profiles if file doesn't exist instead of exiting
-		log.Printf("WARNING: Could not load profiles, initializing with empty profiles")
 		a.ConfigInfo.Profiles = []models.Profile{}
 	}
-	log.Printf("DEBUG: Loaded %d profiles", len(a.ConfigInfo.Profiles))
 
 	// Setup event channel for sending messages to the frontend
 	a.oc = make(chan []byte, 100) // buffered channel to prevent blocking
@@ -108,7 +95,6 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 			}
 		}
 	}()
-	log.Printf("Event channel initialized successfully")
 
 	// Load Rclone config
 	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
@@ -116,6 +102,10 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	}
 	configfile.Install()
 
+	// Cache initial remotes list
+	a.cachedRemotes = fsConfig.GetRemotes()
+
+	a.initialized = true
 	return nil
 }
 
@@ -155,8 +145,6 @@ func (a *App) initializeConfig() {
 	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
 	if err != nil {
 		a.errorHandler.HandleError(err, "init_config", "load_profiles")
-		// Initialize with empty profiles if file doesn't exist instead of returning
-		log.Printf("WARNING: Could not load profiles during initialization, initializing with empty profiles")
 		a.ConfigInfo.Profiles = []models.Profile{}
 	}
 
@@ -167,22 +155,13 @@ func (a *App) initializeConfig() {
 	}
 	configfile.Install()
 
-	// Setup event channel if not already initialized
-	if a.oc == nil {
-		a.oc = make(chan []byte, 100) // buffered channel to prevent blocking
-		go func() {
-			for data := range a.oc {
-				// Use Wails v3 events API
-				if a.app != nil {
-					a.app.Event.Emit("tofe", string(data))
-				}
-			}
-		}()
-		log.Printf("Event channel initialized in initializeConfig")
-	}
-
 	// Mark as initialized
 	a.initialized = true
+}
+
+// invalidateRemotesCache refreshes the cached remotes list from rclone config
+func (a *App) invalidateRemotesCache() {
+	a.cachedRemotes = fsConfig.GetRemotes()
 }
 
 // LogFrontendMessage logs a message from the frontend

@@ -21,38 +21,23 @@ import { SyncStatusComponent } from "../components/sync-status/sync-status.compo
 import { ToggleSwitch } from "primeng/toggleswitch";
 import { Dialog } from "primeng/dialog";
 import { ConfirmationService } from "primeng/api";
-import {
-  LucideAngularModule,
-  Settings,
-  Plus,
-  Download,
-  Upload,
-  RefreshCw,
-  RotateCcw,
-  Edit,
-  Trash2,
-  Play,
-  Square,
-  Eraser,
-  FolderOpen,
-  FileText,
-  Cloud,
-  ChevronDown,
-  Terminal,
-  Archive,
-  StopCircle,
-  Clock,
-} from "lucide-angular";
+import { ButtonModule } from "primeng/button";
+import { Card } from "primeng/card";
+import { InputText } from "primeng/inputtext";
+import { Select } from "primeng/select";
 
 @Component({
   selector: "app-home",
   imports: [
     CommonModule,
     FormsModule,
-    LucideAngularModule,
     SyncStatusComponent,
     ToggleSwitch,
     Dialog,
+    ButtonModule,
+    Card,
+    InputText,
+    Select,
   ],
   templateUrl: "./home.component.html",
   styleUrl: "./home.component.css",
@@ -60,28 +45,6 @@ import {
 })
 export class HomeComponent implements OnInit, OnDestroy {
   Action = Action;
-
-  // Lucide Icons
-  readonly SettingsIcon = Settings;
-  readonly PlusIcon = Plus;
-  readonly DownloadIcon = Download;
-  readonly UploadIcon = Upload;
-  readonly RefreshCwIcon = RefreshCw;
-  readonly RotateCcwIcon = RotateCcw;
-  readonly EditIcon = Edit;
-  readonly Trash2Icon = Trash2;
-  readonly PlayIcon = Play;
-  readonly SquareIcon = Square;
-  readonly EraserIcon = Eraser;
-  readonly FolderOpenIcon = FolderOpen;
-  readonly FileTextIcon = FileText;
-  readonly CloudIcon = Cloud;
-  readonly ChevronDownIcon = ChevronDown;
-  readonly TerminalIcon = Terminal;
-  readonly ArchiveIcon = Archive;
-  readonly StopCircleIcon = StopCircle;
-  readonly ClockIcon = Clock;
-  readonly EraseIcon = Eraser;
 
   readonly operationTypes: { value: OperationType; label: string }[] = [
     { value: 'sync', label: 'Sync' },
@@ -91,11 +54,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     { value: 'dedupe', label: 'Dedupe' },
   ];
 
-  readonly syncDirections: { value: SyncDirection; label: string; icon: any }[] = [
-    { value: 'pull', label: 'Pull', icon: Download },
-    { value: 'push', label: 'Push', icon: Upload },
-    { value: 'bi', label: 'Bi-Sync', icon: RefreshCw },
-    { value: 'bi-resync', label: 'Resync', icon: RotateCcw },
+  readonly syncDirections: { value: SyncDirection; label: string; icon: string }[] = [
+    { value: 'pull', label: 'Pull', icon: 'pi pi-download' },
+    { value: 'push', label: 'Push', icon: 'pi pi-upload' },
+    { value: 'bi', label: 'Bi-Sync', icon: 'pi pi-sync' },
+    { value: 'bi-resync', label: 'Resync', icon: 'pi pi-replay' },
   ];
 
   private subscriptions = new Subscription();
@@ -114,22 +77,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly confirmationService: ConfirmationService
   ) {}
 
-  ngOnInit(): void {
-    console.log("HomeComponent ngOnInit called");
-    console.log(
-      "AppService configInfo$ current value:",
-      this.appService.configInfo$.value
-    );
-    console.log("TabService tabs current value:", this.tabService.tabsValue);
-    console.log(
-      "TabService activeTabId current value:",
-      this.tabService.activeTabIdValue
-    );
-
-    // Check if subscriptions is already initialized
-    if (!this.subscriptions || this.subscriptions.closed) {
-      console.log("HomeComponent creating new subscriptions");
-      this.subscriptions = new Subscription();
+  ngOnInit(): void {    // Check if subscriptions is already initialized
+    if (!this.subscriptions || this.subscriptions.closed) {      this.subscriptions = new Subscription();
     }
 
     try {
@@ -137,24 +86,13 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.subscriptions.add(
         this.appService.configInfo$
           .pipe(
-            map((configInfo) => {
-              console.log(
-                "HomeComponent configInfo$ pipe received:",
-                configInfo
-              );
-              if (!configInfo) {
-                console.warn(
-                  "HomeComponent received null/undefined configInfo"
-                );
-                return undefined;
+            map((configInfo) => {              if (!configInfo) {                return undefined;
               }
               return this.validateCurrentProfileIndex(configInfo);
             })
           )
           .subscribe({
-            next: (profile) => {
-              console.log("HomeComponent profile validation result:", profile);
-              this.isCurrentProfileValid = profile;
+            next: (profile) => {              this.isCurrentProfileValid = profile;
               this.cdr.detectChanges();
             },
             error: (error) => {
@@ -172,9 +110,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       // Subscribe to tab changes for console output updates
       this.subscriptions.add(
         this.tabService.tabs.subscribe({
-          next: (tabs) => {
-            console.log("HomeComponent tabs updated:", tabs);
-            this.cdr.detectChanges();
+          next: (tabs) => {            this.cdr.detectChanges();
           },
           error: (error) => {
             console.error("HomeComponent tabs subscription error:", error);
@@ -189,9 +125,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {
-    console.log("HomeComponent ngOnDestroy called");
-    this.subscriptions.unsubscribe();
+  ngOnDestroy(): void {    this.subscriptions.unsubscribe();
   }
 
   changeProfile(e: Event): void {
@@ -215,39 +149,21 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   validateCurrentProfileIndex(
     configInfo: models.ConfigInfo
-  ): models.Profile | undefined {
-    console.log("validateCurrentProfileIndex called with:", {
-      configInfo,
-      profiles: configInfo?.profiles,
-      selectedIndex: configInfo?.selected_profile_index,
-      profilesLength: configInfo?.profiles?.length,
-    });
-
-    if (
+  ): models.Profile | undefined {    if (
       !configInfo ||
       !configInfo.profiles ||
       !Array.isArray(configInfo.profiles)
-    ) {
-      console.warn(
-        "validateCurrentProfileIndex: invalid configInfo or profiles"
-      );
-      return undefined;
+    ) {      return undefined;
     }
 
     if (
       typeof configInfo.selected_profile_index !== "number" ||
       configInfo.selected_profile_index < 0 ||
       configInfo.selected_profile_index >= configInfo.profiles.length
-    ) {
-      console.warn(
-        "validateCurrentProfileIndex: invalid selected_profile_index"
-      );
-      return undefined;
+    ) {      return undefined;
     }
 
-    const result = configInfo.profiles[configInfo.selected_profile_index];
-    console.log("validateCurrentProfileIndex result:", result);
-    return result;
+    const result = configInfo.profiles[configInfo.selected_profile_index];    return result;
   }
 
   pull(): void {
@@ -289,8 +205,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Tab management methods
   createTab(): void {
     this.tabService.createTab();
-    // Force change detection to ensure UI updates
-    this.cdr.detectChanges();
   }
 
   deleteTab(tabId: string): void {
@@ -308,7 +222,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         accept: () => {
           this.appService.stopCommandForTab(tabId);
           this.tabService.deleteTab(tabId);
-          this.cdr.detectChanges();
         },
       });
       return;
@@ -337,7 +250,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.pullWithTab(profile, tabId);
-    this.cdr.detectChanges();
   }
 
   pushTab(tabId: string): void {
@@ -355,7 +267,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.pushWithTab(profile, tabId);
-    this.cdr.detectChanges();
   }
 
   biTab(tabId: string): void {
@@ -373,7 +284,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.biWithTab(profile, tabId);
-    this.cdr.detectChanges();
   }
 
   biResyncTab(tabId: string): void {
@@ -391,29 +301,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profile =
       this.appService.configInfo$.value.profiles[tab.selectedProfileIndex!];
     this.appService.biWithTab(profile, tabId, true);
-    this.cdr.detectChanges();
   }
 
   stopCommandTab(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
-    if (tab) {
-      console.log(
-        "Stopping command for tab:",
-        tabId,
-        "currentTaskId:",
-        tab.currentTaskId,
-        "currentAction:",
-        tab.currentAction
-      );
-
-      // Set stopping state immediately
+    if (tab) {      // Set stopping state immediately
       this.tabService.updateTab(tabId, {
         isStopping: true,
         data: [...(tab.data || []), "Stopping command..."],
       });
 
       this.appService.stopCommandForTab(tabId);
-      this.cdr.detectChanges();
     }
   }
 
@@ -426,15 +324,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     tabId: string | undefined
   ): void {
     if (!tabId) return;
-    const selectedIndex = parseProfileSelection(selectedValue);
-    console.log("changeProfileTab called:", {
-      selectedValue,
-      selectedIndex,
-      tabId,
-    });
-    this.tabService.updateTab(tabId, { selectedProfileIndex: selectedIndex });
-    // Force change detection to ensure UI is updated
-    this.cdr.detectChanges();
+    const selectedIndex = parseProfileSelection(selectedValue);    this.tabService.updateTab(tabId, { selectedProfileIndex: selectedIndex });
   }
 
   validateTabProfileIndex(tab: Tab): boolean {
@@ -485,23 +375,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     const index = this.tabService.tabsValue.findIndex(
       (tab) => tab.id === activeTabId
     );
-    const result = index >= 0 ? index : 0;
-    console.log("getActiveTabIndex:", { activeTabId, index, result });
-    return result; // Always return valid index
+    const result = index >= 0 ? index : 0;    return result; // Always return valid index
   }
 
   onTabChange(index: number): void {
     try {
-      const tabs = this.tabService.tabsValue;
-      console.log("onTabChange called:", { index, tabsLength: tabs.length });
-      if (index >= 0 && index < tabs.length && tabs[index]) {
-        const selectedTab = tabs[index];
-        console.log("Switching to tab:", {
-          id: selectedTab.id,
-          name: selectedTab.name,
-          selectedProfileIndex: selectedTab.selectedProfileIndex,
-        });
-        this.tabService.setActiveTab(selectedTab.id);
+      const tabs = this.tabService.tabsValue;      if (index >= 0 && index < tabs.length && tabs[index]) {
+        const selectedTab = tabs[index];        this.tabService.setActiveTab(selectedTab.id);
 
         // Force change detection and update select element
         this.cdr.detectChanges();
@@ -521,31 +401,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     return config.color;
   }
 
-  getActionIcon(action: Action): typeof this.DownloadIcon {
+  getActionIcon(action: Action): string {
     switch (action) {
       case Action.Pull:
-        return this.DownloadIcon;
+        return 'pi pi-download';
       case Action.Push:
-        return this.UploadIcon;
+        return 'pi pi-upload';
       case Action.Bi:
       case Action.BiResync:
-        return this.RefreshCwIcon;
+        return 'pi pi-sync';
       default:
-        return this.RefreshCwIcon;
-    }
-  }
-
-  getActionIconPath(action: Action): string {
-    switch (action) {
-      case Action.Pull:
-        return "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10";
-      case Action.Push:
-        return "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12";
-      case Action.Bi:
-      case Action.BiResync:
-        return "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15";
-      default:
-        return "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15";
+        return 'pi pi-play';
     }
   }
 
@@ -554,15 +420,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     return config.label;
   }
 
-  onProfileChange(event: Event, tabId: string | undefined): void {
-    const target = event.target as HTMLSelectElement;
-    const value = target.value === "null" ? null : +target.value;
-    console.log("onProfileChange called:", {
-      value,
-      tabId,
-      targetValue: target.value,
-    });
+  onProfileChange(value: number | null, tabId: string | undefined): void {
     this.changeProfileTab(value, tabId);
+  }
+
+  getProfileOptions(): { label: string; value: number | null }[] {
+    const profiles = this.appService.configInfo$.value?.profiles || [];
+    return [
+      { label: 'No profile selected', value: null },
+      ...profiles.map((p, i) => ({ label: p.name, value: i })),
+    ];
   }
 
   trackByTabId(index: number, tab: Tab): string {
@@ -590,36 +457,23 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getTabProfileValue(tab: Tab | undefined): number | null {
-    if (!tab) {
-      console.log("getTabProfileValue: no tab provided");
-      return null;
+    if (!tab) {      return null;
     }
-    const value = tab.selectedProfileIndex ?? null;
-    console.log("getTabProfileValue:", {
-      tabId: tab.id,
-      tabName: tab.name,
-      selectedProfileIndex: tab.selectedProfileIndex,
-      value,
-      isActive: tab.isActive,
-    });
-    return value;
+    const value = tab.selectedProfileIndex ?? null;    return value;
   }
 
   setOperationType(tabId: string, type: OperationType): void {
     this.tabService.updateTab(tabId, { operationType: type });
-    this.cdr.detectChanges();
   }
 
   setSyncDirection(tabId: string, direction: SyncDirection): void {
     this.tabService.updateTab(tabId, { syncDirection: direction });
-    this.cdr.detectChanges();
   }
 
   toggleDryRun(tabId: string): void {
     const tab = this.tabService.getTab(tabId);
     if (tab) {
       this.tabService.updateTab(tabId, { dryRun: !tab.dryRun });
-      this.cdr.detectChanges();
     }
   }
 
@@ -648,7 +502,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     }
     // TODO: Wire Copy, Move, Check, Dedupe to OperationService bindings
-    this.cdr.detectChanges();
   }
 
   getOperationLabel(tab: Tab): string {
@@ -679,21 +532,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         `profile-select-${tab.id}`
       ) as HTMLSelectElement;
       if (selectElement) {
-        const expectedValue = tab.selectedProfileIndex?.toString() ?? "null";
-        console.log("updateSelectElementValue:", {
-          tabId: tab.id,
-          expectedValue,
-          currentValue: selectElement.value,
-          selectedProfileIndex: tab.selectedProfileIndex,
-        });
-
-        if (selectElement.value !== expectedValue) {
-          selectElement.value = expectedValue;
-          console.log("Updated select element value to:", expectedValue);
-        }
-      } else {
-        console.warn("Select element not found for tab:", tab.id);
-      }
+        const expectedValue = tab.selectedProfileIndex?.toString() ?? "null";        if (selectElement.value !== expectedValue) {
+          selectElement.value = expectedValue;        }
+      } else {      }
     } catch (error) {
       console.error("Error updating select element value:", error);
     }

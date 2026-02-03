@@ -1,16 +1,8 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import {
-  LucideAngularModule,
-  FolderTree,
-  RefreshCw,
-  FolderPlus,
-  Trash2,
-  ChevronRight,
-  File,
-  Folder,
-} from "lucide-angular";
+import { ButtonModule } from "primeng/button";
+import { InputText } from "primeng/inputtext";
 
 interface FileEntry {
   path: string;
@@ -24,14 +16,14 @@ interface FileEntry {
 @Component({
   selector: "app-file-browser",
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, ButtonModule, InputText],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col h-full">
       <!-- Header -->
       <div class="p-4 border-b border-gray-700">
         <div class="flex items-center gap-3 mb-3">
-          <lucide-icon [img]="FolderTreeIcon" class="w-5 h-5 text-primary-400"></lucide-icon>
+          <i class="pi pi-folder-open text-primary-400" style="font-size: 1.25rem"></i>
           <h1 class="text-lg font-semibold text-gray-100">File Browser</h1>
         </div>
 
@@ -39,15 +31,13 @@ interface FileEntry {
         <div class="flex gap-2">
           <input
             type="text"
+            pInputText
             [(ngModel)]="currentPath"
             placeholder="remote:path (e.g. gdrive:documents)"
-            class="input-field flex-1"
+            class="flex-1"
             (keyup.enter)="browse()"
           />
-          <button (click)="browse()" class="btn-primary flex items-center gap-1.5">
-            <lucide-icon [img]="RefreshCwIcon" class="w-4 h-4"></lucide-icon>
-            Browse
-          </button>
+          <p-button (click)="browse()" icon="pi pi-sync" label="Browse"></p-button>
         </div>
 
         <!-- Breadcrumbs -->
@@ -61,32 +51,32 @@ interface FileEntry {
             {{ crumb }}
           </button>
           @if (!last) {
-          <lucide-icon [img]="ChevronRightIcon" class="w-3 h-3"></lucide-icon>
+          <i class="pi pi-chevron-right" style="font-size: 0.75rem"></i>
           } }
         </div>
         }
 
         <!-- Toolbar -->
         <div class="flex gap-2 mt-2">
-          <button
+          <p-button
             (click)="refresh()"
-            class="px-3 py-1.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 flex items-center gap-1.5"
-          >
-            <lucide-icon [img]="RefreshCwIcon" class="w-3 h-3"></lucide-icon>
-            Refresh
-          </button>
-          <button
-            class="px-3 py-1.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 flex items-center gap-1.5"
-          >
-            <lucide-icon [img]="FolderPlusIcon" class="w-3 h-3"></lucide-icon>
-            New Folder
-          </button>
-          <button
-            class="px-3 py-1.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 flex items-center gap-1.5"
-          >
-            <lucide-icon [img]="Trash2Icon" class="w-3 h-3"></lucide-icon>
-            Delete
-          </button>
+            icon="pi pi-sync"
+            label="Refresh"
+            severity="secondary"
+            size="small"
+          ></p-button>
+          <p-button
+            icon="pi pi-plus"
+            label="New Folder"
+            severity="secondary"
+            size="small"
+          ></p-button>
+          <p-button
+            icon="pi pi-trash"
+            label="Delete"
+            severity="secondary"
+            size="small"
+          ></p-button>
         </div>
       </div>
 
@@ -98,7 +88,7 @@ interface FileEntry {
         </div>
         } @else if (entries.length === 0) {
         <div class="flex flex-col items-center justify-center h-48 text-gray-500">
-          <lucide-icon [img]="FolderTreeIcon" class="w-12 h-12 mb-3 opacity-30"></lucide-icon>
+          <i class="pi pi-folder-open mb-3 opacity-30" style="font-size: 3rem"></i>
           <p class="text-sm">Enter a remote path above to browse files</p>
         </div>
         } @else {
@@ -117,11 +107,10 @@ interface FileEntry {
               (click)="entry.is_dir ? openDir(entry) : null"
             >
               <td class="px-4 py-2 flex items-center gap-2">
-                <lucide-icon
-                  [img]="entry.is_dir ? FolderIcon : FileIcon"
-                  class="w-4 h-4"
-                  [class]="entry.is_dir ? 'text-yellow-400' : 'text-gray-400'"
-                ></lucide-icon>
+                <i
+                  [class]="entry.is_dir ? 'pi pi-folder text-yellow-400' : 'pi pi-file text-gray-400'"
+                  style="font-size: 1rem"
+                ></i>
                 <span class="text-gray-200">{{ entry.name }}</span>
               </td>
               <td class="px-4 py-2 text-right text-gray-400">
@@ -140,14 +129,6 @@ interface FileEntry {
   `,
 })
 export class FileBrowserComponent {
-  readonly FolderTreeIcon = FolderTree;
-  readonly RefreshCwIcon = RefreshCw;
-  readonly FolderPlusIcon = FolderPlus;
-  readonly Trash2Icon = Trash2;
-  readonly ChevronRightIcon = ChevronRight;
-  readonly FileIcon = File;
-  readonly FolderIcon = Folder;
-
   currentPath = "";
   entries: FileEntry[] = [];
   breadcrumbs: string[] = [];

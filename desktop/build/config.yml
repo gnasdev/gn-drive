@@ -18,8 +18,6 @@ dev_mode:
       - "*.go"
   git_ignore: true
   executes:
-    - cmd: go mod tidy
-      type: blocking
     - cmd: go build -o bin/ns-drive
       type: blocking
     - cmd: ./bin/ns-drive

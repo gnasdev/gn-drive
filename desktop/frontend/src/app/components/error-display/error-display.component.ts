@@ -12,20 +12,11 @@ import {
   ErrorNotification,
   ErrorSeverity,
 } from "../../services/error.service";
-import {
-  LucideAngularModule,
-  AlertCircle,
-  AlertTriangle,
-  Info,
-  X,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-angular";
 
 @Component({
   selector: "app-error-display",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (activeErrors.length > 0) {
@@ -44,10 +35,7 @@ import {
               [class]="getIconClasses(error.severity)"
               class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
             >
-              <lucide-icon
-                [img]="getErrorIcon(error.severity)"
-                [size]="16"
-              ></lucide-icon>
+              <i [class]="getErrorIconClass(error.severity)"></i>
             </div>
             <div class="flex-1 min-w-0">
               <h4
@@ -73,7 +61,7 @@ import {
             class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-300 transition-colors"
             aria-label="Dismiss error"
           >
-            <lucide-icon [img]="XIcon" [size]="16"></lucide-icon>
+            <i class="pi pi-times"></i>
           </button>
         </div>
 
@@ -90,13 +78,13 @@ import {
             class="flex items-center space-x-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
           >
             <span>Details</span>
-            <lucide-icon
-              [img]="
-                isDetailsExpanded(error.id) ? ChevronUpIcon : ChevronDownIcon
+            <i
+              [class]="
+                isDetailsExpanded(error.id)
+                  ? 'pi pi-chevron-up'
+                  : 'pi pi-chevron-down'
               "
-              [size]="16"
-            >
-            </lucide-icon>
+            ></i>
           </button>
           @if (isDetailsExpanded(error.id)) {
           <div
@@ -144,14 +132,6 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
   private subscription?: Subscription;
   private expandedDetails = new Set<string>();
 
-  // Lucide icons
-  AlertCircleIcon = AlertCircle;
-  AlertTriangleIcon = AlertTriangle;
-  InfoIcon = Info;
-  XIcon = X;
-  ChevronDownIcon = ChevronDown;
-  ChevronUpIcon = ChevronUp;
-
   constructor(
     private errorService: ErrorService,
     private cdr: ChangeDetectorRef
@@ -188,17 +168,17 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
     return this.expandedDetails.has(errorId);
   }
 
-  getErrorIcon(severity: ErrorSeverity): typeof this.InfoIcon {
+  getErrorIconClass(severity: ErrorSeverity): string {
     switch (severity) {
       case ErrorSeverity.INFO:
-        return this.InfoIcon;
+        return "pi pi-info-circle";
       case ErrorSeverity.WARNING:
-        return this.AlertTriangleIcon;
+        return "pi pi-exclamation-triangle";
       case ErrorSeverity.ERROR:
       case ErrorSeverity.CRITICAL:
-        return this.AlertCircleIcon;
+        return "pi pi-exclamation-circle";
       default:
-        return this.AlertCircleIcon;
+        return "pi pi-exclamation-circle";
     }
   }
 

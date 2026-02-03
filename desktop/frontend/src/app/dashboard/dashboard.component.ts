@@ -1,18 +1,13 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component } from "@angular/core";
-import {
-  LucideAngularModule,
-  Play,
-  Clock,
-  HardDrive,
-  Activity,
-} from "lucide-angular";
+import { Card } from "primeng/card";
+import { ButtonModule } from "primeng/button";
 import { NavigationService } from "../navigation.service.js";
 
 @Component({
   selector: "app-dashboard",
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, Card, ButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="p-6 space-y-6">
@@ -20,75 +15,74 @@ import { NavigationService } from "../navigation.service.js";
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <!-- Quick Actions -->
-        <div class="panel">
+        <p-card>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
             Quick Actions
           </h2>
           <div class="space-y-3">
-            <button
-              (click)="navigationService.navigateToOperations()"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-200 transition-colors"
+            <p-button
+              styleClass="w-full"
+              severity="secondary"
+              [outlined]="true"
+              (onClick)="navigationService.navigateToOperations()"
             >
-              <lucide-icon [img]="PlayIcon" class="w-5 h-5 text-primary-400"></lucide-icon>
+              <i class="pi pi-play text-primary-400"></i>
               <span>Start New Operation</span>
-            </button>
-            <button
-              (click)="navigationService.navigateToSchedules()"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-200 transition-colors"
+            </p-button>
+            <p-button
+              styleClass="w-full"
+              severity="secondary"
+              [outlined]="true"
+              (onClick)="navigationService.navigateToSchedules()"
             >
-              <lucide-icon [img]="ClockIcon" class="w-5 h-5 text-primary-400"></lucide-icon>
+              <i class="pi pi-clock text-primary-400"></i>
               <span>Manage Schedules</span>
-            </button>
+            </p-button>
           </div>
-        </div>
+        </p-card>
 
         <!-- Active Operations -->
-        <div class="panel">
+        <p-card>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
             Active Operations
           </h2>
           <div class="flex items-center justify-center h-24 text-gray-500">
             <div class="text-center">
-              <lucide-icon [img]="ActivityIcon" class="w-8 h-8 mx-auto mb-2 opacity-40"></lucide-icon>
+              <i class="pi pi-chart-line text-2xl mx-auto mb-2 opacity-40"></i>
               <p class="text-sm">No active operations</p>
             </div>
           </div>
-        </div>
+        </p-card>
 
         <!-- Remote Storage -->
-        <div class="panel">
+        <p-card>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
             Remote Storage
           </h2>
           <div class="flex items-center justify-center h-24 text-gray-500">
             <div class="text-center">
-              <lucide-icon [img]="HardDriveIcon" class="w-8 h-8 mx-auto mb-2 opacity-40"></lucide-icon>
+              <i class="pi pi-server text-2xl mx-auto mb-2 opacity-40"></i>
               <p class="text-sm">Configure remotes to see quota info</p>
             </div>
           </div>
-        </div>
+        </p-card>
 
         <!-- Recent Activity -->
-        <div class="panel">
+        <p-card>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
             Recent Activity
           </h2>
           <div class="flex items-center justify-center h-24 text-gray-500">
             <div class="text-center">
-              <lucide-icon [img]="ClockIcon" class="w-8 h-8 mx-auto mb-2 opacity-40"></lucide-icon>
+              <i class="pi pi-clock text-2xl mx-auto mb-2 opacity-40"></i>
               <p class="text-sm">No recent activity</p>
             </div>
           </div>
-        </div>
+        </p-card>
       </div>
     </div>
   `,
 })
 export class DashboardComponent {
-  readonly PlayIcon = Play;
-  readonly ClockIcon = Clock;
-  readonly HardDriveIcon = HardDrive;
-  readonly ActivityIcon = Activity;
-
   constructor(public readonly navigationService: NavigationService) {}
 }

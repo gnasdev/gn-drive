@@ -4,7 +4,7 @@
   <app-sidebar></app-sidebar>
 
   <!-- Main Content Area -->
-  <main class="content-area">
+  <main class="flex-1 overflow-auto">
     @switch ((navigationService.currentState$ | async)?.page) {
       @case ('dashboard') {
         <app-dashboard></app-dashboard>
@@ -25,13 +25,31 @@
         <app-remotes></app-remotes>
       }
       @case ('schedules') {
-        <app-schedules></app-schedules>
+        @defer {
+          <app-schedules></app-schedules>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('history') {
-        <app-history></app-history>
+        @defer {
+          <app-history></app-history>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('settings') {
-        <app-settings></app-settings>
+        @defer {
+          <app-settings></app-settings>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
     }
   </main>

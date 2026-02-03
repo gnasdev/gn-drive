@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@config "../tailwind.config.js";
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(assets/fonts/roboto-variable.woff2) format('woff2');
+}
+
+/* Global styles - dark only */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: "Roboto", "Helvetica Neue", sans-serif;
+  background: #111827;
+  color: #f9fafb;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Hide scrollbar utility class */
+.hide-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Console output styling */
+.console-output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  background: #111827;
+  color: #4ade80;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow: auto;
+  max-height: 24rem;
+}
+
+/* Animation utilities */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* PrimeNG overlay z-index fixes (ensure overlays render above sidebar z-40) */
+.p-select-overlay,
+.p-dialog-mask,
+.p-toast,
+.p-tooltip,
+.p-confirmdialog-mask,
+.p-popover,
+.p-sidebar-mask {
+  z-index: 50 !important;
+}

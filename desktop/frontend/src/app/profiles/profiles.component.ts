@@ -11,14 +11,9 @@ import { NavigationService } from "../navigation.service";
 import { ErrorService } from "../services/error.service";
 import { BehaviorSubject, Subscription } from "rxjs";
 import { FormsModule } from "@angular/forms";
-import {
-  LucideAngularModule,
-  Users,
-  Plus,
-  FolderOpen,
-  X,
-  Trash2,
-} from "lucide-angular";
+import { Card } from "primeng/card";
+import { Toolbar } from "primeng/toolbar";
+import { ButtonModule } from "primeng/button";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
   parseRemotePath,
@@ -31,11 +26,9 @@ import {
   DEFAULT_PARALLEL_OPTIONS,
 } from "./profiles.types";
 
-// No Material imports needed anymore
-
 @Component({
   selector: "app-profiles",
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, Card, Toolbar, ButtonModule],
   templateUrl: "./profiles.component.html",
   styleUrl: "./profiles.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,13 +36,6 @@ import {
 export class ProfilesComponent implements OnInit, OnDestroy {
   Date = Date;
   private subscriptions = new Subscription();
-
-  // Lucide Icons
-  readonly UsersIcon = Users;
-  readonly PlusIcon = Plus;
-  readonly FolderOpenIcon = FolderOpen;
-  readonly XIcon = X;
-  readonly Trash2Icon = Trash2;
 
   saveBtnText$ = new BehaviorSubject<string>("Save ✓");
 

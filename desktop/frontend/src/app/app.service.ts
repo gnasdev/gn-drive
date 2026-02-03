@@ -70,26 +70,16 @@ export class AppService implements OnDestroy {
   constructor(
     private tabService: TabService,
     private errorService: ErrorService
-  ) {
-    console.log("AppService constructor called");
-    const configInfo = new models.ConfigInfo();
+  ) {    const configInfo = new models.ConfigInfo();
     configInfo.profiles = [];
     this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
-    console.log("AppService initial configInfo:", configInfo);
-
     // Store cleanup function for event listener
-    this.eventCleanup = Events.On("tofe", (event) => {
-      console.log("AppService received event:", event);
-      const rawData = event.data;
-      console.log("AppService raw event data:", rawData);
-
+    this.eventCleanup = Events.On("tofe", (event) => {      const rawData = event.data;
       const parsedEvent = parseEvent(rawData as string);
       if (!parsedEvent) {
         console.error("AppService: Failed to parse event");
         return;
       }
-      console.log("AppService parsed event:", parsedEvent);
-
       // Handle new typed events
       if (isSyncEvent(parsedEvent)) {
         this.handleSyncEvent(parsedEvent);
@@ -116,19 +106,12 @@ export class AppService implements OnDestroy {
       if ("command" in parsedEvent) {
         this.handleLegacyCommand(parsedEvent as unknown as LegacyCommandDTO);
       }
-    });
-
-    console.log("AppService calling getConfigInfo and getRemotes");
-    this.getConfigInfo();
+    });    this.getConfigInfo();
     this.getRemotes();
   }
 
-  ngOnDestroy() {
-    console.log("AppService ngOnDestroy called");
-    // Cleanup event listener
-    if (this.eventCleanup) {
-      console.log("AppService cleaning up event listener");
-      this.eventCleanup();
+  ngOnDestroy() {    // Cleanup event listener
+    if (this.eventCleanup) {      this.eventCleanup();
       this.eventCleanup = undefined;
     }
   }
@@ -175,8 +158,6 @@ export class AppService implements OnDestroy {
 
   // Handle new typed sync events from backend
   private handleSyncEvent(event: SyncEvent) {
-    console.log("AppService handling sync event:", event);
-
     // Route to tab if tabId is present
     if (event.tabId) {
       this.tabService.handleTypedSyncEvent(event);
@@ -216,8 +197,6 @@ export class AppService implements OnDestroy {
 
   // Handle config events from backend
   private handleConfigEvent(event: ConfigEvent) {
-    console.log("AppService handling config event:", event);
-
     // Refresh config info when config events are received
     switch (event.type) {
       case "config:updated":
@@ -232,8 +211,6 @@ export class AppService implements OnDestroy {
 
   // Handle error events from backend
   private handleErrorEvent(event: ErrorEvent) {
-    console.log("AppService handling error event:", event);
-
     // Route to tab if tabId is present
     if (event.tabId) {
       const tab = this.tabService.getTab(event.tabId);
@@ -256,12 +233,7 @@ export class AppService implements OnDestroy {
   // Handle legacy command DTOs for backward compatibility
   private handleLegacyCommand(data: LegacyCommandDTO) {
     // If event has tab_id, route to TabService
-    if (data.tab_id) {
-      console.log(
-        "AppService routing legacy event to TabService for tab:",
-        data.tab_id
-      );
-      this.tabService.handleCommandEvent(data as CommandDTO);
+    if (data.tab_id) {      this.tabService.handleCommandEvent(data as CommandDTO);
       return;
     }
 
@@ -294,15 +266,10 @@ export class AppService implements OnDestroy {
   }
 
   async pull(profile: models.Profile) {
-    if (this.currentAction$.value === Action.Pull) return;
-
-    console.log("pull called with profile:", profile);
-    this.replaceData("Pulling...");
+    if (this.currentAction$.value === Action.Pull) return;    this.replaceData("Pulling...");
 
     try {
-      const taskId = await Sync(Action.Pull, profile);
-      console.log("pull received taskId:", taskId);
-      this.currentId$.next(taskId);
+      const taskId = await Sync(Action.Pull, profile);      this.currentId$.next(taskId);
       if (this.currentId$.value) {
         this.currentAction$.next(Action.Pull);
       } else {
@@ -317,15 +284,10 @@ export class AppService implements OnDestroy {
 
   async pullWithTab(profile: models.Profile, tabId: string) {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.currentAction === Action.Pull) return;
-
-    console.log("pullWithTab called with profile:", profile, "tabId:", tabId);
-    this.tabService.updateTab(tabId, { data: ["Pulling..."] });
+    if (!tab || tab.currentAction === Action.Pull) return;    this.tabService.updateTab(tabId, { data: ["Pulling..."] });
 
     try {
-      const taskId = await SyncWithTabId(Action.Pull, profile, tabId);
-      console.log("pullWithTab received taskId:", taskId);
-      if (taskId) {
+      const taskId = await SyncWithTabId(Action.Pull, profile, tabId);      if (taskId) {
         this.tabService.updateTab(tabId, {
           currentAction: Action.Pull,
           currentTaskId: taskId,
@@ -345,15 +307,10 @@ export class AppService implements OnDestroy {
   }
 
   async push(profile: models.Profile) {
-    if (this.currentAction$.value === Action.Push) return;
-
-    console.log("push called with profile:", profile);
-    this.replaceData("Pushing...");
+    if (this.currentAction$.value === Action.Push) return;    this.replaceData("Pushing...");
 
     try {
-      const taskId = await Sync(Action.Push, profile);
-      console.log("push received taskId:", taskId);
-      this.currentId$.next(taskId);
+      const taskId = await Sync(Action.Push, profile);      this.currentId$.next(taskId);
       if (this.currentId$.value) {
         this.currentAction$.next(Action.Push);
       } else {
@@ -368,15 +325,10 @@ export class AppService implements OnDestroy {
 
   async pushWithTab(profile: models.Profile, tabId: string) {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || tab.currentAction === Action.Push) return;
-
-    console.log("pushWithTab called with profile:", profile, "tabId:", tabId);
-    this.tabService.updateTab(tabId, { data: ["Pushing..."] });
+    if (!tab || tab.currentAction === Action.Push) return;    this.tabService.updateTab(tabId, { data: ["Pushing..."] });
 
     try {
-      const taskId = await SyncWithTabId(Action.Push, profile, tabId);
-      console.log("pushWithTab received taskId:", taskId);
-      if (taskId) {
+      const taskId = await SyncWithTabId(Action.Push, profile, tabId);      if (taskId) {
         this.tabService.updateTab(tabId, {
           currentAction: Action.Push,
           currentTaskId: taskId,
@@ -398,14 +350,10 @@ export class AppService implements OnDestroy {
   async bi(profile: models.Profile, resync = false) {
     if (this.currentAction$.value === Action.Bi) return;
 
-    const action = resync ? Action.BiResync : Action.Bi;
-    console.log("bi called with profile:", profile, "action:", action);
-    this.replaceData(resync ? "Resyncing..." : "Syncing...");
+    const action = resync ? Action.BiResync : Action.Bi;    this.replaceData(resync ? "Resyncing..." : "Syncing...");
 
     try {
-      const taskId = await Sync(action, profile);
-      console.log("bi received taskId:", taskId);
-      this.currentId$.next(taskId);
+      const taskId = await Sync(action, profile);      this.currentId$.next(taskId);
       if (this.currentId$.value) {
         this.currentAction$.next(Action.Bi);
       } else {
@@ -422,23 +370,12 @@ export class AppService implements OnDestroy {
     const tab = this.tabService.getTab(tabId);
     if (!tab || tab.currentAction === Action.Bi) return;
 
-    const action = resync ? Action.BiResync : Action.Bi;
-    console.log(
-      "biWithTab called with profile:",
-      profile,
-      "tabId:",
-      tabId,
-      "action:",
-      action
-    );
-    this.tabService.updateTab(tabId, {
+    const action = resync ? Action.BiResync : Action.Bi;    this.tabService.updateTab(tabId, {
       data: [resync ? "Resyncing..." : "Syncing..."],
     });
 
     try {
-      const taskId = await SyncWithTabId(action, profile, tabId);
-      console.log("biWithTab received taskId:", taskId);
-      if (taskId) {
+      const taskId = await SyncWithTabId(action, profile, tabId);      if (taskId) {
         this.tabService.updateTab(tabId, {
           currentAction: Action.Bi,
           currentTaskId: taskId,
@@ -458,10 +395,7 @@ export class AppService implements OnDestroy {
   }
 
   stopCommand() {
-    if (!this.currentAction$.value) return;
-
-    console.log("stopCommand called with taskId:", this.currentId$.value);
-    try {
+    if (!this.currentAction$.value) return;    try {
       StopCommand(this.currentId$.value);
     } catch (error) {
       console.error("stopCommand error:", error);
@@ -471,15 +405,7 @@ export class AppService implements OnDestroy {
 
   stopCommandForTab(tabId: string) {
     const tab = this.tabService.getTab(tabId);
-    if (!tab || !tab.currentAction || !tab.currentTaskId) return;
-
-    console.log(
-      "stopCommandForTab called with tabId:",
-      tabId,
-      "taskId:",
-      tab.currentTaskId
-    );
-    try {
+    if (!tab || !tab.currentAction || !tab.currentTaskId) return;    try {
       StopCommand(tab.currentTaskId);
     } catch (error) {
       console.error("stopCommandForTab error:", error);
@@ -492,22 +418,8 @@ export class AppService implements OnDestroy {
     }
   }
 
-  async getConfigInfo() {
-    console.log("AppService getConfigInfo called");
-    try {
-      const configInfo = await GetConfigInfo();
-      console.log(
-        "AppService getConfigInfo received from backend:",
-        configInfo
-      );
-      configInfo.profiles = configInfo.profiles ?? [];
-      console.log(
-        "AppService getConfigInfo after profiles normalization:",
-        configInfo
-      );
-      this.configInfo$.next(configInfo);
-      console.log("AppService getConfigInfo emitted to configInfo$");
-    } catch (e) {
+  async getConfigInfo() {    try {
+      const configInfo = await GetConfigInfo();      configInfo.profiles = configInfo.profiles ?? [];      this.configInfo$.next(configInfo);    } catch (e) {
       console.error("AppService getConfigInfo error:", e);
       this.errorService.handleApiError(e, "get_config_info");
     }
