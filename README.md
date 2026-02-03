@@ -87,9 +87,52 @@ NOTICE: TabService starting up...
 
 ### Production Build
 
+#### Quick Build (Binary Only)
+
 ```bash
 task build
 # Creates: ns-drive binary in project root
+```
+
+#### macOS App Bundle (Recommended)
+
+Use task or the build script to create a signed `.app` bundle:
+
+```bash
+# Using task (recommended)
+task build:macos
+
+# With custom version
+VERSION=1.2.0 task build:macos
+
+# With Apple Developer signing identity
+SIGNING_IDENTITY="Developer ID Application: Your Name" task build:macos
+
+# Or using the shell script directly
+./scripts/build-macos.sh
+```
+
+This creates:
+- `ns-drive.app` - Signed macOS application bundle
+- Ready to run or distribute
+
+**What the script does:**
+1. Checks prerequisites (Go, Node.js, wails3)
+2. Generates TypeScript bindings
+3. Builds frontend (Angular production build)
+4. Builds backend (Go binary with optimizations)
+5. Creates `.app` bundle with proper structure
+6. Generates app icon (icns format)
+7. Signs the app (ad-hoc or with provided identity)
+
+**Running the built app:**
+
+```bash
+# Run directly
+open ns-drive.app
+
+# Install to Applications
+cp -R ns-drive.app /Applications/
 ```
 
 ### Manual Development (Alternative)
@@ -186,14 +229,18 @@ wails3 dev -config ./build/config.yml -port 9245
 
 ## 🔧 Available Commands
 
-| Command        | Description                                           | Status     |
-| -------------- | ----------------------------------------------------- | ---------- |
-| `task build`   | Build the application for current platform            | ✅ Working |
-| `task dev:fe`  | Start frontend development server                     | ✅ Working |
-| `task dev:be`  | Start Wails dev server (requires frontend dev server) | ✅ Working |
-| `task lint:fe` | Run ESLint on frontend code                           | ✅ Working |
-| `task lint:be` | Run golangci-lint on backend code                     | ✅ Working |
-| `task lint`    | Run linting on both frontend and backend              | ✅ Working |
+| Command                      | Description                                           | Status     |
+| ---------------------------- | ----------------------------------------------------- | ---------- |
+| `task build`                 | Build the application for current platform            | ✅ Working |
+| `task build:macos`           | Build signed macOS .app bundle                        | ✅ Working |
+| `task build:macos:bundle`    | Create macOS .app bundle (without signing)            | ✅ Working |
+| `task build:macos:sign`      | Sign existing macOS .app bundle                       | ✅ Working |
+| `task dev:fe`                | Start frontend development server                     | ✅ Working |
+| `task dev:be`                | Start Wails dev server (requires frontend dev server) | ✅ Working |
+| `task lint:fe`               | Run ESLint on frontend code                           | ✅ Working |
+| `task lint:be`               | Run golangci-lint on backend code                     | ✅ Working |
+| `task lint`                  | Run linting on both frontend and backend              | ✅ Working |
+| `task clean`                 | Clean all build artifacts                             | ✅ Working |
 
 ## 🌐 Supported Cloud Providers
 
@@ -245,10 +292,13 @@ ns-drive/
 │   ├── build/             # Build configuration
 │   ├── go.mod             # Go module definition
 │   └── main.go            # Application entry point
+├── scripts/               # Build and utility scripts
+│   └── build-macos.sh    # macOS production build script
 ├── docs/                  # Documentation
 ├── screenshots/           # Application screenshots
 ├── Taskfile.yml          # Build tasks
 ├── ns-drive              # Built binary (after build)
+├── ns-drive.app          # macOS app bundle (after build)
 └── README.md             # This file
 ```
 

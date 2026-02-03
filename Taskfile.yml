@@ -88,12 +88,102 @@ tasks:
       - echo "Running backend tests with coverage..."
       - go test -coverprofile=coverage.out ./...
       - go tool cover -html=coverage.out -o coverage.html
-      - echo "Coverage report generated: desktop/coverage.html"
+      - echo "Coverage report generated at desktop/coverage.html"
+
+  build:macos:
+    summary: Builds macOS .app bundle with code signing
+    vars:
+      BUNDLE_ID: '{{.BUNDLE_ID | default "com.nsdrive.app"}}'
+      APP_DISPLAY_NAME: '{{.APP_DISPLAY_NAME | default "NS-Drive"}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY | default "-"}}'
+    cmds:
+      - task: build:macos:bundle
+      - task: build:macos:sign
+
+  build:macos:bundle:
+    summary: Creates macOS .app bundle structure
+    vars:
+      BUNDLE_ID: '{{.BUNDLE_ID | default "com.nsdrive.app"}}'
+      APP_DISPLAY_NAME: '{{.APP_DISPLAY_NAME | default "NS-Drive"}}'
+    dir: desktop
+    cmds:
+      - echo "Generating bindings..."
+      - wails3 generate bindings -ts ./...
+      - cd frontend && ln -sf bindings wailsjs 2>/dev/null || true
+      - echo "Building frontend..."
+      - cd frontend && npm ci --legacy-peer-deps && npm run build
+      - echo "Building backend..."
+      - mkdir -p {{.BIN_DIR}}
+      - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - echo "Creating app bundle..."
+      - mkdir -p {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS
+      - mkdir -p {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources
+      - cp {{.BIN_DIR}}/{{.APP_NAME}} {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/
+      - |
+        cat > {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+            <dict>
+                <key>CFBundlePackageType</key>
+                <string>APPL</string>
+                <key>CFBundleName</key>
+                <string>{{.APP_DISPLAY_NAME}}</string>
+                <key>CFBundleExecutable</key>
+                <string>{{.APP_NAME}}</string>
+                <key>CFBundleIdentifier</key>
+                <string>{{.BUNDLE_ID}}</string>
+                <key>CFBundleVersion</key>
+                <string>{{.VERSION}}</string>
+                <key>CFBundleShortVersionString</key>
+                <string>{{.VERSION}}</string>
+                <key>CFBundleIconFile</key>
+                <string>iconfile</string>
+                <key>LSMinimumSystemVersion</key>
+                <string>10.13.0</string>
+                <key>NSHighResolutionCapable</key>
+                <true/>
+            </dict>
+        </plist>
+        EOF
+      - echo -n "APPL????" > {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/PkgInfo
+      - task: build:macos:icon
+      - cp -R {{.BIN_DIR}}/{{.APP_NAME}}.app ../{{.APP_NAME}}.app
+      - echo "App bundle created at {{.APP_NAME}}.app"
+
+  build:macos:icon:
+    summary: Creates macOS app icon (icns)
+    dir: desktop
+    cmds:
+      - mkdir -p /tmp/ns-drive-icons.iconset
+      - sips -z 16 16 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_16x16.png >/dev/null 2>&1
+      - sips -z 32 32 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_16x16@2x.png >/dev/null 2>&1
+      - sips -z 32 32 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_32x32.png >/dev/null 2>&1
+      - sips -z 64 64 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_32x32@2x.png >/dev/null 2>&1
+      - sips -z 128 128 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_128x128.png >/dev/null 2>&1
+      - sips -z 256 256 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_128x128@2x.png >/dev/null 2>&1
+      - sips -z 256 256 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_256x256.png >/dev/null 2>&1
+      - sips -z 512 512 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_256x256@2x.png >/dev/null 2>&1
+      - sips -z 512 512 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_512x512.png >/dev/null 2>&1
+      - sips -z 1024 1024 build/appicon.png --out /tmp/ns-drive-icons.iconset/icon_512x512@2x.png >/dev/null 2>&1
+      - iconutil -c icns /tmp/ns-drive-icons.iconset -o {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/iconfile.icns
+      - rm -rf /tmp/ns-drive-icons.iconset
+
+  build:macos:sign:
+    summary: Signs the macOS app bundle
+    vars:
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY | default "-"}}'
+    cmds:
+      - echo "Signing app bundle..."
+      - codesign --force --deep --sign "{{.SIGNING_IDENTITY}}" {{.APP_NAME}}.app
+      - codesign --verify --verbose {{.APP_NAME}}.app
+      - echo "App signed successfully"
 
   clean:
     summary: Cleans build artifacts
     cmds:
       - rm -f ns-drive
+      - rm -rf ns-drive.app
       - rm -rf desktop/bin
       - rm -rf desktop/frontend/dist
       - rm -rf desktop/frontend/node_modules/.cache
