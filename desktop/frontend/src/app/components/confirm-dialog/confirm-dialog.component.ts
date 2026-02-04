@@ -21,6 +21,7 @@ export interface ConfirmDialogData {
       [header]="data.title"
       [(visible)]="isOpen"
       [modal]="true"
+      [draggable]="false"
       [closable]="true"
       [style]="{ width: '24rem' }"
       (onHide)="onCancel()"

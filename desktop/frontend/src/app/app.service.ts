@@ -107,7 +107,15 @@ export class AppService implements OnDestroy {
       if ("command" in parsedEvent) {
         this.handleLegacyCommand(parsedEvent as unknown as LegacyCommandDTO);
       }
-    });    this.getConfigInfo();
+    });
+  }
+
+  /**
+   * Initialize data loading from backend.
+   * Call this after first paint to avoid blocking the initial render.
+   */
+  initialize(): void {
+    this.getConfigInfo();
     this.getRemotes();
   }
 

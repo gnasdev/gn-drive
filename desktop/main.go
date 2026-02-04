@@ -5,6 +5,8 @@ import (
 	"desktop/backend/services"
 	"embed"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -61,6 +63,20 @@ func main() {
 	// Wire up service dependencies
 	schedulerService.SetSyncService(syncService)
 
+	// Compute shared config once to avoid duplicate file I/O across services
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Warning: Could not get user home directory: %v", err)
+		homeDir = "."
+	}
+	configDir := filepath.Join(homeDir, ".config", "ns-drive")
+	wd, _ := os.Getwd()
+	services.SetSharedConfig(&services.SharedConfig{
+		HomeDir:    homeDir,
+		ConfigDir:  configDir,
+		WorkingDir: wd,
+	})
+
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ns-drive",
@@ -72,7 +88,7 @@ func main() {
 	window.SetURL("/")
 
 	// Run the application
-	err := app.Run()
+	err = app.Run()
 	if err != nil {
 		log.Fatal("Error:", err.Error())
 	}

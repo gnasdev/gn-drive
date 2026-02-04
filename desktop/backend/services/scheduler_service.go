@@ -61,14 +61,29 @@ func (s *SchedulerService) ServiceName() string {
 	return "SchedulerService"
 }
 
-// ServiceStartup is called when the service starts
+// ServiceStartup is called when the service starts.
+// Initialization runs in a goroutine to avoid blocking app startup.
 func (s *SchedulerService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
-	log.Printf("SchedulerService starting up...")
-	if err := s.initialize(); err != nil {
-		return err
-	}
-	s.cron.Start()
+	log.Printf("SchedulerService starting up (async)...")
+	go func() {
+		if err := s.initialize(); err != nil {
+			log.Printf("SchedulerService init error: %v", err)
+			return
+		}
+		s.cron.Start()
+	}()
 	return nil
+}
+
+// ensureInitialized lazily initializes the service if not yet done.
+func (s *SchedulerService) ensureInitialized() error {
+	s.mutex.RLock()
+	if s.initialized {
+		s.mutex.RUnlock()
+		return nil
+	}
+	s.mutex.RUnlock()
+	return s.initialize()
 }
 
 // ServiceShutdown is called when the service shuts down
@@ -87,12 +102,17 @@ func (s *SchedulerService) initialize() error {
 		return nil
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = "."
+	// Use shared config to avoid duplicate os.UserHomeDir() calls
+	shared := GetSharedConfig()
+	if shared != nil {
+		s.filePath = filepath.Join(shared.ConfigDir, "schedules.json")
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		s.filePath = filepath.Join(homeDir, ".config", "ns-drive", "schedules.json")
 	}
-
-	s.filePath = filepath.Join(homeDir, ".config", "ns-drive", "schedules.json")
 
 	if err := os.MkdirAll(filepath.Dir(s.filePath), 0755); err != nil {
 		return fmt.Errorf("failed to create schedules directory: %w", err)
@@ -119,6 +139,9 @@ func (s *SchedulerService) initialize() error {
 
 // AddSchedule adds a new schedule entry
 func (s *SchedulerService) AddSchedule(ctx context.Context, entry models.ScheduleEntry) error {
+	if err := s.ensureInitialized(); err != nil {
+		return err
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -153,6 +176,9 @@ func (s *SchedulerService) AddSchedule(ctx context.Context, entry models.Schedul
 
 // UpdateSchedule updates an existing schedule
 func (s *SchedulerService) UpdateSchedule(ctx context.Context, entry models.ScheduleEntry) error {
+	if err := s.ensureInitialized(); err != nil {
+		return err
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -206,6 +232,9 @@ func (s *SchedulerService) UpdateSchedule(ctx context.Context, entry models.Sche
 
 // DeleteSchedule removes a schedule
 func (s *SchedulerService) DeleteSchedule(ctx context.Context, scheduleId string) error {
+	if err := s.ensureInitialized(); err != nil {
+		return err
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -236,6 +265,9 @@ func (s *SchedulerService) DeleteSchedule(ctx context.Context, scheduleId string
 
 // GetSchedules returns all schedules
 func (s *SchedulerService) GetSchedules(ctx context.Context) ([]models.ScheduleEntry, error) {
+	if err := s.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -246,6 +278,9 @@ func (s *SchedulerService) GetSchedules(ctx context.Context) ([]models.ScheduleE
 
 // EnableSchedule enables a schedule
 func (s *SchedulerService) EnableSchedule(ctx context.Context, scheduleId string) error {
+	if err := s.ensureInitialized(); err != nil {
+		return err
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -269,6 +304,9 @@ func (s *SchedulerService) EnableSchedule(ctx context.Context, scheduleId string
 
 // DisableSchedule disables a schedule
 func (s *SchedulerService) DisableSchedule(ctx context.Context, scheduleId string) error {
+	if err := s.ensureInitialized(); err != nil {
+		return err
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

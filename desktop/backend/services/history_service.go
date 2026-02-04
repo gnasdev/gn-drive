@@ -50,9 +50,21 @@ func (h *HistoryService) ServiceName() string {
 	return "HistoryService"
 }
 
-// ServiceStartup is called when the service starts
+// ServiceStartup is called when the service starts.
+// Initialization is deferred to first access to speed up app startup.
 func (h *HistoryService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
-	log.Printf("HistoryService starting up...")
+	log.Printf("HistoryService starting up (lazy init)...")
+	return nil
+}
+
+// ensureInitialized lazily initializes the service on first access.
+func (h *HistoryService) ensureInitialized() error {
+	h.mutex.RLock()
+	if h.initialized {
+		h.mutex.RUnlock()
+		return nil
+	}
+	h.mutex.RUnlock()
 	return h.initialize()
 }
 
@@ -71,12 +83,17 @@ func (h *HistoryService) initialize() error {
 		return nil
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = "."
+	// Use shared config to avoid duplicate os.UserHomeDir() calls
+	shared := GetSharedConfig()
+	if shared != nil {
+		h.filePath = filepath.Join(shared.ConfigDir, "history.json")
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		h.filePath = filepath.Join(homeDir, ".config", "ns-drive", "history.json")
 	}
-
-	h.filePath = filepath.Join(homeDir, ".config", "ns-drive", "history.json")
 
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(h.filePath), 0755); err != nil {
@@ -127,6 +144,9 @@ func (h *HistoryService) AddEntry(ctx context.Context, entry models.HistoryEntry
 
 // GetHistory returns history entries with pagination
 func (h *HistoryService) GetHistory(ctx context.Context, limit, offset int) ([]models.HistoryEntry, error) {
+	if err := h.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 
@@ -146,6 +166,9 @@ func (h *HistoryService) GetHistory(ctx context.Context, limit, offset int) ([]m
 
 // GetHistoryForProfile returns history entries for a specific profile
 func (h *HistoryService) GetHistoryForProfile(ctx context.Context, profileName string) ([]models.HistoryEntry, error) {
+	if err := h.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 
@@ -160,6 +183,9 @@ func (h *HistoryService) GetHistoryForProfile(ctx context.Context, profileName s
 
 // GetStats returns aggregate statistics across all history
 func (h *HistoryService) GetStats(ctx context.Context) (*models.AggregateStats, error) {
+	if err := h.ensureInitialized(); err != nil {
+		return nil, err
+	}
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 
@@ -195,6 +221,9 @@ func (h *HistoryService) GetStats(ctx context.Context) (*models.AggregateStats, 
 
 // ClearHistory removes all history entries
 func (h *HistoryService) ClearHistory(ctx context.Context) error {
+	if err := h.ensureInitialized(); err != nil {
+		return err
+	}
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 

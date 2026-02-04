@@ -1,9 +1,14 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from "@angular/core";
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Card } from "primeng/card";
 import { Toolbar } from "primeng/toolbar";
 import { ToggleSwitch } from "primeng/toggleswitch";
+import {
+  GetSettings,
+  SetEnabled,
+  SetDebugMode,
+} from "../../../wailsjs/desktop/backend/services/notificationservice";
 
 @Component({
   selector: "app-settings",
@@ -139,22 +144,41 @@ import { ToggleSwitch } from "primeng/toggleswitch";
     </div>
   `,
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnInit {
   notificationsEnabled = true;
   configEncrypted = false;
   debugMode = false;
 
   constructor(private readonly cdr: ChangeDetectorRef) {}
 
-  saveNotificationSetting() {
-    // TODO: Call NotificationService.SetEnabled via Wails bindings
+  async ngOnInit() {
+    try {
+      const settings = await GetSettings();
+      this.notificationsEnabled = settings.notifications_enabled;
+      this.debugMode = settings.debug_mode;
+      this.cdr.markForCheck();
+    } catch (e) {
+      console.error("Failed to load settings:", e);
+    }
+  }
+
+  async saveNotificationSetting() {
+    try {
+      await SetEnabled(this.notificationsEnabled);
+    } catch (e) {
+      console.error("Failed to save notification setting:", e);
+    }
   }
 
   toggleConfigEncryption() {
-    // TODO: Show password dialog, call CryptService via Wails bindings
+    // Config encryption requires password dialog — not yet implemented
   }
 
-  saveDebugSetting() {
-    // TODO: Persist debug mode setting
+  async saveDebugSetting() {
+    try {
+      await SetDebugMode(this.debugMode);
+    } catch (e) {
+      console.error("Failed to save debug setting:", e);
+    }
   }
 }

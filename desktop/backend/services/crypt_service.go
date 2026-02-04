@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configfile"
 	"github.com/rclone/rclone/fs/config/obscure"
 	"github.com/rclone/rclone/fs/rc"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -66,7 +65,7 @@ func (c *CryptService) ServiceShutdown(ctx context.Context) error {
 	return nil
 }
 
-// initialize ensures rclone config is loaded
+// initialize ensures crypt service is ready
 func (c *CryptService) initialize() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -75,7 +74,7 @@ func (c *CryptService) initialize() error {
 		return nil
 	}
 
-	configfile.Install()
+	// configfile.Install() is called once by App.ServiceStartup — no need to repeat here.
 	c.initialized = true
 	return nil
 }

@@ -2,6 +2,15 @@
 
 @config "../tailwind.config.js";
 
+/* Override primeicons font-display from 'block' to 'swap' to prevent render-blocking */
+@font-face {
+  font-family: 'primeicons';
+  font-display: swap;
+  src: url('/node_modules/primeicons/fonts/primeicons.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @font-face {
   font-family: 'Roboto';
   font-style: normal;
@@ -12,8 +21,11 @@
 }
 
 /* Global styles - dark only */
-* {
+*,
+*:focus,
+*:focus-visible {
   box-sizing: border-box;
+  outline: none;
 }
 html,
 body {

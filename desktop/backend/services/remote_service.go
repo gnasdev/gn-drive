@@ -10,7 +10,6 @@ import (
 
 	"github.com/rclone/rclone/fs"
 	fsConfig "github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configfile"
 	"github.com/rclone/rclone/fs/rc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -75,9 +74,7 @@ func (r *RemoteService) initializeRcloneConfig() error {
 		return nil
 	}
 
-	// Initialize rclone config
-	// Note: The config path should be set by the main application
-	configfile.Install()
+	// configfile.Install() is called once by App.ServiceStartup — no need to repeat here.
 
 	r.initialized = true
 	log.Printf("RemoteService initialized")

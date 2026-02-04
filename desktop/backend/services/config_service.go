@@ -5,7 +5,6 @@ import (
 	"desktop/backend/config"
 	"desktop/backend/events"
 	"desktop/backend/models"
-	"desktop/backend/utils"
 	"desktop/backend/validation"
 	"fmt"
 	"log"
@@ -72,31 +71,31 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 		return nil
 	}
 
-	// Set working directory
-	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
-		return fmt.Errorf("failed to set working directory: %w", err)
+	// Use shared config to avoid duplicate os.UserHomeDir() and CdToNormalizeWorkingDir() calls
+	shared := GetSharedConfig()
+	if shared != nil {
+		c.configInfo.EnvConfig = config.Config{
+			ProfileFilePath: filepath.Join(shared.ConfigDir, "profiles.json"),
+			RcloneFilePath:  filepath.Join(shared.ConfigDir, "rclone.conf"),
+		}
+		c.configInfo.WorkingDir = shared.WorkingDir
+	} else {
+		// Fallback if shared config not set
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Printf("Warning: Could not get user home directory, using relative paths: %v", err)
+			homeDir = "."
+		}
+		c.configInfo.EnvConfig = config.Config{
+			ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
+			RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
+		}
+		wd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+		c.configInfo.WorkingDir = wd
 	}
-
-	// Load environment config (embedded .env)
-	// This would need to be passed from the main app or loaded differently
-	// For now, we'll create a placeholder using home directory paths
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("Warning: Could not get user home directory, using relative paths: %v", err)
-		homeDir = "."
-	}
-
-	c.configInfo.EnvConfig = config.Config{
-		ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
-		RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
-	}
-
-	// Get working directory
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
-	}
-	c.configInfo.WorkingDir = wd
 
 	// Load profiles from file
 	if err := c.configInfo.ReadFromFile(c.configInfo.EnvConfig); err != nil {

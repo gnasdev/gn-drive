@@ -430,7 +430,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const profiles = this.appService.configInfo$.value?.profiles || [];
     return [
       { label: 'No profile selected', value: null },
-      ...profiles.map((p, i) => ({ label: p.name, value: i })),
+      ...profiles.map((p, i) => ({ label: p.name || "(Untitled Profile)", value: i })),
     ];
   }
 

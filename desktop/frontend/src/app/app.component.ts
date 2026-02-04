@@ -10,7 +10,6 @@ import { AppService } from "./app.service.js";
 import { combineLatest, Subscription } from "rxjs";
 import { HomeComponent } from "./home/home.component.js";
 import { ProfilesComponent } from "./profiles/profiles.component.js";
-
 import { RemotesComponent } from "./remotes/remotes.component.js";
 import { SidebarComponent } from "./components/sidebar/sidebar.component.js";
 import { DashboardComponent } from "./dashboard/dashboard.component.js";
@@ -56,9 +55,7 @@ export class AppComponent implements OnInit, OnDestroy {
     public readonly navigationService: NavigationService,
     private readonly loggingService: LoggingService,
     private readonly consoleLoggerService: ConsoleLoggerService
-  ) {
-    this.initializeLogging();
-  }
+  ) {}
 
   ngOnInit() {
     if (this.isInitialized) {
@@ -75,6 +72,12 @@ export class AppComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       })
     );
+
+    // Defer logging and backend data loading after first paint
+    requestAnimationFrame(() => {
+      this.initializeLogging();
+      this.appService.initialize();
+    });
   }
 
   ngOnDestroy() {

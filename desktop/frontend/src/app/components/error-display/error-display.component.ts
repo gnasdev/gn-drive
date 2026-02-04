@@ -12,125 +12,116 @@ import {
   ErrorNotification,
   ErrorSeverity,
 } from "../../services/error.service";
+import { Dialog } from "primeng/dialog";
+import { ButtonModule } from "primeng/button";
 
 @Component({
   selector: "app-error-display",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, Dialog, ButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (activeErrors.length > 0) {
-    <div
-      class="fixed top-20 right-4 w-96 max-h-[calc(100vh-100px)] overflow-y-auto z-50 space-y-2"
+    <p-dialog
+      header="Error Details"
+      [(visible)]="dialogVisible"
+      [modal]="true"
+      [dismissableMask]="true"
+      [draggable]="false"
+      [closable]="true"
+      [style]="{ width: '36rem', maxHeight: '80vh' }"
+      (onHide)="onDialogHide()"
     >
-      @for (error of activeErrors; track error.id) {
-      <div
-        [class]="getErrorCardClasses(error.severity)"
-        class="bg-gray-800 rounded-lg shadow-lg border-l-4 p-4 animate-slide-in"
-      >
-        <!-- Header -->
-        <div class="flex items-start justify-between mb-3">
-          <div class="flex items-center space-x-3">
-            <div
-              [class]="getIconClasses(error.severity)"
-              class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-            >
-              <i [class]="getErrorIconClass(error.severity)"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h4
-                class="text-sm font-semibold text-gray-100"
+      @if (activeErrors.length > 0) {
+      <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+        @for (error of activeErrors; track error.id) {
+        <div
+          [class]="getErrorCardClasses(error.severity)"
+          class="bg-gray-800 rounded-lg border-l-4 p-4"
+        >
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <div
+                [class]="getIconClasses(error.severity)"
+                class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
               >
-                {{ error.title }}
-              </h4>
-              <div class="flex items-center space-x-2 mt-1">
-                <span class="text-xs text-gray-400">{{
-                  error.timestamp | date : "short"
-                }}</span>
-                <span
-                  [class]="getSeverityChipClasses(error.severity)"
-                  class="px-2 py-1 text-xs font-medium rounded-full"
-                >
-                  {{ error.severity.toUpperCase() }}
-                </span>
+                <i [class]="getErrorIconClass(error.severity)"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-100">
+                  {{ error.title }}
+                </h4>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs text-gray-400">{{
+                    error.timestamp | date : "medium"
+                  }}</span>
+                  <span
+                    [class]="getSeverityChipClasses(error.severity)"
+                    class="px-2 py-0.5 text-xs font-medium rounded-full"
+                  >
+                    {{ error.severity.toUpperCase() }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          <button
-            (click)="dismissError(error.id)"
-            class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-300 transition-colors"
-            aria-label="Dismiss error"
-          >
-            <i class="pi pi-times"></i>
-          </button>
-        </div>
 
-        <!-- Message -->
-        <p class="text-sm text-gray-300 mb-3">
-          {{ error.message }}
-        </p>
+          <!-- Message -->
+          <p class="text-sm text-gray-300 mb-2">
+            {{ error.message }}
+          </p>
 
-        <!-- Details (expandable) -->
-        @if (error.details) {
-        <div class="border-t border-gray-600 pt-3">
-          <button
-            (click)="toggleDetails(error.id)"
-            class="flex items-center space-x-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
-          >
-            <span>Details</span>
-            <i
-              [class]="
-                isDetailsExpanded(error.id)
-                  ? 'pi pi-chevron-up'
-                  : 'pi pi-chevron-down'
-              "
-            ></i>
-          </button>
-          @if (isDetailsExpanded(error.id)) {
+          <!-- Details -->
+          @if (error.details) {
           <div
-            class="mt-2 p-3 bg-gray-700 rounded text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto"
+            class="p-3 bg-gray-700 rounded text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto mb-2"
           >
             {{ error.details }}
           </div>
           }
+
+          <!-- Actions -->
+          <div class="flex items-center gap-2 pt-1">
+            <p-button
+              icon="pi pi-copy"
+              label="Copy"
+              [text]="true"
+              severity="secondary"
+              size="small"
+              (onClick)="copyError(error)"
+            ></p-button>
+            <p-button
+              icon="pi pi-times"
+              label="Dismiss"
+              [text]="true"
+              severity="danger"
+              size="small"
+              (onClick)="dismissError(error.id)"
+            ></p-button>
+          </div>
         </div>
         }
       </div>
       }
-    </div>
-    }
+
+      <ng-template #footer>
+        <div class="flex justify-end">
+          <p-button
+            label="Clear All"
+            icon="pi pi-trash"
+            severity="secondary"
+            (onClick)="clearAll()"
+          ></p-button>
+        </div>
+      </ng-template>
+    </p-dialog>
   `,
-  styles: [
-    `
-      .animate-slide-in {
-        animation: slideIn 0.3s ease-out;
-      }
-
-      @keyframes slideIn {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-
-      @media (max-width: 768px) {
-        .fixed.top-20.right-4.w-96 {
-          width: calc(100vw - 2rem);
-          right: 1rem;
-          left: 1rem;
-        }
-      }
-    `,
-  ],
 })
 export class ErrorDisplayComponent implements OnInit, OnDestroy {
   activeErrors: ErrorNotification[] = [];
+  dialogVisible = false;
   private subscription?: Subscription;
-  private expandedDetails = new Set<string>();
+  private previousErrorCount = 0;
 
   constructor(
     private errorService: ErrorService,
@@ -139,10 +130,21 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.subscription = this.errorService.errors$.subscribe((errors) => {
-      // Only show persistent errors (non-auto-hide) in the error display
       this.activeErrors = errors.filter(
         (error) => !error.dismissed && !error.autoHide
       );
+
+      // Auto-open dialog when new persistent errors arrive
+      if (this.activeErrors.length > this.previousErrorCount) {
+        this.dialogVisible = true;
+      }
+
+      // Auto-close when all errors are dismissed
+      if (this.activeErrors.length === 0) {
+        this.dialogVisible = false;
+      }
+
+      this.previousErrorCount = this.activeErrors.length;
       this.cdr.detectChanges();
     });
   }
@@ -151,21 +153,34 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
     this.subscription?.unsubscribe();
   }
 
+  onDialogHide(): void {
+    this.dialogVisible = false;
+  }
+
   dismissError(errorId: string): void {
     this.errorService.dismissError(errorId);
   }
 
-  toggleDetails(errorId: string): void {
-    if (this.expandedDetails.has(errorId)) {
-      this.expandedDetails.delete(errorId);
-    } else {
-      this.expandedDetails.add(errorId);
-    }
-    this.cdr.detectChanges();
+  clearAll(): void {
+    this.errorService.clearAllErrors();
+    this.dialogVisible = false;
   }
 
-  isDetailsExpanded(errorId: string): boolean {
-    return this.expandedDetails.has(errorId);
+  async copyError(error: ErrorNotification): Promise<void> {
+    const text = [
+      `[${error.severity.toUpperCase()}] ${error.title}`,
+      `Time: ${error.timestamp.toISOString()}`,
+      `Message: ${error.message}`,
+      error.details ? `Details: ${error.details}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      console.error("Failed to copy error to clipboard");
+    }
   }
 
   getErrorIconClass(severity: ErrorSeverity): string {
@@ -191,7 +206,7 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
       case ErrorSeverity.ERROR:
         return "border-l-red-500";
       case ErrorSeverity.CRITICAL:
-        return "border-l-purple-500 shadow-purple-900";
+        return "border-l-purple-500";
       default:
         return "border-l-red-500";
     }
@@ -225,9 +240,5 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
       default:
         return "bg-red-900 text-red-200";
     }
-  }
-
-  trackByErrorId(_index: number, error: ErrorNotification): string {
-    return error.id;
   }
 }

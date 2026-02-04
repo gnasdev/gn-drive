@@ -229,7 +229,7 @@ export class ProfilesComponent implements OnInit, OnDestroy {
     const remotes = this.appService.remotes$.value || [];
     return [
       { label: "Local", value: "" },
-      ...remotes.map((r) => ({ label: r.name, value: r.name })),
+      ...remotes.map((r) => ({ label: r.name || "(Untitled Remote)", value: r.name })),
     ];
   }
 

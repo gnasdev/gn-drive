@@ -7,19 +7,49 @@
   <main class="flex-1 overflow-auto">
     @switch ((navigationService.currentState$ | async)?.page) {
       @case ('dashboard') {
-        <app-dashboard></app-dashboard>
+        @defer {
+          <app-dashboard></app-dashboard>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('operations') {
-        <app-home></app-home>
+        @defer {
+          <app-home></app-home>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('file-browser') {
-        <app-file-browser></app-file-browser>
+        @defer {
+          <app-file-browser></app-file-browser>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('profiles') {
-        <app-profiles></app-profiles>
+        @defer {
+          <app-profiles></app-profiles>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('remotes') {
-        <app-remotes></app-remotes>
+        @defer {
+          <app-remotes></app-remotes>
+        } @placeholder {
+          <div class="flex items-center justify-center h-full">
+            <span class="text-gray-400">Loading...</span>
+          </div>
+        }
       }
       @case ('schedules') {
         @defer {

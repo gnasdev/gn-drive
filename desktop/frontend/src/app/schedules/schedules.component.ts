@@ -141,6 +141,7 @@ interface ScheduleEntry {
         [(visible)]="showAddModal"
         [modal]="true"
         [dismissableMask]="true"
+        [draggable]="false"
         [style]="{ width: '80vw', minHeight: '80vh' }"
         [closable]="true"
       >
