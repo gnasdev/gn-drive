@@ -9,14 +9,19 @@ import (
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 //go:embed all:frontend/dist/browser
 var assets embed.FS
 
+//go:embed build/appicon.png
+var appIcon []byte
+
 func main() {
 	// Create service instances
 	appService := be.NewApp()
+	logService := services.NewLogService()
 	syncService := services.NewSyncService(nil)
 	configService := services.NewConfigService(nil)
 	remoteService := services.NewRemoteService(nil)
@@ -27,6 +32,9 @@ func main() {
 	notificationService := services.NewNotificationService(nil)
 	cryptService := services.NewCryptService(nil)
 	boardService := services.NewBoardService(nil)
+	exportService := services.NewExportService(nil)
+	importService := services.NewImportService(nil)
+	trayService := services.NewTrayService(appIcon)
 
 	// Create application with all services registered
 	app := application.New(application.Options{
@@ -37,6 +45,7 @@ func main() {
 		},
 		Services: []application.Service{
 			application.NewService(appService),
+			application.NewService(logService),
 			application.NewService(syncService),
 			application.NewService(configService),
 			application.NewService(remoteService),
@@ -47,11 +56,14 @@ func main() {
 			application.NewService(notificationService),
 			application.NewService(cryptService),
 			application.NewService(boardService),
+			application.NewService(exportService),
+			application.NewService(importService),
 		},
 	})
 
 	// Store the application reference in all services for events
 	appService.SetApp(app)
+	logService.SetApp(app)
 	syncService.SetApp(app)
 	configService.SetApp(app)
 	remoteService.SetApp(app)
@@ -62,10 +74,23 @@ func main() {
 	notificationService.SetApp(app)
 	cryptService.SetApp(app)
 	boardService.SetApp(app)
+	exportService.SetApp(app)
+	importService.SetApp(app)
 
 	// Wire up service dependencies
 	schedulerService.SetSyncService(syncService)
 	boardService.SetSyncService(syncService)
+	boardService.SetNotificationService(notificationService)
+	syncService.SetLogService(logService)
+	syncService.SetNotificationService(notificationService)
+
+	// Set singleton instances for cross-service access
+	services.SetBoardServiceInstance(boardService)
+	services.SetTrayServiceInstance(trayService)
+
+	// Wire up tray service dependencies
+	trayService.SetApp(app)
+	trayService.SetBoardService(boardService)
 
 	// Compute shared config once to avoid duplicate file I/O across services
 	homeDir, err := os.UserHomeDir()
@@ -91,8 +116,27 @@ func main() {
 	// Set window reference on shared EventBus for window-specific events
 	services.SetSharedEventBusWindow(window)
 
+	// Set EventBus on LogService after window is ready
+	logService.SetEventBus(services.GetSharedEventBus())
+
 	// Set the window URL to load the frontend
 	window.SetURL("/")
+
+	// Handle window close - minimize to tray or quit based on setting
+	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if notificationService.IsMinimizeToTray(nil) {
+			// Cancel the close event and hide window instead
+			event.Cancel()
+			window.Hide()
+		}
+		// If not minimize to tray, let the window close normally which will quit the app
+	})
+
+	// Initialize system tray
+	trayService.SetWindow(window)
+	if err := trayService.Initialize(); err != nil {
+		log.Printf("Warning: Failed to initialize system tray: %v", err)
+	}
 
 	// Run the application
 	err = app.Run()

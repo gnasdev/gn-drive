@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/emersion/go-autostart"
 	"github.com/gen2brain/beeep"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -16,6 +17,8 @@ import (
 type AppSettings struct {
 	NotificationsEnabled bool `json:"notifications_enabled"`
 	DebugMode            bool `json:"debug_mode"`
+	MinimizeToTray       bool `json:"minimize_to_tray"`
+	StartAtLogin         bool `json:"start_at_login"`
 }
 
 // NotificationService handles desktop notifications and app settings persistence
@@ -121,11 +124,68 @@ func (n *NotificationService) IsDebugMode(ctx context.Context) bool {
 	return n.settings.DebugMode
 }
 
+// SetMinimizeToTray enables or disables minimize to tray on close
+func (n *NotificationService) SetMinimizeToTray(ctx context.Context, enabled bool) {
+	n.mutex.Lock()
+	n.settings.MinimizeToTray = enabled
+	n.mutex.Unlock()
+	n.saveSettings()
+}
+
+// IsMinimizeToTray returns whether minimize to tray is enabled
+func (n *NotificationService) IsMinimizeToTray(ctx context.Context) bool {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	return n.settings.MinimizeToTray
+}
+
 // GetSettings returns all current app settings
 func (n *NotificationService) GetSettings(ctx context.Context) AppSettings {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
 	return n.settings
+}
+
+// SetStartAtLogin enables or disables starting the app at login
+func (n *NotificationService) SetStartAtLogin(ctx context.Context, enabled bool) error {
+	// Get executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Printf("Failed to get executable path: %v", err)
+		return err
+	}
+
+	app := &autostart.App{
+		Name:        "NS-Drive",
+		DisplayName: "NS-Drive",
+		Exec:        []string{execPath},
+	}
+
+	if enabled {
+		if err := app.Enable(); err != nil {
+			log.Printf("Failed to enable start at login: %v", err)
+			return err
+		}
+	} else {
+		if err := app.Disable(); err != nil {
+			log.Printf("Failed to disable start at login: %v", err)
+			return err
+		}
+	}
+
+	n.mutex.Lock()
+	n.settings.StartAtLogin = enabled
+	n.mutex.Unlock()
+	n.saveSettings()
+
+	return nil
+}
+
+// IsStartAtLogin returns whether start at login is enabled
+func (n *NotificationService) IsStartAtLogin(ctx context.Context) bool {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	return n.settings.StartAtLogin
 }
 
 func (n *NotificationService) loadSettings() {

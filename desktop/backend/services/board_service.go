@@ -25,11 +25,28 @@ type BoardService struct {
 	initialized bool
 
 	// Dependencies
-	syncService *SyncService
+	syncService         *SyncService
+	notificationService *NotificationService
 
 	// Active executions
 	activeFlows map[string]*FlowExecution
 	flowMutex   sync.RWMutex
+}
+
+// Singleton instance for cross-service access
+var boardServiceInstance *BoardService
+var boardServiceOnce sync.Once
+
+// GetBoardService returns the singleton BoardService instance
+func GetBoardService() *BoardService {
+	return boardServiceInstance
+}
+
+// SetBoardServiceInstance sets the singleton instance (called from main.go)
+func SetBoardServiceInstance(bs *BoardService) {
+	boardServiceOnce.Do(func() {
+		boardServiceInstance = bs
+	})
 }
 
 // FlowExecution tracks a running board execution
@@ -72,6 +89,11 @@ func (b *BoardService) SetApp(app *application.App) {
 // SetSyncService sets the sync service dependency
 func (b *BoardService) SetSyncService(syncService *SyncService) {
 	b.syncService = syncService
+}
+
+// SetNotificationService sets the notification service for desktop notifications
+func (b *BoardService) SetNotificationService(notificationService *NotificationService) {
+	b.notificationService = notificationService
 }
 
 // ServiceName returns the name of the service
@@ -217,6 +239,12 @@ func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
 	}
 
 	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "added", "Board created")
+
+	// Refresh system tray menu
+	if ts := GetTrayService(); ts != nil {
+		ts.RefreshMenu()
+	}
+
 	return nil
 }
 
@@ -262,6 +290,12 @@ func (b *BoardService) UpdateBoard(ctx context.Context, board models.Board) erro
 	}
 
 	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "updated", "Board updated")
+
+	// Refresh system tray menu
+	if ts := GetTrayService(); ts != nil {
+		ts.RefreshMenu()
+	}
+
 	return nil
 }
 
@@ -294,6 +328,12 @@ func (b *BoardService) DeleteBoard(ctx context.Context, boardId string) error {
 	}
 
 	b.emitBoardEvent(events.BoardUpdated, boardId, "", "deleted", "Board deleted")
+
+	// Refresh system tray menu
+	if ts := GetTrayService(); ts != nil {
+		ts.RefreshMenu()
+	}
+
 	return nil
 }
 
@@ -502,8 +542,10 @@ func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, lay
 
 	if hasFailure {
 		b.emitBoardEvent(events.BoardExecutionFailed, board.Id, "", "failed", "Board execution completed with failures")
+		b.sendBoardNotification(board, false, flow.Status)
 	} else {
 		b.emitBoardEvent(events.BoardExecutionCompleted, board.Id, "", "completed", "Board execution completed successfully")
+		b.sendBoardNotification(board, true, flow.Status)
 	}
 }
 
@@ -947,6 +989,44 @@ func (b *BoardService) saveToFile() error {
 	return os.WriteFile(b.filePath, data, 0644)
 }
 
+// sendBoardNotification sends a desktop notification for board execution completion/failure
+func (b *BoardService) sendBoardNotification(board *models.Board, success bool, status *models.BoardExecutionStatus) {
+	if b.notificationService == nil {
+		return
+	}
+
+	boardName := board.Name
+	if boardName == "" {
+		boardName = "Unnamed board"
+	}
+
+	var title, body string
+	if success {
+		title = "Board Execution Completed"
+		completedCount := 0
+		for _, es := range status.EdgeStatuses {
+			if es.Status == "completed" {
+				completedCount++
+			}
+		}
+		body = fmt.Sprintf("Board \"%s\" completed successfully. %d sync(s) executed.", boardName, completedCount)
+	} else {
+		title = "Board Execution Failed"
+		failedCount := 0
+		for _, es := range status.EdgeStatuses {
+			if es.Status == "failed" {
+				failedCount++
+			}
+		}
+		body = fmt.Sprintf("Board \"%s\" completed with %d failure(s).", boardName, failedCount)
+	}
+
+	// Send notification (context.Background() since flow context may be cancelled)
+	if err := b.notificationService.SendNotification(context.Background(), title, body); err != nil {
+		log.Printf("Failed to send board notification: %v", err)
+	}
+}
+
 // emitBoardEvent emits a board event
 func (b *BoardService) emitBoardEvent(eventType events.EventType, boardId, edgeId, status, message string) {
 	event := events.NewBoardEvent(eventType, boardId, edgeId, status, message)
@@ -957,4 +1037,66 @@ func (b *BoardService) emitBoardEvent(eventType events.EventType, boardId, edgeI
 	} else if b.app != nil {
 		b.app.Event.Emit("tofe", event)
 	}
+}
+
+// OnRemoteDeleted handles cleanup when a remote is deleted
+// Removes nodes referencing the deleted remote and any edges connected to them
+func (b *BoardService) OnRemoteDeleted(remoteName string) error {
+	if err := b.ensureInitialized(); err != nil {
+		return err
+	}
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	modified := false
+	for i := range b.boards {
+		board := &b.boards[i]
+
+		// Find nodes that reference the deleted remote
+		nodesToRemove := make(map[string]bool)
+		for _, node := range board.Nodes {
+			if node.RemoteName == remoteName {
+				nodesToRemove[node.Id] = true
+			}
+		}
+
+		if len(nodesToRemove) == 0 {
+			continue
+		}
+
+		// Remove edges connected to the nodes being removed
+		newEdges := make([]models.BoardEdge, 0, len(board.Edges))
+		for _, edge := range board.Edges {
+			if !nodesToRemove[edge.SourceId] && !nodesToRemove[edge.TargetId] {
+				newEdges = append(newEdges, edge)
+			}
+		}
+
+		// Remove the nodes
+		newNodes := make([]models.BoardNode, 0, len(board.Nodes))
+		for _, node := range board.Nodes {
+			if !nodesToRemove[node.Id] {
+				newNodes = append(newNodes, node)
+			}
+		}
+
+		board.Nodes = newNodes
+		board.Edges = newEdges
+		board.UpdatedAt = time.Now()
+		modified = true
+
+		log.Printf("Board '%s': removed %d nodes and associated edges for deleted remote '%s'",
+			board.Name, len(nodesToRemove), remoteName)
+	}
+
+	if modified {
+		if err := b.saveToFile(); err != nil {
+			return fmt.Errorf("failed to save boards after remote deletion cleanup: %w", err)
+		}
+		// Emit event to notify frontend about board updates
+		b.emitBoardEvent(events.BoardUpdated, "", "", "remote_deleted", fmt.Sprintf("Boards updated: remote '%s' was deleted", remoteName))
+	}
+
+	return nil
 }

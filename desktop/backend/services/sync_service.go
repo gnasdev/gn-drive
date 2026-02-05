@@ -97,12 +97,14 @@ type SyncResult struct {
 
 // SyncService handles all sync operations using the rclone Go library
 type SyncService struct {
-	app         *application.App
-	eventBus    *events.WailsEventBus
-	activeTasks map[int]*SyncTask
-	taskCounter int
-	mutex       sync.RWMutex
-	envConfig   beConfig.Config
+	app                 *application.App
+	eventBus            *events.WailsEventBus
+	logService          *LogService
+	notificationService *NotificationService
+	activeTasks         map[int]*SyncTask
+	taskCounter         int
+	mutex               sync.RWMutex
+	envConfig           beConfig.Config
 }
 
 // SyncTask represents an active sync task
@@ -138,6 +140,16 @@ func (s *SyncService) SetApp(app *application.App) {
 // SetEnvConfig sets the environment configuration (needed for rclone init)
 func (s *SyncService) SetEnvConfig(config beConfig.Config) {
 	s.envConfig = config
+}
+
+// SetLogService sets the log service for reliable log delivery
+func (s *SyncService) SetLogService(logService *LogService) {
+	s.logService = logService
+}
+
+// SetNotificationService sets the notification service for desktop notifications
+func (s *SyncService) SetNotificationService(notificationService *NotificationService) {
+	s.notificationService = notificationService
 }
 
 // ServiceName returns the name of the service
@@ -297,6 +309,16 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 
 	// Create output log channel for progress reporting
 	outLog := make(chan string, 100)
+	var outLogClosed bool
+	var outLogMutex sync.Mutex
+	closeOutLog := func() {
+		outLogMutex.Lock()
+		defer outLogMutex.Unlock()
+		if !outLogClosed {
+			outLogClosed = true
+			close(outLog)
+		}
+	}
 
 	// Start sync status reporting
 	stopSyncStatus := utils.StartSyncStatusReporting(nil, task.Id, string(task.Action), task.TabId)
@@ -304,7 +326,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	// Register cancel function in the global command store
 	utils.AddCmd(task.Id, func() {
 		stopSyncStatus()
-		close(outLog)
+		closeOutLog()
 		task.Cancel()
 	})
 
@@ -321,7 +343,11 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 				AppendBoardLog(logEntry)
 			}
 
-			if s.eventBus != nil {
+			// Use LogService for reliable log delivery with sequence numbers
+			if s.logService != nil {
+				s.logService.LogSync(task.TabId, string(task.Action), "running", logEntry)
+			} else if s.eventBus != nil {
+				// Fallback to direct event emission if LogService not available
 				event := events.NewSyncEvent(events.SyncProgress, task.TabId, string(task.Action), "running", logEntry)
 				if emitErr := s.eventBus.EmitSyncEvent(event); emitErr != nil {
 					log.Printf("Failed to emit progress event: %v", emitErr)
@@ -349,8 +375,12 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		err = fmt.Errorf("unknown sync action: %s", task.Action)
 	}
 
+	// Close the outLog channel to unblock the log reader goroutine
+	closeOutLog()
+
 	// Clean up
 	stopSyncStatus()
+
 	if task.TabId != "" {
 		utils.RemoveTabMapping(task.Id)
 	}
@@ -370,6 +400,11 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		task.Status = "failed"
 		taskErr = fmt.Errorf("sync failed: %w", err)
 		s.handleSyncError(task, taskErr.Error())
+
+		// Send notification for sync failure (only for non-board tasks)
+		if !strings.HasPrefix(task.TabId, "board-") {
+			s.sendSyncNotification(task, false, err.Error())
+		}
 		return
 	}
 
@@ -379,6 +414,11 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	task.EndTime = &endTime
 
 	s.emitSyncEvent(events.SyncCompleted, task.TabId, string(task.Action), "completed", "Sync operation completed successfully")
+
+	// Send notification for sync success (only for non-board tasks)
+	if !strings.HasPrefix(task.TabId, "board-") {
+		s.sendSyncNotification(task, true, "")
+	}
 }
 
 // emitSyncEvent emits a sync event to the frontend via unified EventBus
@@ -391,6 +431,50 @@ func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, s
 	} else if s.app != nil {
 		// Fallback to direct emission if EventBus not initialized
 		s.app.Event.Emit("tofe", event)
+	}
+}
+
+// sendSyncNotification sends a desktop notification for sync completion/failure
+func (s *SyncService) sendSyncNotification(task *SyncTask, success bool, errorMsg string) {
+	if s.notificationService == nil {
+		return
+	}
+
+	// Build notification title and body
+	actionLabel := "Sync"
+	switch task.Action {
+	case ActionPull:
+		actionLabel = "Pull"
+	case ActionPush:
+		actionLabel = "Push"
+	case ActionBi:
+		actionLabel = "Bi-directional Sync"
+	case ActionBiResync:
+		actionLabel = "Bi-directional Resync"
+	}
+
+	profileName := task.Profile.Name
+	if profileName == "" {
+		profileName = "Unnamed profile"
+	}
+
+	var title, body string
+	if success {
+		title = fmt.Sprintf("%s Completed", actionLabel)
+		body = fmt.Sprintf("Profile \"%s\" synced successfully.", profileName)
+	} else {
+		title = fmt.Sprintf("%s Failed", actionLabel)
+		// Truncate error message if too long
+		errText := errorMsg
+		if len(errText) > 100 {
+			errText = errText[:97] + "..."
+		}
+		body = fmt.Sprintf("Profile \"%s\" failed: %s", profileName, errText)
+	}
+
+	// Send notification (context.Background() since task context may be cancelled)
+	if err := s.notificationService.SendNotification(context.Background(), title, body); err != nil {
+		log.Printf("Failed to send sync notification: %v", err)
 	}
 }
 
