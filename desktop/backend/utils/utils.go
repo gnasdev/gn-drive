@@ -142,7 +142,6 @@ func LogErrorAndExit(err error) {
 func HandleError(err error, msg string, onError func(err error), onClear func()) error {
 	if err != nil {
 		log.Printf("%s: %v", msg, err)
-		debug.PrintStack()
 
 		if onError != nil {
 			onError(err)

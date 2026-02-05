@@ -26,6 +26,7 @@ func main() {
 	schedulerService := services.NewSchedulerService(nil)
 	notificationService := services.NewNotificationService(nil)
 	cryptService := services.NewCryptService(nil)
+	boardService := services.NewBoardService(nil)
 
 	// Create application with all services registered
 	app := application.New(application.Options{
@@ -45,6 +46,7 @@ func main() {
 			application.NewService(schedulerService),
 			application.NewService(notificationService),
 			application.NewService(cryptService),
+			application.NewService(boardService),
 		},
 	})
 
@@ -59,9 +61,11 @@ func main() {
 	schedulerService.SetApp(app)
 	notificationService.SetApp(app)
 	cryptService.SetApp(app)
+	boardService.SetApp(app)
 
 	// Wire up service dependencies
 	schedulerService.SetSyncService(syncService)
+	boardService.SetSyncService(syncService)
 
 	// Compute shared config once to avoid duplicate file I/O across services
 	homeDir, err := os.UserHomeDir()

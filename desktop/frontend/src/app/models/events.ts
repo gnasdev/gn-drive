@@ -24,6 +24,13 @@ export type EventType =
   | "tab:output"
   // Error Events
   | "error:occurred"
+  // Board Events
+  | "board:updated"
+  | "board:execution:started"
+  | "board:execution:progress"
+  | "board:execution:completed"
+  | "board:execution:failed"
+  | "board:execution:cancelled"
   // Legacy command types
   | "command_started"
   | "command_stoped"
@@ -81,6 +88,21 @@ export interface ErrorEvent extends BaseEvent {
   tabId?: string;
 }
 
+// Board event structure
+export interface BoardEvent extends BaseEvent {
+  type:
+    | "board:updated"
+    | "board:execution:started"
+    | "board:execution:progress"
+    | "board:execution:completed"
+    | "board:execution:failed"
+    | "board:execution:cancelled";
+  boardId: string;
+  edgeId?: string;
+  status: string;
+  message?: string;
+}
+
 // Legacy command DTO (for backward compatibility)
 export interface CommandDTO {
   command: string;
@@ -97,6 +119,7 @@ export type AppEvent =
   | RemoteEvent
   | TabEvent
   | ErrorEvent
+  | BoardEvent
   | CommandDTO;
 
 // Type guards
@@ -142,6 +165,15 @@ export function isErrorEvent(event: unknown): event is ErrorEvent {
   if (typeof event !== "object" || event === null) return false;
   const e = event as Record<string, unknown>;
   return e["type"] === "error:occurred";
+}
+
+export function isBoardEvent(event: unknown): event is BoardEvent {
+  if (typeof event !== "object" || event === null) return false;
+  const e = event as Record<string, unknown>;
+  return (
+    typeof e["type"] === "string" &&
+    (e["type"] as string).startsWith("board:")
+  );
 }
 
 export function isLegacyCommandDTO(event: unknown): event is CommandDTO {

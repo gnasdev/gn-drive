@@ -117,7 +117,7 @@ func Check(ctx context.Context, config beConfig.Config, profile models.Profile, 
 func ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models.FileEntry, error) {
 	remoteFs, err := fs.NewFs(ctx, remotePath)
 	if err != nil {
-		return []models.FileEntry{}, nil
+		return nil, fmt.Errorf("failed to access %s: %w", remotePath, err)
 	}
 
 	var entries []models.FileEntry
@@ -140,7 +140,7 @@ func ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models
 		return nil
 	})
 	if err != nil {
-		return []models.FileEntry{}, nil
+		return nil, fmt.Errorf("failed to list files in %s: %w", remotePath, err)
 	}
 
 	return entries, nil

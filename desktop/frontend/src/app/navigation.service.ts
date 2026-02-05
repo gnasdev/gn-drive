@@ -5,7 +5,7 @@ export type NavigationState =
   | { page: "dashboard" }
   | { page: "operations" }
   | { page: "file-browser" }
-  | { page: "profiles" }
+  | { page: "board" }
 
   | { page: "remotes" }
   | { page: "schedules" }
@@ -46,8 +46,8 @@ export class NavigationService {
     this.navigationState$.next({ page: "file-browser" });
   }
 
-  navigateToProfiles() {
-    this.navigationState$.next({ page: "profiles" });
+  navigateToBoard() {
+    this.navigationState$.next({ page: "board" });
   }
 
   navigateToRemotes() {

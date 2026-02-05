@@ -73,6 +73,7 @@ type SyncTask struct {
 	StartTime time.Time
 	EndTime   *time.Time
 	Status    string
+	Done      chan error // closed with result when task completes
 }
 
 // NewSyncService creates a new sync service
@@ -152,6 +153,7 @@ func (s *SyncService) StartSync(ctx context.Context, action string, profile mode
 		Cancel:    cancel,
 		StartTime: time.Now(),
 		Status:    "starting",
+		Done:      make(chan error, 1),
 	}
 
 	s.activeTasks[taskId] = task
@@ -214,9 +216,30 @@ func (s *SyncService) GetActiveTasks(ctx context.Context) (map[int]*SyncTask, er
 	return tasks, nil
 }
 
+// WaitForTask blocks until the given task completes and returns its error (nil on success)
+func (s *SyncService) WaitForTask(ctx context.Context, taskId int) error {
+	s.mutex.RLock()
+	task, exists := s.activeTasks[taskId]
+	s.mutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("task %d not found", taskId)
+	}
+
+	select {
+	case err := <-task.Done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // executeSyncTask executes the sync operation using the rclone Go library
 func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
+	var taskErr error
 	defer func() {
+		task.Done <- taskErr
+		close(task.Done)
 		s.mutex.Lock()
 		delete(s.activeTasks, task.Id)
 		s.mutex.Unlock()
@@ -225,7 +248,8 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	// Initialize rclone config
 	ctx, err := rclone.InitConfig(ctx, s.envConfig.DebugMode)
 	if err != nil {
-		s.handleSyncError(task, fmt.Sprintf("Failed to initialize rclone config: %v", err))
+		taskErr = fmt.Errorf("failed to initialize rclone config: %w", err)
+		s.handleSyncError(task, taskErr.Error())
 		return
 	}
 
@@ -287,6 +311,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	select {
 	case <-ctx.Done():
 		task.Status = "cancelled"
+		taskErr = ctx.Err()
 		s.emitSyncEvent(events.SyncCancelled, task.TabId, string(task.Action), "cancelled", "Sync operation was cancelled")
 		return
 	default:
@@ -295,7 +320,8 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	// Handle result
 	if err != nil {
 		task.Status = "failed"
-		s.handleSyncError(task, fmt.Sprintf("Sync failed: %v", err))
+		taskErr = fmt.Errorf("sync failed: %w", err)
+		s.handleSyncError(task, taskErr.Error())
 		return
 	}
 

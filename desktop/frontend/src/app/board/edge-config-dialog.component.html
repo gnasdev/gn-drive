@@ -1,0 +1,283 @@
+<p-dialog
+  header="Edge Configuration"
+  [(visible)]="visible"
+  [modal]="true"
+  [dismissableMask]="true"
+  [draggable]="false"
+  [style]="{ width: '44rem', height: '80vh' }"
+  [closable]="true"
+  (onHide)="onClose()"
+>
+  @if (edge) {
+  <!-- Tab Navigation -->
+  <div class="flex border-b border-gray-700 mb-4 -mx-5">
+    @for (tab of tabs; track tab.id) {
+    <p-button
+      [label]="tab.label"
+      [icon]="tab.icon"
+      [text]="true"
+      [rounded]="false"
+      size="small"
+      [severity]="activeTab === tab.id ? 'primary' : 'secondary'"
+      [styleClass]="activeTab === tab.id
+        ? 'border-b-2 border-primary-400 rounded-none'
+        : 'rounded-none'"
+      (onClick)="activeTab = tab.id"
+    />
+    }
+  </div>
+
+  <!-- General Tab -->
+  @if (activeTab === 'general') {
+  <div class="space-y-4">
+    <!-- Action Type -->
+    <div>
+      <span class="text-sm text-gray-400 mb-2 block">Sync Action</span>
+      <p-select
+        [options]="actionOptions"
+        [(ngModel)]="edge.action"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="w-full"
+      />
+    </div>
+
+    <!-- Source & Target (read-only) -->
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-arrow-right mr-2"></i>Connection
+      </h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Source</span>
+          <div class="p-2 bg-gray-800 rounded text-gray-300 text-sm">
+            {{ sourceLabel }}
+          </div>
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Target</span>
+          <div class="p-2 bg-gray-800 rounded text-gray-300 text-sm">
+            {{ targetLabel }}
+          </div>
+        </div>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Filters Tab -->
+  @if (activeTab === 'filters') {
+  <div class="space-y-4">
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Size Filters</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Min Size</span>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="edge.sync_config.min_size"
+            placeholder="e.g. 100k, 10M"
+          />
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Max Size</span>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="edge.sync_config.max_size"
+            placeholder="e.g. 1G, 500M"
+          />
+        </div>
+      </div>
+    </p-card>
+
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Filter Settings</h3>
+      <div class="space-y-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Exclude If Present</span>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="edge.sync_config.exclude_if_present"
+            placeholder="e.g. .nosync"
+          />
+        </div>
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-300">Use Regex</p>
+            <p class="text-xs text-gray-500">Use regex for patterns</p>
+          </div>
+          <p-toggleswitch [(ngModel)]="edge.sync_config.use_regex"></p-toggleswitch>
+        </div>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Performance Tab -->
+  @if (activeTab === 'performance') {
+  <div class="space-y-4">
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">
+        <i class="pi pi-bolt mr-2"></i>Transfer Settings
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Parallel Transfers</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.parallel"
+            placeholder="8"
+            [min]="1"
+            [max]="256"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Bandwidth (MB/s)</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.bandwidth"
+            placeholder="5"
+            [min]="0"
+            [max]="10000"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+      </div>
+    </p-card>
+
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Performance</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Multi-Thread Streams</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.multi_thread_streams"
+            placeholder="4"
+            [min]="0"
+            [max]="64"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Buffer Size</span>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="edge.sync_config.buffer_size"
+            placeholder="16M"
+          />
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Retries</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.retries"
+            placeholder="3"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Low-Level Retries</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.low_level_retries"
+            placeholder="10"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+      </div>
+      <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700">
+        <div>
+          <p class="text-sm text-gray-300">Fast List</p>
+          <p class="text-xs text-gray-500">Recursive list (fewer API calls)</p>
+        </div>
+        <p-toggleswitch [(ngModel)]="edge.sync_config.fast_list"></p-toggleswitch>
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Advanced Tab -->
+  @if (activeTab === 'advanced') {
+  <div class="space-y-4">
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Safety Settings</h3>
+      <div class="space-y-3">
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Max Delete (files)</span>
+          <p-inputnumber
+            [(ngModel)]="edge.sync_config.max_delete"
+            placeholder="Unlimited"
+            [min]="0"
+            [showButtons]="true"
+            styleClass="w-full"
+          />
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 mb-1 block">Max Duration</span>
+          <input
+            pInputText
+            class="w-full"
+            [(ngModel)]="edge.sync_config.max_duration"
+            placeholder="e.g. 1h30m"
+          />
+        </div>
+        <div class="flex items-center justify-between pt-3 border-t border-gray-700">
+          <div>
+            <p class="text-sm text-gray-300">Immutable</p>
+            <p class="text-xs text-gray-500">Do not modify existing files</p>
+          </div>
+          <p-toggleswitch [(ngModel)]="edge.sync_config.immutable"></p-toggleswitch>
+        </div>
+      </div>
+    </p-card>
+
+    <p-card>
+      <h3 class="text-sm font-medium text-gray-200 mb-3">Bi-Sync Settings</h3>
+      <div>
+        <span class="text-xs text-gray-500 mb-1 block">Conflict Resolution</span>
+        <p-select
+          [options]="conflictResolutionOptions"
+          [(ngModel)]="edge.sync_config.conflict_resolution"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="w-full"
+        />
+      </div>
+    </p-card>
+  </div>
+  }
+
+  <!-- Footer -->
+  <div class="flex justify-between pt-4 mt-4 border-t border-gray-700">
+    <p-button
+      label="Delete Edge"
+      icon="pi pi-trash"
+      severity="danger"
+      [text]="true"
+      (onClick)="onDelete()"
+    ></p-button>
+    <div class="flex gap-2">
+      <p-button
+        label="Cancel"
+        severity="secondary"
+        (onClick)="onClose()"
+      ></p-button>
+      <p-button
+        label="Save"
+        icon="pi pi-save"
+        (onClick)="onSave()"
+      ></p-button>
+    </div>
+  </div>
+  }
+</p-dialog>

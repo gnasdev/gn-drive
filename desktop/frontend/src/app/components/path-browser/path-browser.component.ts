@@ -53,6 +53,7 @@ export class PathBrowserComponent {
   showDropdown = false;
   browsingPath = "";
   filterPrefix = "";
+  errorMessage = "";
 
   private lastLoadedKey = "";
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -126,6 +127,7 @@ export class PathBrowserComponent {
     this.cdr.detectChanges();
 
     try {
+      this.errorMessage = "";
       const remotePath = this.buildRemotePath(this.browsingPath);
       const result = await ListFiles(remotePath, false);
       this.entries = (result || []).sort((a, b) => {
@@ -133,10 +135,10 @@ export class PathBrowserComponent {
         return a.name.localeCompare(b.name);
       });
       this.lastLoadedKey = cacheKey;
-    } catch {
+    } catch (err) {
       this.entries = [];
       this.lastLoadedKey = "";
-      this.showDropdown = false;
+      this.errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       this.isLoading = false;
       this.cdr.detectChanges();

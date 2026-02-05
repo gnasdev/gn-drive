@@ -56,6 +56,14 @@ const (
 	// Crypt Events
 	CryptRemoteCreated EventType = "crypt:created"
 	CryptRemoteDeleted EventType = "crypt:deleted"
+
+	// Board Events
+	BoardUpdated            EventType = "board:updated"
+	BoardExecutionStarted   EventType = "board:execution:started"
+	BoardExecutionProgress  EventType = "board:execution:progress"
+	BoardExecutionCompleted EventType = "board:execution:completed"
+	BoardExecutionFailed    EventType = "board:execution:failed"
+	BoardExecutionCancelled EventType = "board:execution:cancelled"
 )
 
 // BaseEvent represents the base structure for all events
@@ -274,6 +282,29 @@ func NewHistoryEvent(eventType EventType, data interface{}) *HistoryEvent {
 			Timestamp: time.Now(),
 			Data:      data,
 		},
+	}
+}
+
+// BoardEvent represents board flow events
+type BoardEvent struct {
+	BaseEvent
+	BoardId string `json:"boardId"`
+	EdgeId  string `json:"edgeId,omitempty"`
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
+// NewBoardEvent creates a new board event
+func NewBoardEvent(eventType EventType, boardId, edgeId, status, message string) *BoardEvent {
+	return &BoardEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+		},
+		BoardId: boardId,
+		EdgeId:  edgeId,
+		Status:  status,
+		Message: message,
 	}
 }
 

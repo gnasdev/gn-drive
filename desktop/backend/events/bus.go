@@ -117,3 +117,8 @@ func (b *WailsEventBus) EmitHistoryEvent(event *HistoryEvent) error {
 func (b *WailsEventBus) EmitCryptEvent(event *CryptEvent) error {
 	return b.Emit(event)
 }
+
+// EmitBoardEvent is a convenience method for board events
+func (b *WailsEventBus) EmitBoardEvent(event *BoardEvent) error {
+	return b.Emit(event)
+}

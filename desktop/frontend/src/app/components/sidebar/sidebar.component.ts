@@ -92,9 +92,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: "pi pi-folder-open",
     },
     {
-      page: "profiles",
-      label: "Profiles",
-      icon: "pi pi-users",
+      page: "board",
+      label: "Board",
+      icon: "pi pi-sitemap",
       section: "Configuration",
     },
     { page: "remotes", label: "Remotes", icon: "pi pi-cloud" },

@@ -24,6 +24,10 @@
       <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-400 mr-2"></div>
       <span class="text-xs text-gray-400">Loading...</span>
     </div>
+    } @else if (errorMessage) {
+    <div class="p-3 text-xs text-red-400 text-center">
+      <i class="pi pi-exclamation-triangle mr-1"></i>{{ errorMessage }}
+    </div>
     } @else {
       <!-- Current browsing path -->
       @if (browsingPath) {

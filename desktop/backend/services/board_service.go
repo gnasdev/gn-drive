@@ -1,0 +1,949 @@
+package services
+
+import (
+	"context"
+	"desktop/backend/events"
+	"desktop/backend/models"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
+
+// BoardService manages board flow definitions and orchestrates execution
+type BoardService struct {
+	app         *application.App
+	eventBus    *events.WailsEventBus
+	boards      []models.Board
+	filePath    string
+	mutex       sync.RWMutex
+	initialized bool
+
+	// Dependencies
+	syncService *SyncService
+
+	// Active executions
+	activeFlows   map[string]*FlowExecution
+	flowMutex     sync.RWMutex
+}
+
+// FlowExecution tracks a running board execution
+type FlowExecution struct {
+	BoardId  string
+	Cancel   context.CancelFunc
+	Status   *models.BoardExecutionStatus
+	StatusMu sync.Mutex // protects Status field from concurrent access
+}
+
+// NewBoardService creates a new board service
+func NewBoardService(app *application.App) *BoardService {
+	return &BoardService{
+		app:         app,
+		boards:      []models.Board{},
+		activeFlows: make(map[string]*FlowExecution),
+	}
+}
+
+// SetApp sets the application reference for events
+func (b *BoardService) SetApp(app *application.App) {
+	b.app = app
+	if bus := GetSharedEventBus(); bus != nil {
+		b.eventBus = bus
+	} else {
+		b.eventBus = events.NewEventBus(app)
+	}
+}
+
+// SetSyncService sets the sync service dependency
+func (b *BoardService) SetSyncService(syncService *SyncService) {
+	b.syncService = syncService
+}
+
+// ServiceName returns the name of the service
+func (b *BoardService) ServiceName() string {
+	return "BoardService"
+}
+
+// ServiceStartup is called when the service starts
+func (b *BoardService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	log.Printf("BoardService starting up (async)...")
+	go func() {
+		if err := b.initialize(); err != nil {
+			log.Printf("BoardService init error: %v", err)
+		}
+	}()
+	return nil
+}
+
+// ServiceShutdown is called when the service shuts down
+func (b *BoardService) ServiceShutdown(ctx context.Context) error {
+	log.Printf("BoardService shutting down...")
+	// Cancel all active flows
+	b.flowMutex.Lock()
+	for _, flow := range b.activeFlows {
+		if flow.Cancel != nil {
+			flow.Cancel()
+		}
+	}
+	b.flowMutex.Unlock()
+	return nil
+}
+
+// ensureInitialized lazily initializes the service if not yet done
+func (b *BoardService) ensureInitialized() error {
+	b.mutex.RLock()
+	if b.initialized {
+		b.mutex.RUnlock()
+		return nil
+	}
+	b.mutex.RUnlock()
+	return b.initialize()
+}
+
+// initialize sets up file path and loads existing boards
+func (b *BoardService) initialize() error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if b.initialized {
+		return nil
+	}
+
+	shared := GetSharedConfig()
+	if shared != nil {
+		b.filePath = filepath.Join(shared.ConfigDir, "boards.json")
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		b.filePath = filepath.Join(homeDir, ".config", "ns-drive", "boards.json")
+	}
+
+	if err := os.MkdirAll(filepath.Dir(b.filePath), 0755); err != nil {
+		return fmt.Errorf("failed to create boards directory: %w", err)
+	}
+
+	if err := b.loadFromFile(); err != nil {
+		log.Printf("Warning: Could not load boards: %v", err)
+		b.boards = []models.Board{}
+	}
+
+	// Auto-migrate from profiles if no boards exist
+	if len(b.boards) == 0 {
+		b.migrateFromProfiles()
+	}
+
+	b.initialized = true
+	log.Printf("BoardService initialized with %d boards", len(b.boards))
+	return nil
+}
+
+// GetBoards returns all boards
+func (b *BoardService) GetBoards(ctx context.Context) ([]models.Board, error) {
+	if err := b.ensureInitialized(); err != nil {
+		return nil, err
+	}
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	result := make([]models.Board, len(b.boards))
+	copy(result, b.boards)
+	return result, nil
+}
+
+// GetBoard returns a single board by ID
+func (b *BoardService) GetBoard(ctx context.Context, boardId string) (*models.Board, error) {
+	if err := b.ensureInitialized(); err != nil {
+		return nil, err
+	}
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	for i := range b.boards {
+		if b.boards[i].Id == boardId {
+			board := b.boards[i]
+			return &board, nil
+		}
+	}
+	return nil, fmt.Errorf("board '%s' not found", boardId)
+}
+
+// AddBoard creates a new board
+func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
+	if err := b.ensureInitialized(); err != nil {
+		return err
+	}
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	// Validate
+	if err := b.validateBoard(&board); err != nil {
+		return fmt.Errorf("invalid board: %w", err)
+	}
+
+	// Check name uniqueness
+	for _, existing := range b.boards {
+		if existing.Name == board.Name {
+			return fmt.Errorf("board with name '%s' already exists", board.Name)
+		}
+	}
+
+	if board.CreatedAt.IsZero() {
+		board.CreatedAt = time.Now()
+	}
+	board.UpdatedAt = time.Now()
+
+	b.boards = append(b.boards, board)
+
+	if err := b.saveToFile(); err != nil {
+		b.boards = b.boards[:len(b.boards)-1]
+		return fmt.Errorf("failed to save boards: %w", err)
+	}
+
+	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "added", "Board created")
+	return nil
+}
+
+// UpdateBoard updates an existing board
+func (b *BoardService) UpdateBoard(ctx context.Context, board models.Board) error {
+	if err := b.ensureInitialized(); err != nil {
+		return err
+	}
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	// Validate
+	if err := b.validateBoard(&board); err != nil {
+		return fmt.Errorf("invalid board: %w", err)
+	}
+
+	found := false
+	var oldBoard models.Board
+	for i, existing := range b.boards {
+		if existing.Id == board.Id {
+			oldBoard = existing
+			board.UpdatedAt = time.Now()
+			board.CreatedAt = existing.CreatedAt
+			b.boards[i] = board
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("board '%s' not found", board.Id)
+	}
+
+	if err := b.saveToFile(); err != nil {
+		// Rollback
+		for i, existing := range b.boards {
+			if existing.Id == board.Id {
+				b.boards[i] = oldBoard
+				break
+			}
+		}
+		return fmt.Errorf("failed to save boards: %w", err)
+	}
+
+	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "updated", "Board updated")
+	return nil
+}
+
+// DeleteBoard removes a board
+func (b *BoardService) DeleteBoard(ctx context.Context, boardId string) error {
+	if err := b.ensureInitialized(); err != nil {
+		return err
+	}
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	found := false
+	var deletedBoard models.Board
+	for i, board := range b.boards {
+		if board.Id == boardId {
+			deletedBoard = board
+			b.boards = append(b.boards[:i], b.boards[i+1:]...)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("board '%s' not found", boardId)
+	}
+
+	if err := b.saveToFile(); err != nil {
+		b.boards = append(b.boards, deletedBoard)
+		return fmt.Errorf("failed to save boards: %w", err)
+	}
+
+	b.emitBoardEvent(events.BoardUpdated, boardId, "", "deleted", "Board deleted")
+	return nil
+}
+
+// ExecuteBoard starts executing a board flow
+func (b *BoardService) ExecuteBoard(ctx context.Context, boardId string) (*models.BoardExecutionStatus, error) {
+	if err := b.ensureInitialized(); err != nil {
+		return nil, err
+	}
+
+	if b.syncService == nil {
+		return nil, fmt.Errorf("sync service not available")
+	}
+
+	// Check if board is already executing
+	b.flowMutex.RLock()
+	if _, exists := b.activeFlows[boardId]; exists {
+		b.flowMutex.RUnlock()
+		return nil, fmt.Errorf("board '%s' is already executing", boardId)
+	}
+	b.flowMutex.RUnlock()
+
+	// Get board
+	b.mutex.RLock()
+	var board *models.Board
+	for i := range b.boards {
+		if b.boards[i].Id == boardId {
+			boardCopy := b.boards[i]
+			board = &boardCopy
+			break
+		}
+	}
+	b.mutex.RUnlock()
+
+	if board == nil {
+		return nil, fmt.Errorf("board '%s' not found", boardId)
+	}
+
+	if len(board.Edges) == 0 {
+		return nil, fmt.Errorf("board '%s' has no edges to execute", board.Name)
+	}
+
+	// Validate DAG (cycle detection)
+	if err := b.detectCycles(board); err != nil {
+		return nil, err
+	}
+
+	// Compute execution layers
+	layers := b.computeExecutionLayers(board)
+
+	// Initialize execution status
+	edgeStatuses := make([]models.EdgeExecutionStatus, len(board.Edges))
+	for i, edge := range board.Edges {
+		edgeStatuses[i] = models.EdgeExecutionStatus{
+			EdgeId: edge.Id,
+			Status: "pending",
+		}
+	}
+
+	status := &models.BoardExecutionStatus{
+		BoardId:      boardId,
+		Status:       "running",
+		EdgeStatuses: edgeStatuses,
+		StartTime:    time.Now(),
+	}
+
+	// Create cancellable context from Background (not from the Wails RPC context,
+	// which gets cancelled when the method call returns)
+	flowCtx, cancel := context.WithCancel(context.Background())
+
+	flow := &FlowExecution{
+		BoardId: boardId,
+		Cancel:  cancel,
+		Status:  status,
+	}
+
+	b.flowMutex.Lock()
+	b.activeFlows[boardId] = flow
+	b.flowMutex.Unlock()
+
+	b.emitBoardEvent(events.BoardExecutionStarted, boardId, "", "running", "Board execution started")
+
+	// Execute in goroutine
+	go b.executeFlow(flowCtx, board, layers, flow)
+
+	return status, nil
+}
+
+// StopBoardExecution cancels a running board execution
+func (b *BoardService) StopBoardExecution(ctx context.Context, boardId string) error {
+	b.flowMutex.Lock()
+	flow, exists := b.activeFlows[boardId]
+	if !exists {
+		b.flowMutex.Unlock()
+		// Execution already finished — not an error
+		return nil
+	}
+
+	flow.Cancel()
+	flow.StatusMu.Lock()
+	flow.Status.Status = "cancelled"
+	flow.StatusMu.Unlock()
+	b.flowMutex.Unlock()
+
+	b.emitBoardEvent(events.BoardExecutionCancelled, boardId, "", "cancelled", "Board execution cancelled")
+	return nil
+}
+
+// GetBoardExecutionStatus returns the current execution status of a board
+func (b *BoardService) GetBoardExecutionStatus(ctx context.Context, boardId string) (*models.BoardExecutionStatus, error) {
+	b.flowMutex.RLock()
+	flow, exists := b.activeFlows[boardId]
+	b.flowMutex.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("no active execution for board '%s'", boardId)
+	}
+
+	flow.StatusMu.Lock()
+	status := *flow.Status // return a copy
+	flow.StatusMu.Unlock()
+	return &status, nil
+}
+
+// executeFlow runs the board execution through layers
+func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, layers [][]models.BoardEdge, flow *FlowExecution) {
+	defer func() {
+		endTime := time.Now()
+		flow.Status.EndTime = &endTime
+		b.flowMutex.Lock()
+		delete(b.activeFlows, board.Id)
+		b.flowMutex.Unlock()
+	}()
+
+	// Track failed nodes to skip downstream
+	failedNodes := make(map[string]bool)
+
+	for _, layer := range layers {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			flow.StatusMu.Lock()
+			flow.Status.Status = "cancelled"
+			b.markRemainingSkipped(flow.Status, layer)
+			flow.StatusMu.Unlock()
+			b.emitBoardEvent(events.BoardExecutionCancelled, board.Id, "", "cancelled", "Board execution cancelled")
+			return
+		default:
+		}
+
+		var wg sync.WaitGroup
+		var layerMu sync.Mutex
+		layerHasFailure := false
+
+		for _, edge := range layer {
+			// Check if this edge's source node is downstream of a failed node
+			if failedNodes[edge.SourceId] {
+				flow.StatusMu.Lock()
+				b.updateEdgeStatus(flow.Status, edge.Id, "skipped", "Skipped: upstream edge failed")
+				flow.StatusMu.Unlock()
+				failedNodes[edge.TargetId] = true
+				b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "skipped", "Skipped: upstream edge failed")
+				continue
+			}
+
+			wg.Add(1)
+			go func(e models.BoardEdge) {
+				defer wg.Done()
+
+				err := b.executeEdge(ctx, board, &e, flow)
+
+				if err != nil {
+					layerMu.Lock()
+					layerHasFailure = true
+					failedNodes[e.TargetId] = true
+					layerMu.Unlock()
+				}
+			}(edge)
+		}
+
+		wg.Wait()
+
+		if layerHasFailure {
+			// Mark all downstream edges as skipped
+			flow.StatusMu.Lock()
+			b.markDownstreamSkipped(flow.Status, failedNodes, layers)
+			flow.StatusMu.Unlock()
+		}
+	}
+
+	// Determine final status
+	flow.StatusMu.Lock()
+	hasFailure := false
+	for _, es := range flow.Status.EdgeStatuses {
+		if es.Status == "failed" {
+			hasFailure = true
+			break
+		}
+	}
+
+	if hasFailure {
+		flow.Status.Status = "failed"
+	} else {
+		flow.Status.Status = "completed"
+	}
+	flow.StatusMu.Unlock()
+
+	if hasFailure {
+		b.emitBoardEvent(events.BoardExecutionFailed, board.Id, "", "failed", "Board execution completed with failures")
+	} else {
+		b.emitBoardEvent(events.BoardExecutionCompleted, board.Id, "", "completed", "Board execution completed successfully")
+	}
+}
+
+// executeEdge executes a single edge sync operation
+func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edge *models.BoardEdge, flow *FlowExecution) error {
+	// Find source and target nodes
+	var sourceNode, targetNode *models.BoardNode
+	for i := range board.Nodes {
+		if board.Nodes[i].Id == edge.SourceId {
+			sourceNode = &board.Nodes[i]
+		}
+		if board.Nodes[i].Id == edge.TargetId {
+			targetNode = &board.Nodes[i]
+		}
+	}
+
+	if sourceNode == nil || targetNode == nil {
+		msg := "source or target node not found"
+		flow.StatusMu.Lock()
+		b.updateEdgeStatus(flow.Status, edge.Id, "failed", msg)
+		flow.StatusMu.Unlock()
+		b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "failed", msg)
+		return fmt.Errorf("%s", msg)
+	}
+
+	// Build profile from edge config with From/To from nodes
+	profile := edge.SyncConfig
+	profile.From = b.buildRemotePath(sourceNode)
+	profile.To = b.buildRemotePath(targetNode)
+	if profile.Name == "" {
+		profile.Name = fmt.Sprintf("%s->%s", sourceNode.Label, targetNode.Label)
+	}
+
+	// Mark edge as running
+	startTime := time.Now()
+	flow.StatusMu.Lock()
+	b.updateEdgeStatusWithTime(flow.Status, edge.Id, "running", "", &startTime, nil)
+	flow.StatusMu.Unlock()
+	b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "running", fmt.Sprintf("Syncing %s -> %s", sourceNode.Label, targetNode.Label))
+
+	// Start sync via SyncService
+	tabId := fmt.Sprintf("board-%s-edge-%s", board.Id, edge.Id)
+	result, err := b.syncService.StartSync(ctx, edge.Action, profile, tabId)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to start sync: %v", err)
+		endTime := time.Now()
+		flow.StatusMu.Lock()
+		b.updateEdgeStatusWithTime(flow.Status, edge.Id, "failed", msg, nil, &endTime)
+		flow.StatusMu.Unlock()
+		b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "failed", msg)
+		return err
+	}
+
+	// Wait for task completion
+	err = b.syncService.WaitForTask(ctx, result.TaskId)
+
+	endTime := time.Now()
+	if err != nil {
+		msg := fmt.Sprintf("Sync failed: %v", err)
+		flow.StatusMu.Lock()
+		b.updateEdgeStatusWithTime(flow.Status, edge.Id, "failed", msg, nil, &endTime)
+		flow.StatusMu.Unlock()
+		b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "failed", msg)
+		return err
+	}
+
+	flow.StatusMu.Lock()
+	b.updateEdgeStatusWithTime(flow.Status, edge.Id, "completed", "Sync completed", nil, &endTime)
+	flow.StatusMu.Unlock()
+	b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "completed", "Sync completed")
+	return nil
+}
+
+// buildRemotePath constructs rclone path from a board node
+func (b *BoardService) buildRemotePath(node *models.BoardNode) string {
+	if node.RemoteName == "local" || node.RemoteName == "" {
+		return node.Path
+	}
+	if node.Path == "" {
+		return node.RemoteName + ":"
+	}
+	return node.RemoteName + ":" + node.Path
+}
+
+// computeExecutionLayers groups edges into execution layers using topological sort
+// Edges in the same layer can run in parallel; layers execute sequentially
+func (b *BoardService) computeExecutionLayers(board *models.Board) [][]models.BoardEdge {
+	// Build node dependency map: nodeId -> set of edges that must complete before edges from this node can start
+	// An edge E2 (B->C) depends on all edges E1 where E1.TargetId == E2.SourceId
+
+	// Map: nodeId -> incoming edges (edges targeting this node)
+	incomingEdges := make(map[string][]string) // nodeId -> []edgeId
+	edgeMap := make(map[string]models.BoardEdge)
+
+	for _, edge := range board.Edges {
+		edgeMap[edge.Id] = edge
+		incomingEdges[edge.TargetId] = append(incomingEdges[edge.TargetId], edge.Id)
+	}
+
+	// Compute edge dependencies: edgeId -> set of edge IDs that must complete first
+	edgeDeps := make(map[string]map[string]bool)
+	for _, edge := range board.Edges {
+		deps := make(map[string]bool)
+		// This edge depends on all edges whose target is this edge's source
+		for _, depEdgeId := range incomingEdges[edge.SourceId] {
+			deps[depEdgeId] = true
+		}
+		edgeDeps[edge.Id] = deps
+	}
+
+	// Kahn's algorithm on edges
+	var layers [][]models.BoardEdge
+	resolved := make(map[string]bool)
+	remaining := make(map[string]bool)
+
+	for _, edge := range board.Edges {
+		remaining[edge.Id] = true
+	}
+
+	for len(remaining) > 0 {
+		// Find edges with all dependencies resolved
+		var layer []models.BoardEdge
+		for edgeId := range remaining {
+			allResolved := true
+			for depId := range edgeDeps[edgeId] {
+				if !resolved[depId] {
+					allResolved = false
+					break
+				}
+			}
+			if allResolved {
+				layer = append(layer, edgeMap[edgeId])
+			}
+		}
+
+		if len(layer) == 0 {
+			// Should not happen if DAG validation passed, but break to avoid infinite loop
+			log.Printf("Warning: could not resolve remaining edges, possible cycle")
+			break
+		}
+
+		// Mark layer edges as resolved
+		for _, edge := range layer {
+			resolved[edge.Id] = true
+			delete(remaining, edge.Id)
+		}
+
+		layers = append(layers, layer)
+	}
+
+	return layers
+}
+
+// detectCycles checks if the board graph contains cycles using DFS
+func (b *BoardService) detectCycles(board *models.Board) error {
+	// Build adjacency list: nodeId -> []nodeId
+	adj := make(map[string][]string)
+	for _, edge := range board.Edges {
+		adj[edge.SourceId] = append(adj[edge.SourceId], edge.TargetId)
+	}
+
+	const (
+		white = 0 // unvisited
+		gray  = 1 // in current path
+		black = 2 // fully processed
+	)
+
+	colors := make(map[string]int)
+	for _, node := range board.Nodes {
+		colors[node.Id] = white
+	}
+
+	var dfs func(nodeId string) bool
+	dfs = func(nodeId string) bool {
+		colors[nodeId] = gray
+		for _, neighbor := range adj[nodeId] {
+			if colors[neighbor] == gray {
+				return true // cycle detected
+			}
+			if colors[neighbor] == white {
+				if dfs(neighbor) {
+					return true
+				}
+			}
+		}
+		colors[nodeId] = black
+		return false
+	}
+
+	for _, node := range board.Nodes {
+		if colors[node.Id] == white {
+			if dfs(node.Id) {
+				return fmt.Errorf("board '%s' contains a cycle, which is not allowed", board.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateBoard performs basic validation on a board
+func (b *BoardService) validateBoard(board *models.Board) error {
+	if board.Id == "" {
+		return fmt.Errorf("board ID is required")
+	}
+	if board.Name == "" {
+		return fmt.Errorf("board name is required")
+	}
+
+	// Build node ID set
+	nodeIds := make(map[string]bool)
+	for _, node := range board.Nodes {
+		if node.Id == "" {
+			return fmt.Errorf("node ID is required")
+		}
+		if nodeIds[node.Id] {
+			return fmt.Errorf("duplicate node ID: %s", node.Id)
+		}
+		nodeIds[node.Id] = true
+	}
+
+	// Validate edges reference valid nodes
+	edgeIds := make(map[string]bool)
+	for _, edge := range board.Edges {
+		if edge.Id == "" {
+			return fmt.Errorf("edge ID is required")
+		}
+		if edgeIds[edge.Id] {
+			return fmt.Errorf("duplicate edge ID: %s", edge.Id)
+		}
+		edgeIds[edge.Id] = true
+
+		if !nodeIds[edge.SourceId] {
+			return fmt.Errorf("edge '%s' references unknown source node '%s'", edge.Id, edge.SourceId)
+		}
+		if !nodeIds[edge.TargetId] {
+			return fmt.Errorf("edge '%s' references unknown target node '%s'", edge.Id, edge.TargetId)
+		}
+		if edge.SourceId == edge.TargetId {
+			return fmt.Errorf("edge '%s' cannot connect a node to itself", edge.Id)
+		}
+
+		// Validate action
+		switch edge.Action {
+		case "pull", "push", "bi", "bi-resync":
+			// valid
+		default:
+			return fmt.Errorf("edge '%s' has invalid action '%s'", edge.Id, edge.Action)
+		}
+	}
+
+	// Check for cycles
+	return b.detectCycles(board)
+}
+
+// updateEdgeStatus updates the status of an edge in the execution status
+func (b *BoardService) updateEdgeStatus(status *models.BoardExecutionStatus, edgeId, newStatus, message string) {
+	for i := range status.EdgeStatuses {
+		if status.EdgeStatuses[i].EdgeId == edgeId {
+			status.EdgeStatuses[i].Status = newStatus
+			status.EdgeStatuses[i].Message = message
+			return
+		}
+	}
+}
+
+// updateEdgeStatusWithTime updates edge status with optional start/end times
+func (b *BoardService) updateEdgeStatusWithTime(status *models.BoardExecutionStatus, edgeId, newStatus, message string, startTime, endTime *time.Time) {
+	for i := range status.EdgeStatuses {
+		if status.EdgeStatuses[i].EdgeId == edgeId {
+			status.EdgeStatuses[i].Status = newStatus
+			status.EdgeStatuses[i].Message = message
+			if startTime != nil {
+				status.EdgeStatuses[i].StartTime = startTime
+			}
+			if endTime != nil {
+				status.EdgeStatuses[i].EndTime = endTime
+			}
+			return
+		}
+	}
+}
+
+// markRemainingSkipped marks all pending edges as skipped
+func (b *BoardService) markRemainingSkipped(status *models.BoardExecutionStatus, currentLayer []models.BoardEdge) {
+	for i := range status.EdgeStatuses {
+		if status.EdgeStatuses[i].Status == "pending" {
+			status.EdgeStatuses[i].Status = "skipped"
+			status.EdgeStatuses[i].Message = "Skipped: execution cancelled"
+		}
+	}
+}
+
+// markDownstreamSkipped marks edges downstream of failed nodes as skipped
+func (b *BoardService) markDownstreamSkipped(status *models.BoardExecutionStatus, failedNodes map[string]bool, layers [][]models.BoardEdge) {
+	for _, layer := range layers {
+		for _, edge := range layer {
+			if failedNodes[edge.SourceId] {
+				b.updateEdgeStatus(status, edge.Id, "skipped", "Skipped: upstream edge failed")
+				failedNodes[edge.TargetId] = true
+			}
+		}
+	}
+}
+
+// migrateFromProfiles auto-migrates existing profiles to boards
+func (b *BoardService) migrateFromProfiles() {
+	shared := GetSharedConfig()
+	if shared == nil {
+		return
+	}
+
+	profilesPath := filepath.Join(shared.ConfigDir, "profiles.json")
+	data, err := os.ReadFile(profilesPath)
+	if err != nil {
+		return // No profiles file, nothing to migrate
+	}
+
+	var profiles []models.Profile
+	if err := json.Unmarshal(data, &profiles); err != nil {
+		log.Printf("Warning: Could not parse profiles for migration: %v", err)
+		return
+	}
+
+	if len(profiles) == 0 {
+		return
+	}
+
+	now := time.Now()
+	for i, profile := range profiles {
+		boardId := fmt.Sprintf("migrated-%d-%d", i, now.UnixMilli())
+
+		// Parse source remote
+		sourceNode := models.BoardNode{
+			Id:         fmt.Sprintf("node-src-%d", i),
+			RemoteName: parseRemoteName(profile.From),
+			Path:       parseRemotePath(profile.From),
+			Label:      parseRemoteName(profile.From),
+			X:          100,
+			Y:          100 + float64(i)*150,
+		}
+		if sourceNode.RemoteName == "" {
+			sourceNode.RemoteName = "local"
+			sourceNode.Label = "Local"
+		}
+
+		// Parse target remote
+		targetNode := models.BoardNode{
+			Id:         fmt.Sprintf("node-tgt-%d", i),
+			RemoteName: parseRemoteName(profile.To),
+			Path:       parseRemotePath(profile.To),
+			Label:      parseRemoteName(profile.To),
+			X:          500,
+			Y:          100 + float64(i)*150,
+		}
+		if targetNode.RemoteName == "" {
+			targetNode.RemoteName = "local"
+			targetNode.Label = "Local"
+		}
+
+		edge := models.BoardEdge{
+			Id:         fmt.Sprintf("edge-%d", i),
+			SourceId:   sourceNode.Id,
+			TargetId:   targetNode.Id,
+			Action:     "push",
+			SyncConfig: profile,
+		}
+
+		board := models.Board{
+			Id:        boardId,
+			Name:      profile.Name,
+			Nodes:     []models.BoardNode{sourceNode, targetNode},
+			Edges:     []models.BoardEdge{edge},
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+
+		b.boards = append(b.boards, board)
+	}
+
+	if err := b.saveToFile(); err != nil {
+		log.Printf("Warning: Failed to save migrated boards: %v", err)
+	} else {
+		log.Printf("Migrated %d profiles to boards", len(profiles))
+	}
+}
+
+// parseRemoteName extracts the remote name from an rclone path (e.g., "gdrive:/path" -> "gdrive")
+func parseRemoteName(path string) string {
+	for i, c := range path {
+		if c == ':' {
+			return path[:i]
+		}
+		if c == '/' {
+			return "" // local path
+		}
+	}
+	return ""
+}
+
+// parseRemotePath extracts the path portion from an rclone path (e.g., "gdrive:/path" -> "/path")
+func parseRemotePath(path string) string {
+	for i, c := range path {
+		if c == ':' {
+			if i+1 < len(path) {
+				return path[i+1:]
+			}
+			return ""
+		}
+		if c == '/' {
+			return path // entire string is a local path
+		}
+	}
+	return path
+}
+
+// loadFromFile loads boards from the JSON file
+func (b *BoardService) loadFromFile() error {
+	data, err := os.ReadFile(b.filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	return json.Unmarshal(data, &b.boards)
+}
+
+// saveToFile saves boards to the JSON file
+func (b *BoardService) saveToFile() error {
+	data, err := json.MarshalIndent(b.boards, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(b.filePath, data, 0644)
+}
+
+// emitBoardEvent emits a board event
+func (b *BoardService) emitBoardEvent(eventType events.EventType, boardId, edgeId, status, message string) {
+	event := events.NewBoardEvent(eventType, boardId, edgeId, status, message)
+	if b.eventBus != nil {
+		if err := b.eventBus.EmitBoardEvent(event); err != nil {
+			log.Printf("Failed to emit board event: %v", err)
+		}
+	} else if b.app != nil {
+		b.app.Event.Emit("tofe", event)
+	}
+}
