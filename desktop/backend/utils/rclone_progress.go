@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rclone/rclone/cmd"
@@ -87,10 +88,21 @@ func formatToProgress(logMessage string) string {
 //
 // It returns a func which should be called to stop the stats.
 func startProgress(outLog chan string) func() {
-	isOutLogClosed := false
-	outLogClosedRecover := func() {
-		if r := recover(); r != nil {
-			isOutLogClosed = true
+	// Use atomic.Bool for thread-safe flag access (fixes race condition)
+	var isOutLogClosed atomic.Bool
+
+	// Safe send helper - returns false if channel is closed
+	safeSend := func(msg string) bool {
+		if isOutLogClosed.Load() {
+			return false
+		}
+		// Use select with default to avoid blocking if channel is full
+		select {
+		case outLog <- msg:
+			return true
+		default:
+			// Channel full, skip this message but don't panic
+			return false
 		}
 	}
 
@@ -100,29 +112,26 @@ func startProgress(outLog chan string) func() {
 	// Use rclone's OutputHandler.AddOutput to capture logs
 	// This hooks into rclone's actual logging system (fs.Errorf, fs.Logf, etc.)
 	fslog.Handler.AddOutput(false, func(level slog.Level, text string) {
-		defer outLogClosedRecover()
-		if isOutLogClosed {
+		if isOutLogClosed.Load() {
 			return
 		}
 		text = strings.TrimSpace(text)
 		if text == "" || shouldSkipLogMessage(text) {
 			return
 		}
-		outLog <- formatToProgress(text)
+		safeSend(formatToProgress(text))
 	})
 
 	// Intercept output from functions such as HashLister to stdout
 	operations.SyncPrintf = func(format string, a ...interface{}) {
-		defer outLogClosedRecover()
-		if !isOutLogClosed {
-			outLog <- formatToProgress(fmt.Sprintf(format, a...))
+		if !isOutLogClosed.Load() {
+			safeSend(formatToProgress(fmt.Sprintf(format, a...)))
 		}
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer outLogClosedRecover()
 		defer wg.Done()
 		progressInterval := defaultProgressInterval
 		if cmd.ShowStats() && statsInterval > 0 {
@@ -132,8 +141,8 @@ func startProgress(outLog chan string) func() {
 		for {
 			select {
 			case <-ticker.C:
-				if !isOutLogClosed {
-					outLog <- formatToProgress("")
+				if !isOutLogClosed.Load() {
+					safeSend(formatToProgress(""))
 				}
 			case <-stopStats:
 				ticker.Stop()
@@ -143,10 +152,9 @@ func startProgress(outLog chan string) func() {
 	}()
 
 	return func() {
-		defer outLogClosedRecover()
 		// CRITICAL ORDER:
-		// 1. Set flag to stop any in-flight callbacks from sending
-		isOutLogClosed = true
+		// 1. Set flag atomically to stop any in-flight callbacks from sending
+		isOutLogClosed.Store(true)
 		// 2. Reset output handler to stop new callbacks
 		fslog.Handler.ResetOutput()
 		operations.SyncPrintf = oldSyncPrint
@@ -154,16 +162,24 @@ func startProgress(outLog chan string) func() {
 		close(stopStats)
 		// 4. Wait for goroutine to finish
 		wg.Wait()
-		// 5. Finally close the channel (safe now since flag prevents sends)
-		close(outLog)
+		// NOTE: Do NOT close outLog here - the caller (sync_service.go) is responsible for closing it
 	}
 }
 
 func startStats(outLog chan string) func() {
-	isOutLogClosed := false
-	outLogClosedRecover := func() {
-		if r := recover(); r != nil {
-			isOutLogClosed = true
+	// Use atomic.Bool for thread-safe flag access (fixes race condition)
+	var isOutLogClosed atomic.Bool
+
+	// Safe send helper
+	safeSend := func(msg string) bool {
+		if isOutLogClosed.Load() {
+			return false
+		}
+		select {
+		case outLog <- msg:
+			return true
+		default:
+			return false
 		}
 	}
 
@@ -174,14 +190,13 @@ func startStats(outLog chan string) func() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer outLogClosedRecover()
 		defer wg.Done()
 		ticker := time.NewTicker(statsInterval)
 		for {
 			select {
 			case <-ticker.C:
-				if !isOutLogClosed {
-					outLog <- accounting.GlobalStats().String()
+				if !isOutLogClosed.Load() {
+					safeSend(accounting.GlobalStats().String())
 				}
 			case <-stopStats:
 				ticker.Stop()
@@ -190,11 +205,9 @@ func startStats(outLog chan string) func() {
 		}
 	}()
 	return func() {
-		defer outLogClosedRecover()
+		isOutLogClosed.Store(true)
 		close(stopStats)
-		if !isOutLogClosed {
-			close(outLog)
-		}
 		wg.Wait()
+		// NOTE: Do NOT close outLog here - the caller (sync_service.go) is responsible for closing it
 	}
 }

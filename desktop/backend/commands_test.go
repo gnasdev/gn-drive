@@ -23,6 +23,9 @@ func TestDeleteRemote_CascadeDeleteProfiles(t *testing.T) {
 	// Create test app instance
 	app := NewApp()
 
+	// Mark as initialized to prevent initializeConfig() from overwriting our test config
+	app.initialized = true
+
 	// Set up test configuration
 	app.ConfigInfo.EnvConfig.ProfileFilePath = filepath.Join(tempDir, "profiles.json")
 	app.ConfigInfo.EnvConfig.RcloneFilePath = filepath.Join(tempDir, "rclone.conf")
@@ -139,6 +142,9 @@ func TestDeleteRemote_NoProfilesAffected(t *testing.T) {
 
 	// Create test app instance
 	app := NewApp()
+
+	// Mark as initialized to prevent initializeConfig() from overwriting our test config
+	app.initialized = true
 
 	// Set up test configuration
 	app.ConfigInfo.EnvConfig.ProfileFilePath = filepath.Join(tempDir, "profiles.json")

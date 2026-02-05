@@ -235,6 +235,13 @@ func (r *RemoteService) DeleteRemote(ctx context.Context, name string) error {
 	// Delete the remote from rclone config
 	fsConfig.DeleteRemote(name)
 
+	// Cleanup boards that reference this remote
+	if boardService := GetBoardService(); boardService != nil {
+		if err := boardService.OnRemoteDeleted(name); err != nil {
+			log.Printf("Warning: failed to cleanup boards after remote deletion: %v", err)
+		}
+	}
+
 	// Create remote info for event
 	remoteInfo := RemoteInfo{
 		Name:        name,

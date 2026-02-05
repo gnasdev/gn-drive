@@ -32,32 +32,98 @@
   <div class="space-y-4">
     <!-- Action Type -->
     <div>
-      <span class="text-sm text-gray-400 mb-2 block">Sync Action</span>
-      <p-select
-        [options]="actionOptions"
-        [(ngModel)]="edge.action"
-        optionLabel="label"
-        optionValue="value"
-        styleClass="w-full"
-      />
+      <span class="text-sm text-gray-400 mb-1 block">Sync Action</span>
+      <p class="text-xs text-gray-500 mb-3">Defines how files are synchronized between source and target.</p>
+
+      <div class="space-y-3">
+        <!-- Push (Default) -->
+        <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+          [class.border-primary-500]="edge.action === 'push'"
+          [class.bg-primary-500/10]="edge.action === 'push'"
+          [class.border-gray-700]="edge.action !== 'push'"
+          [class.hover:border-gray-600]="edge.action !== 'push'"
+        >
+          <input
+            type="radio"
+            name="syncAction"
+            value="push"
+            [(ngModel)]="edge.action"
+            class="mt-1"
+          />
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-200">Default (Push)</p>
+            <p class="text-xs text-gray-500 mt-1">One-way sync from source to target. Files are copied from source to target, making target match source. Target files not in source remain unchanged.</p>
+          </div>
+        </label>
+
+        <!-- Bi-Sync -->
+        <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+          [class.border-primary-500]="edge.action === 'bi'"
+          [class.bg-primary-500/10]="edge.action === 'bi'"
+          [class.border-gray-700]="edge.action !== 'bi'"
+          [class.hover:border-gray-600]="edge.action !== 'bi'"
+        >
+          <input
+            type="radio"
+            name="syncAction"
+            value="bi"
+            [(ngModel)]="edge.action"
+            class="mt-1"
+          />
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-200">Bi-Sync</p>
+            <p class="text-xs text-gray-500 mt-1">Two-way synchronization. Changes on either side are propagated to the other. Keeps both locations in sync. Requires initial Resync before first use.</p>
+          </div>
+        </label>
+
+        <!-- Resync -->
+        <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+          [class.border-primary-500]="edge.action === 'bi-resync'"
+          [class.bg-primary-500/10]="edge.action === 'bi-resync'"
+          [class.border-gray-700]="edge.action !== 'bi-resync'"
+          [class.hover:border-gray-600]="edge.action !== 'bi-resync'"
+        >
+          <input
+            type="radio"
+            name="syncAction"
+            value="bi-resync"
+            [(ngModel)]="edge.action"
+            class="mt-1"
+          />
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-200">Resync</p>
+            <p class="text-xs text-gray-500 mt-1">Force bi-directional sync initialization. Use this when first setting up Bi-Sync, or to recover after sync conflicts. After resync completes, switch back to Bi-Sync for regular use.</p>
+          </div>
+        </label>
+      </div>
     </div>
 
     <!-- Source & Target (read-only) -->
     <p-card>
       <h3 class="text-sm font-medium text-gray-200 mb-3">
-        <i class="pi pi-arrow-right mr-2"></i>Connection
+        @if (isBidirectional()) {
+          <i class="pi pi-arrows-h mr-2"></i>Connection (Bi-directional)
+        } @else {
+          <i class="pi pi-arrow-right mr-2"></i>Connection
+        }
       </h3>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <span class="text-xs text-gray-500 mb-1 block">Source</span>
-          <div class="p-2 bg-gray-800 rounded text-gray-300 text-sm">
-            {{ sourceLabel }}
+          <span class="text-xs text-gray-500 mb-1 block">{{ isBidirectional() ? 'Side A' : 'Source' }}</span>
+          <div class="p-2 bg-gray-800 rounded text-sm">
+            <span class="text-gray-300">{{ sourceLabel }}</span>
+            @if (sourceProvider) {
+              <span class="text-xs text-gray-500 ml-2">({{ sourceProvider }})</span>
+            }
           </div>
         </div>
         <div>
-          <span class="text-xs text-gray-500 mb-1 block">Target</span>
-          <div class="p-2 bg-gray-800 rounded text-gray-300 text-sm">
-            {{ targetLabel }}
+          <span class="text-xs text-gray-500 mb-1 block">{{ isBidirectional() ? 'Side B' : 'Target' }}</span>
+          <div class="p-2 bg-gray-800 rounded text-sm">
+            <span class="text-gray-300">{{ targetLabel }}</span>
+            @if (targetProvider) {
+              <span class="text-xs text-gray-500 ml-2">({{ targetProvider }})</span>
+            }
           </div>
         </div>
       </div>
@@ -150,7 +216,8 @@
     </p-card>
 
     <p-card>
-      <h3 class="text-sm font-medium text-gray-200 mb-3">Advanced Performance</h3>
+      <h3 class="text-sm font-medium text-gray-200 mb-2">Advanced Performance</h3>
+      <p class="text-xs text-gray-500 mb-3">Fine-tune transfer performance for large files or slow connections.</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <span class="text-xs text-gray-500 mb-1 block">Multi-Thread Streams</span>
@@ -162,6 +229,7 @@
             [showButtons]="true"
             styleClass="w-full"
           />
+          <p class="text-xs text-gray-600 mt-1">Number of streams for multi-threaded downloads. Higher values can speed up large file transfers. Set 0 to disable.</p>
         </div>
         <div>
           <span class="text-xs text-gray-500 mb-1 block">Buffer Size</span>
@@ -171,6 +239,7 @@
             [(ngModel)]="edge.sync_config.buffer_size"
             placeholder="16M"
           />
+          <p class="text-xs text-gray-600 mt-1">In-memory buffer size per transfer. Larger buffers may improve speed but use more RAM. (e.g. 16M, 64M)</p>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
@@ -183,6 +252,7 @@
             [showButtons]="true"
             styleClass="w-full"
           />
+          <p class="text-xs text-gray-600 mt-1">Number of retries for failed file operations before giving up.</p>
         </div>
         <div>
           <span class="text-xs text-gray-500 mb-1 block">Low-Level Retries</span>
@@ -193,12 +263,13 @@
             [showButtons]="true"
             styleClass="w-full"
           />
+          <p class="text-xs text-gray-600 mt-1">Retries for low-level HTTP/network errors. Higher values help with unstable connections.</p>
         </div>
       </div>
       <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700">
         <div>
           <p class="text-sm text-gray-300">Fast List</p>
-          <p class="text-xs text-gray-500">Recursive list (fewer API calls)</p>
+          <p class="text-xs text-gray-500">Use recursive listing to reduce API calls. Significantly faster for remotes with many files, but uses more memory. Recommended for cloud storage (Google Drive, S3, etc.).</p>
         </div>
         <p-toggleswitch [(ngModel)]="edge.sync_config.fast_list"></p-toggleswitch>
       </div>
@@ -242,7 +313,8 @@
     </p-card>
 
     <p-card>
-      <h3 class="text-sm font-medium text-gray-200 mb-3">Bi-Sync Settings</h3>
+      <h3 class="text-sm font-medium text-gray-200 mb-2">Bi-Sync Settings</h3>
+      <p class="text-xs text-gray-500 mb-3">Settings specific to bi-directional synchronization (only applies when Sync Action is "Bi-Sync" or "Resync").</p>
       <div>
         <span class="text-xs text-gray-500 mb-1 block">Conflict Resolution</span>
         <p-select
@@ -252,6 +324,17 @@
           optionValue="value"
           styleClass="w-full"
         />
+        <div class="mt-2 p-2 bg-gray-800 rounded text-xs text-gray-400">
+          <p class="mb-1"><strong class="text-gray-300">How conflicts are resolved when the same file is modified on both sides:</strong></p>
+          <ul class="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Default:</strong> Keep both versions with different names</li>
+            <li><strong>Newer wins:</strong> File with more recent modification time is kept</li>
+            <li><strong>Older wins:</strong> File with older modification time is kept</li>
+            <li><strong>Larger wins:</strong> Larger file size is kept</li>
+            <li><strong>Smaller wins:</strong> Smaller file size is kept</li>
+            <li><strong>Path 1/2 wins:</strong> Always prefer source or target side</li>
+          </ul>
+        </div>
       </div>
     </p-card>
   </div>
@@ -266,18 +349,11 @@
       [text]="true"
       (onClick)="onDelete()"
     ></p-button>
-    <div class="flex gap-2">
-      <p-button
-        label="Cancel"
-        severity="secondary"
-        (onClick)="onClose()"
-      ></p-button>
-      <p-button
-        label="Save"
-        icon="pi pi-save"
-        (onClick)="onSave()"
-      ></p-button>
-    </div>
+    <p-button
+      label="Close"
+      severity="secondary"
+      (onClick)="onClose()"
+    ></p-button>
   </div>
   }
 </p-dialog>

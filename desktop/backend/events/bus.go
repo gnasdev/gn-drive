@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -53,7 +54,7 @@ func (b *WailsEventBus) Emit(event interface{}) error {
 	// Serialize event to JSON
 	jsonData, err := json.Marshal(event)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 
 	// Try window-specific event first (more reliable in Wails v3 alpha)
@@ -68,7 +69,8 @@ func (b *WailsEventBus) Emit(event interface{}) error {
 		return nil
 	}
 
-	return nil
+	// Return error instead of silently failing
+	return fmt.Errorf("no event target available (window and app are nil)")
 }
 
 // EmitWithType wraps data in a typed event envelope and emits

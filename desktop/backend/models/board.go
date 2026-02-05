@@ -30,6 +30,13 @@ type Board struct {
 	Edges       []BoardEdge `json:"edges"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
+
+	// Schedule settings
+	ScheduleEnabled bool       `json:"schedule_enabled"`
+	CronExpr        string     `json:"cron_expr,omitempty"` // e.g. "0 */6 * * *"
+	LastRun         *time.Time `json:"last_run,omitempty"`
+	NextRun         *time.Time `json:"next_run,omitempty"`
+	LastResult      string     `json:"last_result,omitempty"` // "success", "failed", "cancelled"
 }
 
 // BoardExecutionStatus represents the status of a running board flow

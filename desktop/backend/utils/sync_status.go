@@ -181,7 +181,7 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 	var syncPrintMu sync.Mutex
 	operations.SyncPrintf = func(format string, a ...interface{}) {
 		defer statusClosedRecover()
-		if !isStatusClosed {
+		if !isStatusClosed && statusChannel != nil {
 			syncPrintMu.Lock()
 			now := time.Now()
 			if now.Sub(lastSyncPrint) < 500*time.Millisecond {
@@ -209,7 +209,7 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 		for {
 			select {
 			case <-ticker.C:
-				if !isStatusClosed {
+				if !isStatusClosed && statusChannel != nil {
 					syncStatus := statusHandler.createSyncStatusFromStats()
 					if jsonData, err := syncStatus.ToJSON(); err == nil {
 						statusChannel <- jsonData

@@ -12,7 +12,7 @@ tasks:
     summary: Builds the application for production
     dir: desktop
     cmds:
-      - '{{env "GOPATH"}}/bin/wails3 generate bindings'
+      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
       - cd frontend && bun install --frozen-lockfile && bun run build
       - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
@@ -21,7 +21,7 @@ tasks:
     summary: Builds the application for development (with debug info)
     dir: desktop
     cmds:
-      - '{{env "GOPATH"}}/bin/wails3 generate bindings'
+      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
       - cd frontend && bun install && bun run build
       - go build -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
@@ -108,8 +108,7 @@ tasks:
     dir: desktop
     cmds:
       - echo "Generating bindings..."
-      - wails3 generate bindings -ts ./...
-      - cd frontend && ln -sf bindings wailsjs 2>/dev/null || true
+      - wails3 generate bindings -ts
       - echo "Building frontend..."
       - cd frontend && bun install --frozen-lockfile && bun run build
       - echo "Building backend..."
@@ -148,6 +147,7 @@ tasks:
         EOF
       - echo -n "APPL????" > {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/PkgInfo
       - task: build:macos:icon
+      - rm -rf ../{{.APP_NAME}}.app
       - cp -R {{.BIN_DIR}}/{{.APP_NAME}}.app ../{{.APP_NAME}}.app
       - echo "App bundle created at {{.APP_NAME}}.app"
 

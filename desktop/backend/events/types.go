@@ -14,8 +14,8 @@ const (
 	SyncCancelled EventType = "sync:cancelled"
 
 	// Config Events
-	ConfigUpdated EventType = "config:updated"
-	ProfileAdded  EventType = "profile:added"
+	ConfigUpdated  EventType = "config:updated"
+	ProfileAdded   EventType = "profile:added"
 	ProfileUpdated EventType = "profile:updated"
 	ProfileDeleted EventType = "profile:deleted"
 
@@ -81,6 +81,7 @@ type SyncEvent struct {
 	Progress int    `json:"progress,omitempty"`
 	Status   string `json:"status"`
 	Message  string `json:"message,omitempty"`
+	SeqNo    uint64 `json:"seqNo,omitempty"`
 }
 
 // SyncProgressData represents detailed sync progress information
@@ -138,6 +139,21 @@ func NewSyncEvent(eventType EventType, tabId, action, status, message string) *S
 		Action:  action,
 		Status:  status,
 		Message: message,
+	}
+}
+
+// NewSyncEventWithSeqNo creates a new sync event with sequence number
+func NewSyncEventWithSeqNo(eventType EventType, tabId, action, status, message string, seqNo uint64) *SyncEvent {
+	return &SyncEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+		},
+		TabId:   tabId,
+		Action:  action,
+		Status:  status,
+		Message: message,
+		SeqNo:   seqNo,
 	}
 }
 

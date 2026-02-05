@@ -1,148 +1,115 @@
 import { CommonModule } from "@angular/common";
 import {
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-  Component,
-  HostListener,
-  OnDestroy,
-  OnInit,
+    ChangeDetectionStrategy,
+    ChangeDetectorRef,
+    Component,
+    HostListener,
+    OnDestroy,
+    OnInit,
 } from "@angular/core";
-import {
-  NavigationService,
-  PageName,
-} from "../../navigation.service.js";
 import { Subscription } from "rxjs";
+import { NavigationService, PageName } from "../../navigation.service.js";
 
 interface SidebarItem {
-  page: PageName;
-  label: string;
-  icon: string;
-  section?: string;
+    page: PageName;
+    label: string;
+    icon: string;
 }
 
 @Component({
-  selector: "app-sidebar",
-  standalone: true,
-  imports: [CommonModule],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <aside
-      class="flex flex-col h-screen bg-gray-950 border-r border-gray-800 transition-all duration-200"
-      [style.width]="collapsed ? '3.5rem' : '13rem'"
-    >
-      <!-- Logo -->
-      <div class="flex items-center h-14 px-3 border-b border-gray-800">
-        <div class="flex items-center gap-2 min-w-0">
-          <img
-            src="assets/appicon.png"
-            alt="NS Drive"
-            class="w-8 h-8 rounded-full shrink-0"
-          />
-          @if (!collapsed) {
-          <span class="text-gray-200 font-semibold text-sm truncate"
-            >NS Drive</span
-          >
-          }
-        </div>
-      </div>
+    selector: "app-sidebar",
+    standalone: true,
+    imports: [CommonModule],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    template: `
+        <aside
+            class="flex flex-col h-screen bg-gray-950 border-r border-gray-800 transition-all duration-200"
+            [style.width]="collapsed ? '3.5rem' : '13rem'"
+        >
+            <!-- Logo -->
+            <div class="flex items-center justify-center h-14 px-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <img
+                        src="assets/appicon.png"
+                        alt="NS Drive"
+                        class="w-8 h-8 rounded-full shrink-0"
+                    />
+                    @if (!collapsed) {
+                        <span
+                            class="text-gray-200 font-semibold text-sm truncate"
+                            >NS Drive</span
+                        >
+                    }
+                </div>
+            </div>
 
-      <!-- Navigation -->
-      <nav class="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
-        @for (item of menuItems; track item.page) { @if (item.section &&
-        showSection(item)) {
-        <div
-          class="text-[10px] uppercase tracking-wider text-gray-500 px-3 pt-3 pb-1"
-        >
-          @if (!collapsed) {
-          {{ item.section }}
-          } @else {
-          <div class="border-t border-gray-700 mx-1 mt-1"></div>
-          }
-        </div>
-        }
-        <button
-          (click)="navigate(item.page)"
-          [class]="
-            isActive(item.page)
-              ? 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-primary-400 bg-primary-400/10 cursor-pointer'
-              : 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 cursor-pointer transition-colors'
-          "
-          [title]="item.label"
-        >
-          <i [class]="item.icon" class="w-5 h-5 shrink-0"></i>
-          @if (!collapsed) {
-          <span class="text-sm truncate">{{ item.label }}</span>
-          }
-        </button>
-        }
-      </nav>
-    </aside>
-  `,
+            <!-- Navigation -->
+            <nav class="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
+                @for (item of menuItems; track item.page) {
+                    <button
+                        (click)="navigate(item.page)"
+                        [class]="
+                            isActive(item.page)
+                                ? 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-primary-400 bg-primary-400/10 cursor-pointer'
+                                : 'flex items-center justify-center gap-2 w-full py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 cursor-pointer transition-colors'
+                        "
+                        [title]="item.label"
+                    >
+                        <i [class]="item.icon" class="w-5 h-5 shrink-0"></i>
+                        @if (!collapsed) {
+                            <span class="text-sm truncate">{{
+                                item.label
+                            }}</span>
+                        }
+                    </button>
+                }
+            </nav>
+        </aside>
+    `,
 })
 export class SidebarComponent implements OnInit, OnDestroy {
-  collapsed = false;
-  private subscription?: Subscription;
+    collapsed = false;
+    private subscription?: Subscription;
 
-  readonly menuItems: SidebarItem[] = [
-    { page: "dashboard", label: "Dashboard", icon: "pi pi-th-large" },
-    { page: "operations", label: "Operations", icon: "pi pi-play" },
-    {
-      page: "file-browser",
-      label: "File Browser",
-      icon: "pi pi-folder-open",
-    },
-    {
-      page: "board",
-      label: "Board",
-      icon: "pi pi-sitemap",
-      section: "Configuration",
-    },
-    { page: "remotes", label: "Remotes", icon: "pi pi-cloud" },
-    { page: "schedules", label: "Schedules", icon: "pi pi-calendar" },
-    {
-      page: "history",
-      label: "History",
-      icon: "pi pi-history",
-      section: "Activity",
-    },
-    { page: "settings", label: "Settings", icon: "pi pi-cog" },
-  ];
+    readonly menuItems: SidebarItem[] = [
+        { page: "board", label: "Board", icon: "pi pi-sitemap" },
+        { page: "remotes", label: "Remotes", icon: "pi pi-cloud" },
+        { page: "settings", label: "Settings", icon: "pi pi-cog" },
+    ];
 
-  constructor(
-    public readonly navigationService: NavigationService,
-    private readonly cdr: ChangeDetectorRef,
-  ) {
-    this.checkWidth(window.innerWidth);
-  }
+    constructor(
+        public readonly navigationService: NavigationService,
+        private readonly cdr: ChangeDetectorRef,
+    ) {
+        this.checkWidth(window.innerWidth);
+    }
 
-  ngOnInit(): void {
-    this.subscription = this.navigationService.currentState$.subscribe(() => {
-      this.cdr.markForCheck();
-    });
-  }
+    ngOnInit(): void {
+        this.subscription = this.navigationService.currentState$.subscribe(
+            () => {
+                this.cdr.markForCheck();
+            },
+        );
+    }
 
-  ngOnDestroy(): void {
-    this.subscription?.unsubscribe();
-  }
+    ngOnDestroy(): void {
+        this.subscription?.unsubscribe();
+    }
 
-  @HostListener("window:resize", ["$event"])
-  onResize(event: Event) {
-    this.checkWidth((event.target as Window).innerWidth);
-  }
+    @HostListener("window:resize", ["$event"])
+    onResize(event: Event) {
+        this.checkWidth((event.target as Window).innerWidth);
+    }
 
-  navigate(page: PageName) {
-    this.navigationService.navigateTo(page);
-  }
+    navigate(page: PageName) {
+        this.navigationService.navigateTo(page);
+    }
 
-  isActive(page: PageName): boolean {
-    return this.navigationService.currentState.page === page;
-  }
+    isActive(page: PageName): boolean {
+        return this.navigationService.currentState.page === page;
+    }
 
-  showSection(item: SidebarItem): boolean {
-    return !!item.section;
-  }
-
-  private checkWidth(width: number) {
-    this.collapsed = width < 960;
-  }
+    private checkWidth(width: number) {
+        this.collapsed = width < 960;
+    }
 }
