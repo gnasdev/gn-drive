@@ -2,7 +2,28 @@
 
 This document describes the Go backend services API exposed to the frontend via Wails bindings.
 
-## App Service
+## Table of Contents
+
+- [App Service (Legacy)](#app-service-legacy)
+- [SyncService](#syncservice)
+- [ConfigService](#configservice)
+- [RemoteService](#remoteservice)
+- [TabService](#tabservice)
+- [SchedulerService](#schedulerservice)
+- [HistoryService](#historyservice)
+- [BoardService](#boardservice)
+- [OperationService](#operationservice)
+- [CryptService](#cryptservice)
+- [NotificationService](#notificationservice)
+- [LogService](#logservice)
+- [ExportService](#exportservice)
+- [ImportService](#importservice)
+- [Data Models](#data-models)
+- [Error Handling](#error-handling)
+
+---
+
+## App Service (Legacy)
 
 Legacy service for sync operations and configuration management.
 
@@ -17,11 +38,6 @@ Start a sync operation without tab association.
 - `profile`: Profile configuration
 
 **Returns:** Task ID (int) for tracking
-
-**Example:**
-```typescript
-const taskId = await Sync("pull", profile);
-```
 
 ---
 
@@ -42,9 +58,6 @@ Start a sync operation associated with a specific tab.
 
 Stop a running sync operation.
 
-**Parameters:**
-- `id`: Task ID to stop
-
 ---
 
 ### Configuration Methods
@@ -53,26 +66,11 @@ Stop a running sync operation.
 
 Get current configuration including profiles.
 
-**Returns:**
-```typescript
-interface ConfigInfo {
-    working_dir: string;
-    selected_profile_index: number;
-    profiles: Profile[];
-    env_config: EnvConfig;
-}
-```
-
 ---
 
 #### `UpdateProfiles(profiles Profile[]) AppError | null`
 
 Update all profiles.
-
-**Parameters:**
-- `profiles`: Array of profiles to save
-
-**Returns:** null on success, AppError on failure
 
 ---
 
@@ -82,20 +80,11 @@ Update all profiles.
 
 Get list of configured cloud remotes.
 
-**Returns:** Array of rclone Remote objects
-
 ---
 
 #### `AddRemote(name string, type string, config map[string]string) AppError | null`
 
 Add a new cloud remote.
-
-**Parameters:**
-- `name`: Remote name (alphanumeric, dash, underscore only)
-- `type`: Remote type (e.g., "drive", "dropbox", "onedrive")
-- `config`: Additional configuration parameters
-
-**Returns:** null on success, AppError on failure
 
 Supported remote types:
 - `drive` - Google Drive
@@ -104,20 +93,13 @@ Supported remote types:
 - `box` - Box
 - `yandex` - Yandex Disk
 - `gphotos` - Google Photos
-- `iclouddrive` - iCloud Drive (requires manual setup)
+- `iclouddrive` - iCloud Drive
 
 ---
 
 #### `DeleteRemote(name string) AppError | null`
 
 Delete a remote and associated profiles.
-
-**Parameters:**
-- `name`: Remote name to delete
-
-**Returns:** null on success, AppError on failure
-
-**Note:** This will cascade delete any profiles using this remote.
 
 ---
 
@@ -136,12 +118,6 @@ Service for managing sync operations with context support.
 #### `StartSync(ctx Context, action string, profile Profile, tabId string) (SyncResult, error)`
 
 Start a sync operation with context cancellation support.
-
-**Parameters:**
-- `ctx`: Context for cancellation
-- `action`: Sync action type
-- `profile`: Profile configuration
-- `tabId`: Tab identifier
 
 **Returns:**
 ```go
@@ -166,6 +142,12 @@ Stop a running sync operation.
 #### `GetActiveTasks(ctx Context) (map[int]*SyncTask, error)`
 
 Get all currently active sync tasks.
+
+---
+
+#### `WaitForTask(ctx Context, taskId int) error`
+
+Wait for a specific task to complete.
 
 ---
 
@@ -212,6 +194,514 @@ Delete a profile by name.
 
 ---
 
+#### `SaveProfiles(ctx Context) error`
+
+Persist profiles to disk.
+
+---
+
+## RemoteService
+
+Service for rclone remote management.
+
+### Methods
+
+#### `GetRemotes(ctx Context) ([]RemoteInfo, error)`
+
+Get all configured remotes with metadata.
+
+---
+
+#### `AddRemote(ctx Context, name, remoteType string, config map[string]string) error`
+
+Add a new remote.
+
+---
+
+#### `UpdateRemote(ctx Context, name string, config map[string]string) error`
+
+Update remote configuration.
+
+---
+
+#### `DeleteRemote(ctx Context, name string) error`
+
+Delete a remote.
+
+---
+
+#### `TestRemote(ctx Context, name string) error`
+
+Test remote connectivity.
+
+---
+
+## TabService
+
+Service for tab lifecycle management.
+
+### Methods
+
+#### `CreateTab(ctx Context, name string) (*Tab, error)`
+
+Create a new tab.
+
+---
+
+#### `GetTab(ctx Context, id string) (*Tab, error)`
+
+Get tab by ID.
+
+---
+
+#### `GetAllTabs(ctx Context) (map[string]*Tab, error)`
+
+Get all tabs.
+
+---
+
+#### `UpdateTab(ctx Context, id string, updates map[string]interface{}) error`
+
+Update tab properties.
+
+---
+
+#### `RenameTab(ctx Context, id string, name string) error`
+
+Rename a tab.
+
+---
+
+#### `SetTabProfile(ctx Context, id string, profile Profile) error`
+
+Associate a profile with a tab.
+
+---
+
+#### `AddTabOutput(ctx Context, id string, output string) error`
+
+Append output to tab.
+
+---
+
+#### `ClearTabOutput(ctx Context, id string) error`
+
+Clear tab output.
+
+---
+
+#### `SetTabState(ctx Context, id string, state TabState) error`
+
+Set tab state (Running, Stopped, Completed, Failed, Cancelled).
+
+---
+
+#### `DeleteTab(ctx Context, id string) error`
+
+Delete a tab.
+
+---
+
+## SchedulerService
+
+Service for cron-based scheduling.
+
+### Methods
+
+#### `AddSchedule(ctx Context, entry ScheduleEntry) error`
+
+Add a new scheduled task.
+
+---
+
+#### `UpdateSchedule(ctx Context, entry ScheduleEntry) error`
+
+Update a schedule.
+
+---
+
+#### `DeleteSchedule(ctx Context, id string) error`
+
+Delete a schedule.
+
+---
+
+#### `GetSchedules(ctx Context) ([]ScheduleEntry, error)`
+
+Get all schedules.
+
+---
+
+#### `EnableSchedule(ctx Context, id string) error`
+
+Enable a schedule.
+
+---
+
+#### `DisableSchedule(ctx Context, id string) error`
+
+Disable a schedule.
+
+---
+
+## HistoryService
+
+Service for operation history tracking.
+
+### Methods
+
+#### `AddEntry(ctx Context, entry HistoryEntry) error`
+
+Add a history entry.
+
+---
+
+#### `GetHistory(ctx Context, limit, offset int) ([]HistoryEntry, error)`
+
+Get paginated history.
+
+---
+
+#### `GetHistoryForProfile(ctx Context, profileName string) ([]HistoryEntry, error)`
+
+Get history for a specific profile.
+
+---
+
+#### `GetStats(ctx Context) (*HistoryStats, error)`
+
+Get aggregate statistics.
+
+---
+
+#### `ClearHistory(ctx Context) error`
+
+Clear all history.
+
+---
+
+## BoardService
+
+Service for visual workflow management.
+
+### Methods
+
+#### `GetBoards(ctx Context) ([]Board, error)`
+
+Get all workflow boards.
+
+---
+
+#### `AddBoard(ctx Context, board Board) error`
+
+Create a new board.
+
+---
+
+#### `UpdateBoard(ctx Context, board Board) error`
+
+Update a board.
+
+---
+
+#### `DeleteBoard(ctx Context, id string) error`
+
+Delete a board.
+
+---
+
+#### `ExecuteBoard(ctx Context, id string) error`
+
+Execute a workflow board (DAG execution with topological sort).
+
+---
+
+#### `StopBoardExecution(ctx Context, id string) error`
+
+Stop a running board execution.
+
+---
+
+#### `GetBoardExecutionStatus(ctx Context, id string) (*BoardExecutionStatus, error)`
+
+Get current execution status.
+
+**Returns:**
+```go
+type BoardExecutionStatus struct {
+    BoardId      string               `json:"boardId"`
+    Status       string               `json:"status"` // running|completed|failed|cancelled
+    EdgeStatuses []EdgeExecutionStatus `json:"edgeStatuses"`
+    StartTime    time.Time            `json:"startTime"`
+    EndTime      *time.Time           `json:"endTime"`
+}
+```
+
+---
+
+## OperationService
+
+Service for file operations.
+
+### File Operations
+
+#### `Copy(ctx Context, source, dest string) error`
+
+Copy files/directories.
+
+---
+
+#### `Move(ctx Context, source, dest string) error`
+
+Move files/directories.
+
+---
+
+#### `Check(ctx Context, source, dest string) error`
+
+Check for differences between source and dest.
+
+---
+
+#### `DryRun(ctx Context, action string, profile Profile) (string, error)`
+
+Perform a dry run of sync operation.
+
+---
+
+### File Browsing
+
+#### `ListFiles(ctx Context, remote, path string) ([]FileEntry, error)`
+
+List files in a remote path.
+
+---
+
+#### `DeleteFile(ctx Context, remote, path string) error`
+
+Delete a file.
+
+---
+
+#### `PurgeDir(ctx Context, remote, path string) error`
+
+Purge a directory (delete including contents).
+
+---
+
+#### `MakeDir(ctx Context, remote, path string) error`
+
+Create a directory.
+
+---
+
+### Storage Info
+
+#### `GetAbout(ctx Context, remote string) (*QuotaInfo, error)`
+
+Get storage quota information.
+
+**Returns:**
+```go
+type QuotaInfo struct {
+    Used  int64 `json:"used"`
+    Total int64 `json:"total"`
+}
+```
+
+---
+
+#### `GetSize(ctx Context, remote, path string) (int64, error)`
+
+Get size of a path.
+
+---
+
+## CryptService
+
+Service for encrypted remote management.
+
+### Methods
+
+#### `CreateCryptRemote(ctx Context, name, underlying, password, salt string) error`
+
+Create an encrypted remote.
+
+---
+
+#### `DeleteCryptRemote(ctx Context, name string) error`
+
+Delete an encrypted remote.
+
+---
+
+#### `ListCryptRemotes(ctx Context) ([]string, error)`
+
+List all encrypted remotes.
+
+---
+
+## NotificationService
+
+Service for notifications and app settings.
+
+### Methods
+
+#### `SendNotification(ctx Context, title, body string) error`
+
+Send a desktop notification.
+
+---
+
+#### `SetEnabled(ctx Context, enabled bool) error`
+
+Enable/disable notifications.
+
+---
+
+#### `SetMinimizeToTray(ctx Context, enabled bool) error`
+
+Set minimize to tray behavior.
+
+---
+
+#### `SetStartAtLogin(ctx Context, enabled bool) error`
+
+Set start at login preference.
+
+---
+
+#### `GetSettings(ctx Context) (*AppSettings, error)`
+
+Get all app settings.
+
+**Returns:**
+```go
+type AppSettings struct {
+    NotificationsEnabled bool `json:"notificationsEnabled"`
+    MinimizeToTray       bool `json:"minimizeToTray"`
+    StartAtLogin         bool `json:"startAtLogin"`
+    DebugMode            bool `json:"debugMode"`
+}
+```
+
+---
+
+## LogService
+
+Service for reliable log delivery.
+
+### Methods
+
+#### `Log(tabId, message string, level LogLevel) error`
+
+Log a message with level (debug, info, warning, error).
+
+---
+
+#### `LogSync(tabId, action, status, message string) error`
+
+Log a sync event.
+
+---
+
+#### `GetLogsSince(ctx Context, tabId string, afterSeqNo int64) ([]LogEntry, error)`
+
+Get logs after a sequence number.
+
+---
+
+#### `GetLatestLogs(ctx Context, tabId string, count int) ([]LogEntry, error)`
+
+Get latest N logs for a tab.
+
+---
+
+#### `GetCurrentSeqNo(ctx Context) (int64, error)`
+
+Get current sequence number.
+
+---
+
+#### `ClearLogs(ctx Context, tabId string) error`
+
+Clear logs for a tab.
+
+---
+
+## ExportService
+
+Service for configuration export.
+
+### Methods
+
+#### `GetExportPreview(ctx Context, options ExportOptions) (*ExportPreview, error)`
+
+Preview what will be exported.
+
+---
+
+#### `ExportToBytes(ctx Context, options ExportOptions) ([]byte, error)`
+
+Export to compressed bytes.
+
+---
+
+#### `ExportToFile(ctx Context, path string, options ExportOptions) error`
+
+Export to a file.
+
+---
+
+#### `ExportWithDialog(ctx Context, options ExportOptions) error`
+
+Export with file picker dialog.
+
+**Export Options:**
+```go
+type ExportOptions struct {
+    IncludeProfiles bool `json:"includeProfiles"`
+    IncludeRemotes  bool `json:"includeRemotes"`
+    IncludeBoards   bool `json:"includeBoards"`
+    IncludeTokens   bool `json:"includeTokens"` // Security risk
+}
+```
+
+---
+
+## ImportService
+
+Service for configuration import.
+
+### Methods
+
+#### `ValidateImportFile(ctx Context, path string) (*ImportValidation, error)`
+
+Validate an import file before importing.
+
+---
+
+#### `ImportFromFile(ctx Context, path string, options ImportOptions) (*ImportResult, error)`
+
+Import from a file.
+
+**Import Options:**
+```go
+type ImportOptions struct {
+    MergeProfiles bool `json:"mergeProfiles"` // true=merge, false=replace
+    MergeRemotes  bool `json:"mergeRemotes"`
+    MergeBoards   bool `json:"mergeBoards"`
+}
+```
+
+---
+
+#### `PreviewWithDialog(ctx Context) (*ImportPreview, error)`
+
+Preview import with file picker dialog.
+
+---
+
 ## Data Models
 
 ### Profile
@@ -225,8 +715,6 @@ interface Profile {
     excluded_paths: string[]; // Exclude patterns (glob)
     bandwidth: number;      // MB/s limit (0 = unlimited)
     parallel: number;       // Concurrent transfers (default 16)
-    backup_path: string;    // Unused
-    cache_path: string;     // Unused
 }
 ```
 
@@ -241,13 +729,76 @@ interface ConfigInfo {
 }
 ```
 
-### EnvConfig
+### ScheduleEntry
 
 ```typescript
-interface EnvConfig {
-    profile_file_path: string;  // Path to profiles.json
-    rclone_file_path: string;   // Path to rclone.conf
-    debug_mode: boolean;
+interface ScheduleEntry {
+    id: string;
+    profile_name: string;
+    action: string;       // pull|push|bi|bi-resync|copy|move
+    cron_expr: string;
+    enabled: boolean;
+    last_run?: string;    // ISO timestamp
+    next_run?: string;
+    last_result?: string; // success|failed|cancelled
+}
+```
+
+### Board / BoardNode / BoardEdge
+
+```typescript
+interface BoardNode {
+    id: string;
+    remote_name: string;
+    path: string;
+    label: string;
+    x: number;
+    y: number;
+}
+
+interface BoardEdge {
+    id: string;
+    source_id: string;
+    target_id: string;
+    action: string;
+    sync_config?: Profile;
+}
+
+interface Board {
+    id: string;
+    name: string;
+    description: string;
+    nodes: BoardNode[];
+    edges: BoardEdge[];
+    created_at: string;
+    updated_at: string;
+}
+```
+
+### HistoryEntry
+
+```typescript
+interface HistoryEntry {
+    id: string;
+    timestamp: string;
+    profile_name: string;
+    action: string;
+    status: string;
+    bytes_transferred: number;
+    message: string;
+}
+```
+
+### FileEntry
+
+```typescript
+interface FileEntry {
+    name: string;
+    path: string;
+    type: string;      // file|dir
+    size: number;
+    mod_time: string;
+    is_dir: boolean;
 }
 ```
 
@@ -260,6 +811,8 @@ interface AppError {
     details?: string;
 }
 ```
+
+---
 
 ## Error Handling
 
@@ -274,6 +827,8 @@ Error codes (from `errors/types.go`):
 - `FILE_SYSTEM_ERROR` - File I/O error
 - `NETWORK_ERROR` - Network operation failed
 - `EXTERNAL_SERVICE_ERROR` - External service error
+
+---
 
 ## Usage Examples
 
@@ -301,4 +856,38 @@ const error = await AddRemote("my-drive", "drive", {});
 if (error) {
     console.error("Failed:", error.error);
 }
+```
+
+### Using Board Service
+
+```typescript
+import { BoardService } from "wailsjs/desktop/backend/services/boardservice";
+
+// Get all boards
+const boards = await BoardService.GetBoards();
+
+// Execute a board
+await BoardService.ExecuteBoard(boardId);
+
+// Check execution status
+const status = await BoardService.GetBoardExecutionStatus(boardId);
+console.log("Status:", status.status);
+```
+
+### Using Scheduler Service
+
+```typescript
+import { SchedulerService } from "wailsjs/desktop/backend/services/schedulerservice";
+
+// Add a schedule
+await SchedulerService.AddSchedule({
+    id: "schedule-1",
+    profile_name: "my-profile",
+    action: "pull",
+    cron_expr: "0 0 * * *", // Daily at midnight
+    enabled: true
+});
+
+// Get all schedules
+const schedules = await SchedulerService.GetSchedules();
 ```

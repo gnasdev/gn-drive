@@ -34,6 +34,8 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 }
 ```
 
+---
+
 ### Config Events
 
 | Event Type | Description | Fields |
@@ -57,6 +59,8 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 }
 ```
 
+---
+
 ### Remote Events
 
 | Event Type | Description | Fields |
@@ -64,7 +68,10 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 | `remote:added` | New remote added | remoteName, data |
 | `remote:updated` | Remote modified | remoteName, data |
 | `remote:deleted` | Remote removed | remoteName, data |
+| `remote:tested` | Remote connection tested | remoteName, success, message |
 | `remotes:list` | Remote list updated | data |
+
+---
 
 ### Tab Events
 
@@ -74,6 +81,88 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 | `tab:updated` | Tab state changed | tabId, tabName, data |
 | `tab:deleted` | Tab removed | tabId, tabName |
 | `tab:output` | Output added to tab | tabId, data |
+| `tab:state_changed` | Tab state transition | tabId, oldState, newState |
+
+---
+
+### Board Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `board:created` | New board created | boardId, data |
+| `board:updated` | Board modified | boardId, data |
+| `board:deleted` | Board removed | boardId |
+| `board:execution_status` | Execution status update | boardId, status, edgeStatuses |
+
+**Example Execution Status Payload:**
+```json
+{
+    "type": "board:execution_status",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "boardId": "board-123",
+    "status": "running",
+    "edgeStatuses": [
+        {
+            "edgeId": "edge-1",
+            "status": "completed",
+            "startTime": "2024-01-15T10:30:00Z",
+            "endTime": "2024-01-15T10:31:00Z"
+        },
+        {
+            "edgeId": "edge-2",
+            "status": "running",
+            "startTime": "2024-01-15T10:31:00Z"
+        }
+    ],
+    "startTime": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+### Schedule Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `schedule:added` | New schedule created | scheduleId, data |
+| `schedule:updated` | Schedule modified | scheduleId, data |
+| `schedule:deleted` | Schedule removed | scheduleId |
+| `schedule:triggered` | Schedule executed | scheduleId, profileName, action |
+| `schedule:completed` | Scheduled sync finished | scheduleId, result |
+
+---
+
+### History Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `history:added` | New history entry | entryId, data |
+| `history:cleared` | History cleared | - |
+
+---
+
+### Log Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `log:message` | New log message | tabId, seqNo, message, level, timestamp |
+| `sync:event` | Sync event log | tabId, seqNo, action, status, message |
+
+**Example Log Payload:**
+```json
+{
+    "type": "log:message",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "tabId": "tab_abc123",
+    "seqNo": 42,
+    "message": "Transferred: 100 MB / 1 GB",
+    "level": "info"
+}
+```
+
+**Log Levels:** `debug`, `info`, `warning`, `error`
+
+---
 
 ### Error Events
 
@@ -92,6 +181,17 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
     "tabId": "tab_abc123_1705312200000"
 }
 ```
+
+---
+
+### Notification Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `notification:sent` | Notification displayed | title, body |
+| `settings:updated` | App settings changed | settings |
+
+---
 
 ## Legacy Command DTOs
 
@@ -115,6 +215,8 @@ For backward compatibility, legacy command events are also supported:
     "tab_id": "tab_abc123_1705312200000"
 }
 ```
+
+---
 
 ## Backend Usage
 
@@ -143,7 +245,9 @@ func NewSyncEvent(eventType EventType, tabId, action, status, message string) *S
 func NewConfigEvent(eventType EventType, profileId string, data interface{}) *ConfigEvent
 func NewRemoteEvent(eventType EventType, remoteName string, data interface{}) *RemoteEvent
 func NewTabEvent(eventType EventType, tabId, tabName string, data interface{}) *TabEvent
+func NewBoardEvent(eventType EventType, boardId string, data interface{}) *BoardEvent
 func NewErrorEvent(code, message, details, tabId string) *ErrorEvent
+func NewLogEvent(tabId string, seqNo int64, message string, level LogLevel) *LogEvent
 ```
 
 ### EventBus Interface
@@ -160,8 +264,12 @@ func (b *WailsEventBus) EmitSyncEvent(event *SyncEvent) error
 func (b *WailsEventBus) EmitConfigEvent(event *ConfigEvent) error
 func (b *WailsEventBus) EmitRemoteEvent(event *RemoteEvent) error
 func (b *WailsEventBus) EmitTabEvent(event *TabEvent) error
+func (b *WailsEventBus) EmitBoardEvent(event *BoardEvent) error
 func (b *WailsEventBus) EmitErrorEvent(event *ErrorEvent) error
+func (b *WailsEventBus) EmitLogEvent(event *LogEvent) error
 ```
+
+---
 
 ## Frontend Usage
 
@@ -170,7 +278,7 @@ func (b *WailsEventBus) EmitErrorEvent(event *ErrorEvent) error
 ```typescript
 // app.service.ts
 import { Events } from "@wailsio/runtime";
-import { parseEvent, isSyncEvent, isConfigEvent } from "./models/events";
+import { parseEvent, isSyncEvent, isConfigEvent, isBoardEvent } from "./models/events";
 
 // Set up listener
 this.eventCleanup = Events.On("tofe", (event) => {
@@ -180,6 +288,8 @@ this.eventCleanup = Events.On("tofe", (event) => {
         this.handleSyncEvent(parsedEvent);
     } else if (isConfigEvent(parsedEvent)) {
         this.handleConfigEvent(parsedEvent);
+    } else if (isBoardEvent(parsedEvent)) {
+        this.handleBoardEvent(parsedEvent);
     }
     // ... handle other event types
 });
@@ -205,6 +315,16 @@ export function isConfigEvent(event: unknown): event is ConfigEvent {
     const e = event as Record<string, unknown>;
     const type = e["type"] as string;
     return type?.startsWith("config:") || type?.startsWith("profile:");
+}
+
+export function isBoardEvent(event: unknown): event is BoardEvent {
+    const e = event as Record<string, unknown>;
+    return typeof e["type"] === "string" && e["type"].startsWith("board:");
+}
+
+export function isLogEvent(event: unknown): event is LogEvent {
+    const e = event as Record<string, unknown>;
+    return e["type"] === "log:message" || e["type"] === "sync:event";
 }
 
 export function isErrorEvent(event: unknown): event is ErrorEvent {
@@ -239,6 +359,26 @@ export interface ConfigEvent {
     data?: unknown;
 }
 
+export interface BoardEvent {
+    type: "board:created" | "board:updated" | "board:deleted" | "board:execution_status";
+    timestamp: string;
+    boardId: string;
+    status?: string;
+    edgeStatuses?: EdgeExecutionStatus[];
+    data?: unknown;
+}
+
+export interface LogEvent {
+    type: "log:message" | "sync:event";
+    timestamp: string;
+    tabId: string;
+    seqNo: number;
+    message: string;
+    level?: string;
+    action?: string;
+    status?: string;
+}
+
 export interface ErrorEvent {
     type: "error:occurred";
     timestamp: string;
@@ -248,6 +388,8 @@ export interface ErrorEvent {
     tabId?: string;
 }
 ```
+
+---
 
 ## Event Routing
 
@@ -268,6 +410,32 @@ private handleSyncEvent(event: SyncEvent) {
 }
 ```
 
+---
+
+## Log Event Sequencing
+
+The LogService uses sequence numbers for reliable log delivery:
+
+```typescript
+// log-consumer.service.ts
+private lastSeqNo = 0;
+
+async pollLogs(tabId: string) {
+    const logs = await LogService.GetLogsSince(tabId, this.lastSeqNo);
+    for (const log of logs) {
+        this.lastSeqNo = log.seqNo;
+        this.processLog(log);
+    }
+}
+```
+
+This ensures:
+- No logs are missed even if events are dropped
+- Logs can be retrieved on reconnection
+- Proper ordering is maintained
+
+---
+
 ## Best Practices
 
 ### Backend
@@ -276,6 +444,7 @@ private handleSyncEvent(event: SyncEvent) {
 2. Include tabId when event is tab-specific
 3. Use appropriate event type for the action
 4. Include meaningful messages for user display
+5. Use sequence numbers for logs that need reliable delivery
 
 ### Frontend
 
@@ -283,6 +452,7 @@ private handleSyncEvent(event: SyncEvent) {
 2. Use type guards before handling events
 3. Handle unknown event types gracefully
 4. Don't assume field presence - use optional chaining
+5. For logs, use sequence-based polling for reliability
 
 ### Error Handling
 
@@ -290,3 +460,10 @@ private handleSyncEvent(event: SyncEvent) {
 2. Include error code for programmatic handling
 3. Include tabId to route errors to correct tab
 4. Provide helpful error messages
+
+### Board Events
+
+1. Track execution status per edge
+2. Update UI progressively as edges complete
+3. Handle partial failures (some edges succeed, some fail)
+4. Support cancellation at any point

@@ -8,6 +8,15 @@ A modern desktop application for cloud storage synchronization powered by rclone
 - **Profile Management**: Create and manage sync profiles with custom configurations
 - **Real-time Monitoring**: Live output streaming and progress tracking for sync operations
 - **Multi-tab Operations**: Run multiple sync operations simultaneously in separate tabs
+- **Visual Workflow Editor**: Design sync workflows with drag-drop board interface and DAG execution
+- **Scheduling**: Cron-based automated sync with configurable schedules
+- **Operation History**: Track all sync operations with statistics and logs
+- **File Operations**: Copy, move, check, dedupe, browse, and delete files on remotes
+- **Import/Export**: Backup and restore profiles, remotes, and boards
+- **Encryption Support**: Create and manage encrypted remotes (crypt layer)
+- **System Tray**: Minimize to tray with quick access to boards
+- **Start at Login**: Launch app automatically with system
+- **Desktop Notifications**: Get notified about sync completion and errors
 - **Dark Mode**: Modern dark/light theme with responsive design
 - **Cross-platform**: Available for Windows, macOS, and Linux
 
@@ -280,13 +289,38 @@ _Manage cloud storage connections and authentication_
 ns-drive/
 ├── desktop/                 # Main application directory
 │   ├── backend/            # Go backend code
-│   │   ├── app.go         # Main application logic
-│   │   ├── services/      # Domain services
+│   │   ├── app.go         # Legacy App service
+│   │   ├── commands.go    # rclone command building
+│   │   ├── services/      # Domain services (12 services)
+│   │   │   ├── sync_service.go      # Sync operations
+│   │   │   ├── config_service.go    # Profile management
+│   │   │   ├── remote_service.go    # Remote management
+│   │   │   ├── tab_service.go       # Tab lifecycle
+│   │   │   ├── scheduler_service.go # Cron scheduling
+│   │   │   ├── history_service.go   # Operation history
+│   │   │   ├── board_service.go     # Workflow boards
+│   │   │   ├── operation_service.go # File operations
+│   │   │   ├── crypt_service.go     # Encryption
+│   │   │   ├── tray_service.go      # System tray
+│   │   │   ├── notification_service.go # Notifications
+│   │   │   ├── log_service.go       # Reliable logging
+│   │   │   ├── export_service.go    # Config export
+│   │   │   └── import_service.go    # Config import
 │   │   ├── models/        # Data structures
+│   │   ├── rclone/        # rclone operations
+│   │   ├── events/        # Event system
 │   │   ├── errors/        # Error handling
+│   │   ├── config/        # Configuration
+│   │   ├── validation/    # Input validation
+│   │   ├── dto/           # Data transfer objects
 │   │   └── utils/         # Utility functions
 │   ├── frontend/          # Angular frontend
 │   │   ├── src/app/       # Application components
+│   │   │   ├── board/     # Visual workflow editor
+│   │   │   ├── remotes/   # Remote management UI
+│   │   │   ├── settings/  # App settings
+│   │   │   ├── components/# Shared components
+│   │   │   └── services/  # Frontend services
 │   │   ├── bindings/      # Wails generated bindings
 │   │   └── dist/          # Built frontend assets
 │   ├── build/             # Build configuration
@@ -340,6 +374,10 @@ wails3 version
 | `desktop/frontend/package.json` | Project | npm dependencies |
 | `~/.config/ns-drive/profiles.json` | User home | Sync profiles configuration |
 | `~/.config/ns-drive/rclone.conf` | User home | Rclone remotes configuration |
+| `~/.config/ns-drive/schedules.json` | User home | Scheduled sync tasks |
+| `~/.config/ns-drive/boards.json` | User home | Workflow board definitions |
+| `~/.config/ns-drive/history.json` | User home | Sync operation history |
+| `~/.config/ns-drive/app_settings.json` | User home | App settings (notifications, tray) |
 
 ### Generating Bindings
 

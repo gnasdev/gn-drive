@@ -91,18 +91,40 @@ The app window opens automatically when ready.
 ```
 ns-drive/
 ├── desktop/
-│   ├── main.go                 # Application entry point
+│   ├── main.go                 # Application entry point (12 services)
 │   ├── backend/
-│   │   ├── app.go             # Main App service
+│   │   ├── app.go             # Legacy App service
 │   │   ├── commands.go        # Sync command building
 │   │   ├── services/          # Domain services
+│   │   │   ├── sync_service.go      # Sync operations
+│   │   │   ├── config_service.go    # Profile management
+│   │   │   ├── remote_service.go    # Remote management
+│   │   │   ├── tab_service.go       # Tab lifecycle
+│   │   │   ├── scheduler_service.go # Cron scheduling
+│   │   │   ├── history_service.go   # Operation history
+│   │   │   ├── board_service.go     # Workflow boards
+│   │   │   ├── operation_service.go # File operations
+│   │   │   ├── crypt_service.go     # Encryption
+│   │   │   ├── tray_service.go      # System tray
+│   │   │   ├── notification_service.go # Notifications
+│   │   │   ├── log_service.go       # Reliable logging
+│   │   │   ├── export_service.go    # Config export
+│   │   │   └── import_service.go    # Config import
 │   │   ├── models/            # Data structures
+│   │   ├── rclone/            # rclone operations
 │   │   ├── events/            # Event system
 │   │   ├── errors/            # Error handling
+│   │   ├── config/            # Configuration
 │   │   ├── validation/        # Input validation
+│   │   ├── dto/               # Data transfer objects
 │   │   └── utils/             # Utilities
 │   ├── frontend/
 │   │   ├── src/app/           # Angular components
+│   │   │   ├── board/         # Visual workflow editor
+│   │   │   ├── remotes/       # Remote management
+│   │   │   ├── settings/      # App settings
+│   │   │   ├── components/    # Shared components
+│   │   │   └── services/      # Frontend services
 │   │   ├── bindings/          # Generated TypeScript bindings
 │   │   └── dist/              # Built assets
 │   └── build/
@@ -190,6 +212,10 @@ cd desktop && go clean -cache
 |------|----------|-------------|
 | `profiles.json` | `~/.config/ns-drive/` | Sync profiles |
 | `rclone.conf` | `~/.config/ns-drive/` | Remote configurations |
+| `schedules.json` | `~/.config/ns-drive/` | Scheduled tasks |
+| `boards.json` | `~/.config/ns-drive/` | Workflow boards |
+| `history.json` | `~/.config/ns-drive/` | Operation history |
+| `app_settings.json` | `~/.config/ns-drive/` | App settings |
 | `config.yml` | `desktop/build/` | Wails dev configuration |
 
 ## Common Issues
@@ -251,9 +277,16 @@ cd desktop/frontend && npm install --legacy-peer-deps
 ### New Backend Service
 
 1. Create service in `desktop/backend/services/`
-2. Register in `desktop/main.go`
-3. Implement `SetApp()` for EventBus access
-4. Add tests
+2. Implement `SetApp()` method for EventBus access:
+   ```go
+   func (s *MyService) SetApp(app *application.App) {
+       s.app = app
+       s.eventBus = events.NewEventBus(app)
+   }
+   ```
+3. Register in `desktop/main.go`
+4. Generate bindings: `wails3 generate bindings`
+5. Add tests
 
 ### New Frontend Component
 
@@ -269,3 +302,10 @@ cd desktop/frontend && npm install --legacy-peer-deps
 3. Add TypeScript type in `desktop/frontend/src/app/models/events.ts`
 4. Add type guard function
 5. Handle in AppService or TabService
+
+### New Model
+
+1. Create model in `desktop/backend/models/`
+2. Add JSON tags for serialization
+3. Generate bindings: `wails3 generate bindings`
+4. TypeScript type will be auto-generated in bindings
