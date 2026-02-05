@@ -44,15 +44,6 @@
             </div>
             <div class="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <p-button
-                icon="pi pi-pencil"
-                severity="secondary"
-                [text]="true"
-                [rounded]="true"
-                size="small"
-                pTooltip="Edit"
-                (onClick)="openBoard(board); $event.stopPropagation()"
-              ></p-button>
-              <p-button
                 icon="pi pi-trash"
                 severity="danger"
                 [text]="true"
@@ -99,32 +90,56 @@
           pTooltip="Back to boards"
           (onClick)="backToList()"
         ></p-button>
-        <i class="pi pi-sitemap text-primary-400"></i>
-        <h1 class="text-lg font-semibold text-gray-100">
+        <span class="text-lg font-semibold text-gray-100 max-w-[200px] truncate">
           {{ activeBoard?.name || '(Unnamed board)' }}
-        </h1>
+        </span>
       </div>
     </ng-template>
     <ng-template #end>
-      @if (activeBoard) {
       <div class="flex items-center gap-2">
-        <!-- Add Node -->
-        <p-select
-          [options]="remoteOptions"
-          [(ngModel)]="selectedRemoteToAdd"
-          (ngModelChange)="addNodeFromRemote($event)"
-          optionLabel="label"
-          optionValue="value"
-          placeholder="Add Remote"
-          styleClass="w-36"
-        />
+        @if (activeBoard && !isExecuting && availableRemotes.length) {
+        <!-- Draggable Remote Badges -->
+        <span class="text-xs text-gray-500 mr-1">Drag to add:</span>
+        @for (remote of availableRemotes; track remote.value) {
+        <span
+          class="px-2 py-1 text-xs font-medium rounded-full bg-gray-700 text-gray-300 border border-gray-600 cursor-grab hover:bg-gray-600 hover:border-gray-500 transition-colors select-none"
+          draggable="true"
+          (dragstart)="onRemoteDragStart($event, remote)"
+          (dragend)="onRemoteDragEnd()"
+          [pTooltip]="'Drag to board to add ' + remote.label"
+        >
+          <i class="pi pi-cloud mr-1 text-primary-400"></i>{{ remote.label }}
+        </span>
+        }
+        }
+        @if (isExecuting) {
+        <span class="text-xs text-yellow-400">
+          <i class="pi pi-spin pi-spinner mr-1"></i>Executing...
+        </span>
+        }
+        <!-- Settings Dropdown -->
+        <p-button
+          icon="pi pi-cog"
+          severity="secondary"
+          [text]="true"
+          [rounded]="true"
+          size="small"
+          pTooltip="Settings"
+          (onClick)="settingsMenu.toggle($event)"
+        ></p-button>
+        <p-menu #settingsMenu [model]="boardSettingsMenuItems" [popup]="true"></p-menu>
       </div>
-      }
     </ng-template>
   </p-toolbar>
 
   <!-- Canvas Area -->
-  <div class="flex-1 overflow-hidden relative">
+  <div
+    class="flex-1 overflow-hidden relative"
+    [class.opacity-80]="draggingRemote"
+    [class.ring-2]="draggingRemote"
+    [class.ring-primary-400]="draggingRemote"
+    [class.ring-inset]="draggingRemote"
+  >
     @if (activeBoard) {
     <app-board-canvas
       [nodes]="activeBoard.nodes || []"
@@ -132,15 +147,21 @@
       [selectedNodeId]="(boardService.selectedNodeId$ | async) ?? null"
       [selectedEdgeId]="(boardService.selectedEdgeId$ | async) ?? null"
       [executionStatus]="(boardService.executionStatus$ | async) ?? null"
-      (nodeSelected)="boardService.selectNode($event)"
-      (nodeDoubleClicked)="openNodeEditDialog($event)"
-      (edgeSelected)="boardService.selectEdge($event)"
-      (edgeDoubleClicked)="openEdgeDialog($event)"
-      (nodeMoved)="boardService.moveNode($event.nodeId, $event.x, $event.y)"
-      (edgeCreated)="boardService.addEdge($event.sourceId, $event.targetId)"
-      (selectionCleared)="boardService.clearSelection()"
-      (nodeContextMenu)="onNodeContextMenu($event, nodeCtxMenu)"
-      (edgeContextMenu)="onEdgeContextMenu($event, edgeCtxMenu)"
+      [disabled]="isExecuting"
+      [remoteProviders]="remoteProviders"
+      (nodeSelected)="isExecuting ? null : boardService.selectNode($event)"
+      (nodeDoubleClicked)="isExecuting ? null : openNodeEditDialog($event)"
+      (edgeSelected)="isExecuting ? null : boardService.selectEdge($event)"
+      (edgeDoubleClicked)="isExecuting ? null : openEdgeDialog($event)"
+      (nodeMoved)="isExecuting ? null : boardService.moveNode($event.nodeId, $event.x, $event.y)"
+      (edgeCreated)="isExecuting ? null : boardService.addEdge($event.sourceId, $event.targetId)"
+      (edgeReconnected)="isExecuting ? null : boardService.reconnectEdge($event.edgeId, $event.endpoint, $event.newNodeId)"
+      (selectionCleared)="isExecuting ? null : boardService.clearSelection()"
+      (nodeContextMenu)="isExecuting ? null : onNodeContextMenu($event, nodeCtxMenu)"
+      (edgeContextMenu)="isExecuting ? null : onEdgeContextMenu($event, edgeCtxMenu)"
+      (nodeDeleted)="isExecuting ? null : boardService.removeNode($event)"
+      (edgeDeleted)="isExecuting ? null : boardService.removeEdge($event)"
+      (canvasDrop)="onCanvasDropAt($event)"
     />
 
     <!-- Execution Status Panel - Always visible -->
@@ -229,7 +250,7 @@
 <p-contextMenu #nodeCtxMenu [model]="nodeContextMenuItems" />
 <p-contextMenu #edgeCtxMenu [model]="edgeContextMenuItems" />
 
-<!-- Board Name Dialog -->
+<!-- Board Name Dialog (Create New) -->
 <p-dialog
   header="New Board"
   [(visible)]="showNameDialog"
@@ -255,6 +276,32 @@
   </div>
 </p-dialog>
 
+<!-- Edit Board Name Dialog -->
+<p-dialog
+  header="Rename Board"
+  [(visible)]="showEditNameDialog"
+  [modal]="true"
+  [dismissableMask]="true"
+  [style]="{ width: '24rem' }"
+>
+  <div class="space-y-3">
+    <div>
+      <span class="text-sm text-gray-400 mb-1 block">Name</span>
+      <input
+        pInputText
+        class="w-full"
+        [(ngModel)]="editBoardName"
+        placeholder="Board name"
+        (keydown.enter)="confirmEditBoardName()"
+      />
+    </div>
+  </div>
+  <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-700">
+    <p-button label="Cancel" severity="secondary" (onClick)="showEditNameDialog = false"></p-button>
+    <p-button label="Save" icon="pi pi-save" (onClick)="confirmEditBoardName()"></p-button>
+  </div>
+</p-dialog>
+
 <!-- Node Edit Dialog -->
 <p-dialog
   header="Edit Node"
@@ -268,18 +315,12 @@
   <div class="space-y-3">
     <div>
       <span class="text-sm text-gray-400 mb-1 block">Remote</span>
-      <div class="p-2 bg-gray-800 rounded text-gray-300 text-sm">
-        {{ editingNode.remote_name || 'local' }}
+      <div class="p-2 bg-gray-800 rounded text-sm">
+        <span class="text-gray-300">{{ editingNode.remote_name || 'local' }}</span>
+        @if (getNodeProvider(editingNode.id)) {
+          <span class="text-xs text-gray-500 ml-2">({{ getNodeProvider(editingNode.id) }})</span>
+        }
       </div>
-    </div>
-    <div>
-      <span class="text-sm text-gray-400 mb-1 block">Label</span>
-      <input
-        pInputText
-        class="w-full"
-        [(ngModel)]="editNodeLabel"
-        [placeholder]="editingNode.remote_name || 'Label'"
-      />
     </div>
     <div>
       <span class="text-sm text-gray-400 mb-1 block">Path</span>
@@ -319,6 +360,148 @@
   [edge]="editingEdge"
   [sourceLabel]="editingEdgeSourceLabel"
   [targetLabel]="editingEdgeTargetLabel"
+  [sourceProvider]="editingEdgeSourceProvider"
+  [targetProvider]="editingEdgeTargetProvider"
   (edgeSaved)="onEdgeSaved($event)"
   (edgeDeleted)="onEdgeDeleted($event)"
 />
+
+<!-- Schedule Dialog -->
+<p-dialog
+  header="Schedule Settings"
+  [(visible)]="showScheduleDialog"
+  [modal]="true"
+  [dismissableMask]="true"
+  [style]="{ width: '32rem' }"
+>
+  <div class="space-y-4">
+    <!-- Enable/Disable Schedule -->
+    <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+      <div>
+        <p class="text-sm font-medium text-gray-200">Enable Schedule</p>
+        <p class="text-xs text-gray-500">Automatically run this board on a schedule</p>
+      </div>
+      <p-toggleswitch [(ngModel)]="scheduleEnabled"></p-toggleswitch>
+    </div>
+
+    @if (scheduleEnabled) {
+    <!-- Frequency Selection -->
+    <div>
+      <span class="text-sm text-gray-400 mb-2 block">Frequency</span>
+      @if (!useCustomCron) {
+      <!-- Preset mode -->
+      <p-select
+        [options]="frequencyPresets"
+        [ngModel]="scheduleCronExpr"
+        (ngModelChange)="onPresetChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="w-full"
+        placeholder="Select frequency"
+      ></p-select>
+      <button
+        class="text-xs text-primary-400 hover:text-primary-300 mt-2 cursor-pointer bg-transparent border-none p-0"
+        (click)="useCustomCron = true"
+      >
+        <i class="pi pi-pencil text-[10px] mr-1"></i>Custom expression
+      </button>
+      } @else {
+      <!-- Custom mode: 5 cron field dropdowns -->
+      <div class="grid grid-cols-5 gap-2">
+        <div>
+          <label class="text-[10px] text-gray-500 block mb-1">Min</label>
+          <p-select
+            [options]="minuteOptions"
+            [(ngModel)]="cronParts.minute"
+            (ngModelChange)="onCronPartChange()"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          ></p-select>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500 block mb-1">Hour</label>
+          <p-select
+            [options]="hourOptions"
+            [(ngModel)]="cronParts.hour"
+            (ngModelChange)="onCronPartChange()"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          ></p-select>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500 block mb-1">Day</label>
+          <p-select
+            [options]="domOptions"
+            [(ngModel)]="cronParts.dom"
+            (ngModelChange)="onCronPartChange()"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          ></p-select>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500 block mb-1">Month</label>
+          <p-select
+            [options]="monthOptions"
+            [(ngModel)]="cronParts.month"
+            (ngModelChange)="onCronPartChange()"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          ></p-select>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500 block mb-1">Weekday</label>
+          <p-select
+            [options]="dowOptions"
+            [(ngModel)]="cronParts.dow"
+            (ngModelChange)="onCronPartChange()"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          ></p-select>
+        </div>
+      </div>
+      <button
+        class="text-xs text-primary-400 hover:text-primary-300 mt-2 cursor-pointer bg-transparent border-none p-0"
+        (click)="useCustomCron = false"
+      >
+        <i class="pi pi-arrow-left text-[10px] mr-1"></i>Back to presets
+      </button>
+      }
+      <!-- Preview -->
+      <p class="text-xs text-gray-500 mt-3 p-2 bg-gray-800 rounded">
+        <i class="pi pi-clock text-[10px] mr-1"></i>{{ getCronDescription() }}
+      </p>
+    </div>
+
+    <!-- Last Run Info -->
+    @if (activeBoard?.last_run) {
+    <div class="p-3 bg-gray-800 rounded-lg">
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-gray-500">Last run:</span>
+        <span class="text-gray-300">{{ activeBoard?.last_run }}</span>
+      </div>
+      @if (activeBoard?.last_result) {
+      <div class="flex items-center justify-between text-xs mt-1">
+        <span class="text-gray-500">Result:</span>
+        <span
+          class="px-2 py-0.5 rounded"
+          [class]="getStatusBadgeClass(activeBoard?.last_result || '')"
+        >
+          {{ activeBoard?.last_result }}
+        </span>
+      </div>
+      }
+    </div>
+    }
+    }
+  </div>
+
+  <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-700">
+    <p-button label="Cancel" severity="secondary" (onClick)="showScheduleDialog = false"></p-button>
+    <p-button label="Save" icon="pi pi-save" (onClick)="saveSchedule()"></p-button>
+  </div>
+</p-dialog>
