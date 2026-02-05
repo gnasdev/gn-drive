@@ -182,13 +182,22 @@ export function isLegacyCommandDTO(event: unknown): event is CommandDTO {
   return typeof e["command"] === "string" && !("type" in e);
 }
 
-// Parse event from raw JSON string
-export function parseEvent(rawData: string): AppEvent | null {
+// Parse event from raw data (can be JSON string or already parsed object)
+export function parseEvent(rawData: unknown): AppEvent | null {
   try {
-    const parsed = JSON.parse(rawData);
-    return parsed as AppEvent;
-  } catch {
-    console.error("Failed to parse event:", rawData);
+    // If rawData is already an object, return it directly
+    if (typeof rawData === "object" && rawData !== null) {
+      return rawData as AppEvent;
+    }
+    // If rawData is a string, parse it as JSON
+    if (typeof rawData === "string") {
+      const parsed = JSON.parse(rawData);
+      return parsed as AppEvent;
+    }
+    console.error("Unexpected rawData type:", typeof rawData, rawData);
+    return null;
+  } catch (e) {
+    console.error("Failed to parse event:", rawData, e);
     return null;
   }
 }

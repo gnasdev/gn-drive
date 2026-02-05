@@ -118,32 +118,6 @@
           placeholder="Add Remote"
           styleClass="w-36"
         />
-        <div class="border-l border-gray-600 h-6 mx-1"></div>
-        <!-- Save -->
-        <p-button
-          icon="pi pi-save"
-          severity="secondary"
-          size="small"
-          label="Save"
-          (onClick)="saveBoard()"
-        ></p-button>
-        <!-- Execute / Stop -->
-        @if (isExecuting) {
-        <p-button
-          icon="pi pi-stop"
-          severity="danger"
-          size="small"
-          label="Stop"
-          (onClick)="stopExecution()"
-        ></p-button>
-        } @else {
-        <p-button
-          icon="pi pi-play"
-          size="small"
-          label="Execute"
-          (onClick)="executeBoard()"
-        ></p-button>
-        }
       </div>
       }
     </ng-template>
@@ -169,18 +143,45 @@
       (edgeContextMenu)="onEdgeContextMenu($event, edgeCtxMenu)"
     />
 
-    <!-- Execution Status Panel -->
-    @if (executionStatus) {
+    <!-- Execution Status Panel - Always visible -->
     <div class="absolute bottom-4 left-4 right-4 bg-gray-800 border border-gray-700 rounded-lg p-3">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-gray-200">Execution Status</span>
-        <span
-          class="text-xs px-2 py-0.5 rounded"
-          [class]="getStatusBadgeClass(executionStatus.status)"
-        >
-          {{ executionStatus.status }}
-        </span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-200">Execution Status</span>
+          @if (executionStatus) {
+          <span
+            class="text-xs px-2 py-0.5 rounded"
+            [class]="getStatusBadgeClass(executionStatus.status)"
+          >
+            {{ executionStatus.status }}
+          </span>
+          } @else {
+          <span class="text-xs px-2 py-0.5 rounded bg-gray-500/20 text-gray-400">idle</span>
+          }
+        </div>
+        <!-- Execute / Stop button -->
+        <div class="flex items-center gap-2">
+          @if (isExecuting) {
+          <p-button
+            icon="pi pi-stop"
+            severity="danger"
+            [text]="true"
+            size="small"
+            pTooltip="Stop execution"
+            (onClick)="stopExecution()"
+          ></p-button>
+          } @else {
+          <p-button
+            icon="pi pi-play"
+            [text]="true"
+            size="small"
+            pTooltip="Execute board"
+            (onClick)="executeBoard()"
+          ></p-button>
+          }
+        </div>
       </div>
+      @if (executionStatus && executionStatus.edge_statuses.length) {
       <div class="space-y-1.5 max-h-32 overflow-y-auto">
         @for (es of executionStatus.edge_statuses; track es.edge_id) {
         <div class="flex items-center gap-2 text-xs">
@@ -211,14 +212,14 @@
         </div>
         }
       </div>
-      <!-- Streaming log output -->
-      @if (latestLogLines) {
-      <div class="mt-2 pt-2 border-t border-gray-700">
-        <div class="bg-gray-900 rounded p-2 text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed max-h-16 overflow-hidden">{{ latestLogLines }}</div>
-      </div>
+      } @else {
+      <div class="text-xs text-gray-500">No execution in progress. Click "Execute" to start.</div>
       }
+      <!-- Streaming log output - Always visible -->
+      <div class="mt-2 pt-2 border-t border-gray-700">
+        <div class="bg-gray-900 rounded p-2 text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed h-[75px] overflow-y-auto">{{ latestLogLines || 'Waiting for logs...' }}</div>
+      </div>
     </div>
-    }
     }
   </div>
 </div>

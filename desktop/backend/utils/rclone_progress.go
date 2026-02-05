@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -24,63 +23,17 @@ const (
 	statsInterval = time.Minute * 1
 	// interval between progress prints
 	defaultProgressInterval = 500 * time.Millisecond
-	// time format for logging
-	logTimeFormat = "2006/01/02 15:04:05"
 )
 
-// Custom slog handler that intercepts logs and forwards them to our progress channel
-type progressLogHandler struct {
-	originalHandler     slog.Handler
-	outLog              chan string
-	isOutLogClosed      *bool
-	outLogClosedRecover func()
-}
-
-func (h *progressLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.originalHandler.Enabled(ctx, level)
-}
-
-func (h *progressLogHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Filter out backend debug messages to prevent recursive logging
-	message := r.Message
-	if strings.Contains(message, "Emitting event to frontend") ||
+// shouldSkipLogMessage returns true for backend debug messages that should be filtered out
+func shouldSkipLogMessage(message string) bool {
+	return strings.Contains(message, "Emitting event to frontend") ||
 		strings.Contains(message, "Event emitted successfully") ||
 		strings.Contains(message, "Event channel") ||
 		strings.Contains(message, "SetApp called") ||
 		strings.Contains(message, "SyncWithTab called") ||
 		strings.Contains(message, "Generated task ID") ||
-		strings.Contains(message, "Sending command") {
-		// Skip these backend debug messages
-		return h.originalHandler.Handle(ctx, r)
-	}
-
-	// Format the log message similar to the original format
-	defer h.outLogClosedRecover()
-	if !*h.isOutLogClosed {
-		logMsg := fmt.Sprintf("%s %-6s: %s", r.Time.Format(logTimeFormat), r.Level.String(), r.Message)
-		h.outLog <- formatToProgress(logMsg)
-	}
-
-	// Also call the original handler
-	return h.originalHandler.Handle(ctx, r)
-}
-
-func (h *progressLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &progressLogHandler{
-		originalHandler:     h.originalHandler.WithAttrs(attrs),
-		outLog:              h.outLog,
-		isOutLogClosed:      h.isOutLogClosed,
-		outLogClosedRecover: h.outLogClosedRecover,
-	}
-}
-
-func (h *progressLogHandler) WithGroup(name string) slog.Handler {
-	return &progressLogHandler{
-		originalHandler:     h.originalHandler.WithGroup(name),
-		outLog:              h.outLog,
-		isOutLogClosed:      h.isOutLogClosed,
-		outLogClosedRecover: h.outLogClosedRecover,
-	}
+		strings.Contains(message, "Sending command")
 }
 
 // formatToProgress prints the progress with an optional log
@@ -143,23 +96,20 @@ func startProgress(outLog chan string) func() {
 
 	stopStats := make(chan struct{})
 	oldSyncPrint := operations.SyncPrintf
-	var originalLogger *slog.Logger
-	var customHandler *progressLogHandler
 
-	if !fslog.Redirected() {
-		// Intercept the log calls using a custom slog handler
-		originalLogger = slog.Default()
-		customHandler = &progressLogHandler{
-			originalHandler:     originalLogger.Handler(),
-			outLog:              outLog,
-			isOutLogClosed:      &isOutLogClosed,
-			outLogClosedRecover: outLogClosedRecover,
+	// Use rclone's OutputHandler.AddOutput to capture logs
+	// This hooks into rclone's actual logging system (fs.Errorf, fs.Logf, etc.)
+	fslog.Handler.AddOutput(false, func(level slog.Level, text string) {
+		defer outLogClosedRecover()
+		if isOutLogClosed {
+			return
 		}
-
-		// Set the custom handler as the default logger
-		newLogger := slog.New(customHandler)
-		slog.SetDefault(newLogger)
-	}
+		text = strings.TrimSpace(text)
+		if text == "" || shouldSkipLogMessage(text) {
+			return
+		}
+		outLog <- formatToProgress(text)
+	})
 
 	// Intercept output from functions such as HashLister to stdout
 	operations.SyncPrintf = func(format string, a ...interface{}) {
@@ -187,11 +137,6 @@ func startProgress(outLog chan string) func() {
 				}
 			case <-stopStats:
 				ticker.Stop()
-				// Restore the original logger
-				if originalLogger != nil {
-					slog.SetDefault(originalLogger)
-				}
-				operations.SyncPrintf = oldSyncPrint
 				return
 			}
 		}
@@ -199,11 +144,18 @@ func startProgress(outLog chan string) func() {
 
 	return func() {
 		defer outLogClosedRecover()
+		// CRITICAL ORDER:
+		// 1. Set flag to stop any in-flight callbacks from sending
+		isOutLogClosed = true
+		// 2. Reset output handler to stop new callbacks
+		fslog.Handler.ResetOutput()
+		operations.SyncPrintf = oldSyncPrint
+		// 3. Signal goroutine to stop
 		close(stopStats)
-		if !isOutLogClosed {
-			close(outLog)
-		}
+		// 4. Wait for goroutine to finish
 		wg.Wait()
+		// 5. Finally close the channel (safe now since flag prevents sends)
+		close(outLog)
 	}
 }
 

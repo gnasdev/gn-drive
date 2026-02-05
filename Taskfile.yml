@@ -13,7 +13,7 @@ tasks:
     dir: desktop
     cmds:
       - '{{env "GOPATH"}}/bin/wails3 generate bindings'
-      - cd frontend && npm ci --legacy-peer-deps && npm run build
+      - cd frontend && bun install --frozen-lockfile && bun run build
       - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
 
@@ -22,7 +22,7 @@ tasks:
     dir: desktop
     cmds:
       - '{{env "GOPATH"}}/bin/wails3 generate bindings'
-      - cd frontend && npm install --legacy-peer-deps && npm run build
+      - cd frontend && bun install && bun run build
       - go build -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
 
@@ -31,7 +31,7 @@ tasks:
     dir: desktop/frontend
     cmds:
       - echo "Starting frontend development server on port {{.VITE_PORT}}..."
-      - npm start -- --port {{.VITE_PORT}}
+      - bun start --port {{.VITE_PORT}}
 
   dev:be:
     summary: Runs the application in development mode (run 'task dev:frontend' in another terminal first)
@@ -46,7 +46,7 @@ tasks:
     dir: desktop/frontend
     cmds:
       - echo "Running frontend linting..."
-      - npm run lint
+      - bun run lint
 
   lint:be:
     summary: Runs golangci-lint on the backend code
@@ -79,7 +79,7 @@ tasks:
     dir: desktop/frontend
     cmds:
       - echo "Running frontend tests..."
-      - npm test -- --watch=false --browsers=ChromeHeadless
+      - bun run test --watch=false --browsers=ChromeHeadless
 
   test:be:coverage:
     summary: Runs Go backend tests with coverage
@@ -111,7 +111,7 @@ tasks:
       - wails3 generate bindings -ts ./...
       - cd frontend && ln -sf bindings wailsjs 2>/dev/null || true
       - echo "Building frontend..."
-      - cd frontend && npm ci --legacy-peer-deps && npm run build
+      - cd frontend && bun install --frozen-lockfile && bun run build
       - echo "Building backend..."
       - mkdir -p {{.BIN_DIR}}
       - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}}" -o {{.BIN_DIR}}/{{.APP_NAME}}

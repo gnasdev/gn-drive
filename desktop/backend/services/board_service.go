@@ -28,8 +28,8 @@ type BoardService struct {
 	syncService *SyncService
 
 	// Active executions
-	activeFlows   map[string]*FlowExecution
-	flowMutex     sync.RWMutex
+	activeFlows map[string]*FlowExecution
+	flowMutex   sync.RWMutex
 }
 
 // FlowExecution tracks a running board execution
@@ -47,6 +47,16 @@ func NewBoardService(app *application.App) *BoardService {
 		boards:      []models.Board{},
 		activeFlows: make(map[string]*FlowExecution),
 	}
+}
+
+// GetExecutionLogs returns board execution logs (polling workaround for Wails v3 event issues)
+func (b *BoardService) GetExecutionLogs(ctx context.Context) []string {
+	return GetBoardLogs()
+}
+
+// ClearExecutionLogs clears the board execution log buffer
+func (b *BoardService) ClearExecutionLogs(ctx context.Context) {
+	ClearBoardLogs()
 }
 
 // SetApp sets the application reference for events
@@ -535,7 +545,8 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 	b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "running", fmt.Sprintf("Syncing %s -> %s", sourceNode.Label, targetNode.Label))
 
 	// Start sync via SyncService
-	tabId := fmt.Sprintf("board-%s-edge-%s", board.Id, edge.Id)
+	// Use IDs directly since they already have "board-" and "edge-" prefixes
+	tabId := fmt.Sprintf("%s-%s", board.Id, edge.Id)
 	result, err := b.syncService.StartSync(ctx, edge.Action, profile, tabId)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to start sync: %v", err)

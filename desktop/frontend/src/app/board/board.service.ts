@@ -10,6 +10,8 @@ import {
   ExecuteBoard,
   StopBoardExecution,
   GetBoardExecutionStatus,
+  GetExecutionLogs,
+  ClearExecutionLogs,
 } from "../../../wailsjs/desktop/backend/services/boardservice.js";
 import { Events } from "@wailsio/runtime";
 import { parseEvent } from "../models/events.js";
@@ -37,11 +39,12 @@ export class BoardService implements OnDestroy {
   private readonly errorService = inject(ErrorService);
   private readonly ngZone = inject(NgZone);
   private eventCleanup: (() => void) | undefined;
+  private logPollingInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.eventCleanup = Events.On("tofe", (event) => {
       const rawData = event.data;
-      const parsedEvent = parseEvent(rawData as string);
+      const parsedEvent = parseEvent(rawData);
       if (parsedEvent && isBoardEvent(parsedEvent)) {
         this.ngZone.run(() => this.handleBoardEvent(parsedEvent));
       } else if (parsedEvent && isSyncEvent(parsedEvent)) {
@@ -52,6 +55,78 @@ export class BoardService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.eventCleanup?.();
+    this.stopLogPolling();
+  }
+
+  // Start polling for logs and status (workaround for Wails v3 event issues)
+  private startLogPolling(): void {
+    if (this.logPollingInterval) return;
+    this.logPollingInterval = setInterval(async () => {
+      try {
+        // Poll for logs
+        const logs = await GetExecutionLogs();
+        if (logs && logs.length > 0) {
+          this.ngZone.run(() => {
+            for (const logEntry of logs) {
+              this.appendLogEntry(logEntry);
+            }
+          });
+        }
+
+        // Also poll for execution status (fallback in case events are missed)
+        const currentStatus = this.executionStatus$.value;
+        if (currentStatus && currentStatus.status === "running") {
+          try {
+            const status = await GetBoardExecutionStatus(currentStatus.board_id);
+            if (status && status.status !== "running") {
+              this.ngZone.run(() => {
+                this.executionStatus$.next(status);
+                if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+                  this.stopLogPolling();
+                  if (status.status !== "cancelled") {
+                    this.fetchRemainingLogs();
+                  }
+                }
+              });
+            }
+          } catch {
+            // If GetBoardExecutionStatus fails, the execution might have finished
+            // and been cleaned up from activeFlows
+            this.ngZone.run(() => {
+              if (currentStatus) {
+                currentStatus.status = "completed";
+                this.executionStatus$.next({ ...currentStatus });
+              }
+              this.stopLogPolling();
+              this.fetchRemainingLogs();
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[BoardService] Error polling:', err);
+      }
+    }, 500);
+  }
+
+  // Stop polling for logs
+  private stopLogPolling(): void {
+    if (this.logPollingInterval) {
+      clearInterval(this.logPollingInterval);
+      this.logPollingInterval = null;
+    }
+  }
+
+  // Append a single log entry to the latest lines
+  private appendLogEntry(logEntry: string): void {
+    const lines = logEntry.split("\n").filter((l) => l.trim());
+    if (lines.length > 0) {
+      const current = this.latestLogLines$.value;
+      const allLines = current ? current.split("\n") : [];
+      allLines.push(...lines);
+      // Keep only last 5 lines
+      const trimmed = allLines.slice(-5).join("\n");
+      this.latestLogLines$.next(trimmed);
+    }
   }
 
   async loadBoards(): Promise<void> {
@@ -107,6 +182,9 @@ export class BoardService implements OnDestroy {
       this.edgeLogs.clear();
       this.latestLogLines$.next("");
 
+      // Clear any existing logs in the backend buffer
+      await ClearExecutionLogs();
+
       // Set preliminary execution status BEFORE the RPC call so that
       // events emitted by the backend goroutine (which starts immediately)
       // can be matched by handleBoardEvent / handleSyncLogEvent.
@@ -124,10 +202,18 @@ export class BoardService implements OnDestroy {
         this.executionStatus$.next(prelimStatus);
       }
 
+      // Start polling for logs (workaround for Wails v3 event issues)
+      this.startLogPolling();
+
+      // ExecuteBoard returns immediately (execution runs in background goroutine)
+      // We rely on events to track progress and completion
       await ExecuteBoard(boardId);
-      // Don't overwrite executionStatus$ from the RPC response —
-      // events have already been updating it in real-time.
+
+      // Don't stop polling here - keep polling until we receive completion event
+      // The polling will be stopped when handleBoardEvent receives completion/failed/cancelled
     } catch (err) {
+      this.stopLogPolling();
+      await ClearExecutionLogs();
       this.executionStatus$.next(null);
       this.errorService.handleApiError(err, "Failed to execute board");
     }
@@ -136,6 +222,7 @@ export class BoardService implements OnDestroy {
   async stopExecution(boardId: string): Promise<void> {
     try {
       await StopBoardExecution(boardId);
+      this.stopLogPolling();
     } catch (err) {
       this.errorService.handleApiError(err, "Failed to stop execution");
     }
@@ -273,12 +360,14 @@ export class BoardService implements OnDestroy {
     const tabId = event.tabId;
     if (!tabId || !tabId.startsWith("board-")) return;
 
-    // Parse tabId: "board-{boardId}-edge-{edgeId}"
+    // Parse tabId: "{boardId}-{edgeId}" where boardId starts with "board-" and edgeId starts with "edge-"
+    // Example: "board-123-xxx-edge-456-yyy" -> boardId="123-xxx", edgeId="456-yyy"
     const match = tabId.match(/^board-(.+)-edge-(.+)$/);
     if (!match) return;
 
-    const boardId = match[1];
-    const edgeId = match[2];
+    // Add prefixes back since the IDs in the model include them
+    const boardId = `board-${match[1]}`;
+    const edgeId = `edge-${match[2]}`;
 
     // Only capture logs for the active board
     const status = this.executionStatus$.value;
@@ -305,7 +394,9 @@ export class BoardService implements OnDestroy {
 
   private handleBoardEvent(event: BoardEvent): void {
     const status = this.executionStatus$.value;
-    if (!status || status.board_id !== event.boardId) return;
+    if (!status || status.board_id !== event.boardId) {
+      return;
+    }
 
     // Update edge status if applicable
     if (event.edgeId && status.edge_statuses) {
@@ -322,12 +413,30 @@ export class BoardService implements OnDestroy {
     const type = event.type as string;
     if (type === "board:execution:completed") {
       status.status = "completed";
+      this.stopLogPolling();
+      this.fetchRemainingLogs();
     } else if (type === "board:execution:failed") {
       status.status = "failed";
+      this.stopLogPolling();
+      this.fetchRemainingLogs();
     } else if (type === "board:execution:cancelled") {
       status.status = "cancelled";
+      this.stopLogPolling();
     }
 
     this.executionStatus$.next({ ...status });
+  }
+
+  private async fetchRemainingLogs(): Promise<void> {
+    try {
+      const remainingLogs = await GetExecutionLogs();
+      if (remainingLogs && remainingLogs.length > 0) {
+        for (const logEntry of remainingLogs) {
+          this.appendLogEntry(logEntry);
+        }
+      }
+    } catch {
+      // Ignore errors when fetching remaining logs
+    }
   }
 }

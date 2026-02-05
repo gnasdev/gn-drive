@@ -29,6 +29,9 @@ import {
     <svg
       #svgCanvas
       class="w-full h-full bg-gray-900"
+      [class.cursor-grabbing]="isPanning || draggingNode"
+      [class.cursor-crosshair]="connectingFrom"
+      [class.cursor-grab]="!isPanning && !draggingNode && !connectingFrom"
       [attr.viewBox]="viewBox"
       (mousedown)="onCanvasMouseDown($event)"
       (mousemove)="onCanvasMouseMove($event)"
@@ -81,7 +84,7 @@ import {
           />
         </pattern>
       </defs>
-      <rect width="5000" height="5000" x="-2500" y="-2500" fill="url(#grid)" />
+      <rect class="canvas-bg" width="5000" height="5000" x="-2500" y="-2500" fill="url(#grid)" />
 
       <!-- Edges -->
       @for (edge of edges; track edge.id) {
@@ -242,9 +245,9 @@ export class BoardCanvasComponent {
   private viewHeight = 600;
 
   // Drag state
-  private draggingNode: models.BoardNode | null = null;
+  draggingNode: models.BoardNode | null = null;
   private dragOffset = { x: 0, y: 0 };
-  private isPanning = false;
+  isPanning = false;
   private panStart = { x: 0, y: 0 };
 
   // Connection state
@@ -301,7 +304,11 @@ export class BoardCanvasComponent {
   }
 
   onCanvasMouseDown(event: MouseEvent): void {
-    if (event.target === this.svgCanvas?.nativeElement) {
+    const target = event.target as Element;
+    const isSvgBackground =
+      target === this.svgCanvas?.nativeElement ||
+      target.classList.contains("canvas-bg");
+    if (isSvgBackground) {
       this.selectionCleared.emit();
       this.isPanning = true;
       this.panStart = { x: event.clientX, y: event.clientY };

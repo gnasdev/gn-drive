@@ -2,7 +2,6 @@ package events
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -19,8 +18,9 @@ type EventBus interface {
 
 // WailsEventBus implements EventBus using Wails event system
 type WailsEventBus struct {
-	app   *application.App
-	mutex sync.RWMutex
+	app    *application.App
+	window *application.WebviewWindow
+	mutex  sync.RWMutex
 }
 
 // NewEventBus creates a new WailsEventBus
@@ -37,26 +37,37 @@ func (b *WailsEventBus) SetApp(app *application.App) {
 	b.app = app
 }
 
+// SetWindow sets the window reference for window-specific events
+func (b *WailsEventBus) SetWindow(window *application.WebviewWindow) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.window = window
+}
+
 // Emit sends an event to the frontend via the unified "tofe" channel
 // The event should have a Type field that identifies the event type
 func (b *WailsEventBus) Emit(event interface{}) error {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	if b.app == nil {
-		log.Printf("EventBus: app is nil, cannot emit event")
-		return nil
-	}
-
 	// Serialize event to JSON
 	jsonData, err := json.Marshal(event)
 	if err != nil {
-		log.Printf("EventBus: failed to marshal event: %v", err)
 		return err
 	}
 
-	// Emit through unified "tofe" channel
-	b.app.Event.Emit("tofe", string(jsonData))
+	// Try window-specific event first (more reliable in Wails v3 alpha)
+	if b.window != nil {
+		b.window.EmitEvent("tofe", string(jsonData))
+		return nil
+	}
+
+	// Fallback to app-level event
+	if b.app != nil {
+		b.app.Event.Emit("tofe", string(jsonData))
+		return nil
+	}
+
 	return nil
 }
 

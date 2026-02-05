@@ -23,7 +23,7 @@ task lint:be     # golangci-lint on backend only
 
 # Testing
 cd desktop && go test ./...                    # Run all Go tests
-cd desktop/frontend && npm test                # Run Angular tests (Karma/Jasmine)
+cd desktop/frontend && bun run test            # Run Angular tests (Karma/Jasmine)
 
 # Regenerate TypeScript bindings after modifying Go services/models
 cd desktop && wails3 generate bindings
@@ -78,6 +78,6 @@ import * as models from "../../wailsjs/desktop/backend/models/models";
 
 ## Development Notes
 
-- Frontend dependencies require `npm install --legacy-peer-deps` due to peer dependency conflicts
+- Frontend uses Bun as package manager (`bun install` in `desktop/frontend/`)
 - Dev server port is configurable via `WAILS_VITE_PORT` env var (default: 9245)
 - All Go service methods accept `context.Context` as first parameter for cancellation support

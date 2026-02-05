@@ -9,6 +9,7 @@ import (
 	"desktop/backend/utils"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +32,47 @@ func SetSharedEventBus(bus *events.WailsEventBus) {
 	eventBusMutex.Lock()
 	defer eventBusMutex.Unlock()
 	sharedEventBus = bus
+}
+
+// SetSharedEventBusWindow sets the window on the shared EventBus for window-specific events
+func SetSharedEventBusWindow(window *application.WebviewWindow) {
+	eventBusMutex.RLock()
+	defer eventBusMutex.RUnlock()
+	if sharedEventBus != nil {
+		sharedEventBus.SetWindow(window)
+	}
+}
+
+// Board log buffer for polling (workaround for Wails v3 event issues)
+var boardLogBuffer []string
+var boardLogMutex sync.RWMutex
+var boardLogBufferSize = 200
+
+// AppendBoardLog adds a log entry for board execution
+func AppendBoardLog(logEntry string) {
+	boardLogMutex.Lock()
+	defer boardLogMutex.Unlock()
+	boardLogBuffer = append(boardLogBuffer, logEntry)
+	if len(boardLogBuffer) > boardLogBufferSize {
+		boardLogBuffer = boardLogBuffer[len(boardLogBuffer)-boardLogBufferSize:]
+	}
+}
+
+// GetBoardLogs returns and clears board logs
+func GetBoardLogs() []string {
+	boardLogMutex.Lock()
+	defer boardLogMutex.Unlock()
+	logs := make([]string, len(boardLogBuffer))
+	copy(logs, boardLogBuffer)
+	boardLogBuffer = boardLogBuffer[:0]
+	return logs
+}
+
+// ClearBoardLogs clears the board log buffer
+func ClearBoardLogs() {
+	boardLogMutex.Lock()
+	defer boardLogMutex.Unlock()
+	boardLogBuffer = boardLogBuffer[:0]
 }
 
 // SyncAction represents the type of sync operation
@@ -272,7 +314,13 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 
 	// Goroutine to read output logs and emit progress events
 	go func() {
+		isBoardTask := strings.HasPrefix(task.TabId, "board-")
 		for logEntry := range outLog {
+			// For board tasks, also append to the board log buffer for polling
+			if isBoardTask {
+				AppendBoardLog(logEntry)
+			}
+
 			if s.eventBus != nil {
 				event := events.NewSyncEvent(events.SyncProgress, task.TabId, string(task.Action), "running", logEntry)
 				if emitErr := s.eventBus.EmitSyncEvent(event); emitErr != nil {

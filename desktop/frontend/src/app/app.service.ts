@@ -75,8 +75,12 @@ export class AppService implements OnDestroy {
     configInfo.profiles = [];
     this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
     // Store cleanup function for event listener
-    this.eventCleanup = Events.On("tofe", (event) => {      const rawData = event.data;
-      const parsedEvent = parseEvent(rawData as string);
+    console.log('[AppService] Constructor - subscribing to tofe events');
+    this.eventCleanup = Events.On("tofe", (event) => {
+      console.log('[AppService] RAW tofe event received:', event);
+      const rawData = event.data;
+      console.log('[AppService] rawData type:', typeof rawData);
+      const parsedEvent = parseEvent(rawData);
       if (!parsedEvent) {
         console.error("AppService: Failed to parse event");
         return;

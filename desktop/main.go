@@ -88,6 +88,9 @@ func main() {
 		Height: 768,
 	})
 
+	// Set window reference on shared EventBus for window-specific events
+	services.SetSharedEventBusWindow(window)
+
 	// Set the window URL to load the frontend
 	window.SetURL("/")
 
