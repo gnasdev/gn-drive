@@ -360,12 +360,23 @@ export class FlowsService implements OnDestroy {
    * Execute all operations in a flow sequentially
    */
   async executeFlow(flowId: string): Promise<void> {
+    console.log(`[FlowsService] executeFlow called: flowId=${flowId}`);
+
     const flow = this.flows.find((f) => f.id === flowId);
-    if (!flow || flow.operations.length === 0) return;
+    if (!flow || flow.operations.length === 0) {
+      console.warn(`[FlowsService] executeFlow: flow not found or empty, flowId=${flowId}, found=${!!flow}, ops=${flow?.operations.length}`);
+      return;
+    }
+
+    console.log(`[FlowsService] executeFlow: ${flow.operations.length} operations`);
+    flow.operations.forEach((op, i) => {
+      console.log(`[FlowsService]   op[${i}]: source=${op.sourceRemote}:${op.sourcePath} target=${op.targetRemote}:${op.targetPath} action=${op.syncConfig.action}`);
+    });
 
     // Check all operations have valid remotes
     const hasInvalidOps = flow.operations.some((op) => !op.sourceRemote || !op.targetRemote);
     if (hasInvalidOps) {
+      console.error(`[FlowsService] executeFlow: invalid operations (missing remotes)`);
       this.errorService.handleApiError(
         new Error('Some operations have invalid remotes'),
         'Cannot execute flow with incomplete operations'
@@ -393,12 +404,19 @@ export class FlowsService implements OnDestroy {
 
         this.executingOperationIndex = i;
         const operation = this.getFlow(flowId)?.operations[i];
-        if (!operation) break;
+        if (!operation) {
+          console.warn(`[FlowsService] executeFlow: operation[${i}] not found after state update`);
+          break;
+        }
+
+        console.log(`[FlowsService] executeFlow: starting operation[${i}] id=${operation.id}`);
 
         // Mark current operation as running
         this.updateOperation(flowId, operation.id, { status: 'running' });
 
         const boardStatus = await this.executeSingleOperation(flowId, operation);
+
+        console.log(`[FlowsService] executeFlow: operation[${i}] result=${boardStatus}`);
 
         // Check if flow was stopped during execution
         if (this.executingFlowId !== flowId) break;
@@ -423,6 +441,7 @@ export class FlowsService implements OnDestroy {
         this.updateFlow(flowId, { status: 'completed' });
       }
     } catch (err) {
+      console.error(`[FlowsService] executeFlow error:`, err);
       this.updateFlow(flowId, { status: 'failed' });
       this.errorService.handleApiError(err, 'Flow execution failed');
     } finally {
@@ -490,14 +509,27 @@ export class FlowsService implements OnDestroy {
     const board = this.operationToBoard(operation);
     this.tempBoardId = board.id;
 
+    console.log(`[FlowsService] executeSingleOperation: boardId=${board.id} source=${operation.sourceRemote}:${operation.sourcePath} target=${operation.targetRemote}:${operation.targetPath} action=${operation.syncConfig.action}`);
+
     try {
+      console.log(`[FlowsService] Adding board...`, JSON.stringify(board, null, 2));
       await AddBoard(board);
+      console.log(`[FlowsService] Board added successfully`);
+
       await ClearExecutionLogs();
       this.startLogPolling(flowId, operation.id);
+
+      console.log(`[FlowsService] Executing board ${board.id}...`);
       await ExecuteBoard(board.id);
+      console.log(`[FlowsService] ExecuteBoard returned, waiting for completion...`);
 
       // Wait for board execution to actually complete (ExecuteBoard returns immediately)
-      return await this.waitForBoardCompletion(board.id);
+      const result = await this.waitForBoardCompletion(board.id);
+      console.log(`[FlowsService] Board completed with status: ${result}`);
+      return result;
+    } catch (err) {
+      console.error(`[FlowsService] executeSingleOperation error:`, err);
+      throw err;
     } finally {
       // Final flush: collect any remaining logs before stopping
       await this.flushRemainingLogs(flowId, operation.id);
@@ -511,6 +543,7 @@ export class FlowsService implements OnDestroy {
     return new Promise((resolve) => {
       let resolved = false;
       let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+      let consecutiveErrors = 0;
 
       const doResolve = (status: string) => {
         if (resolved) return;
@@ -518,6 +551,7 @@ export class FlowsService implements OnDestroy {
         if (fallbackInterval) clearInterval(fallbackInterval);
         this.boardCompletionResolve = null;
         this.boardCompletionBoardId = null;
+        console.log(`[FlowsService] Board ${boardId} completed with status: ${status}`);
         resolve(status);
       };
 
@@ -532,27 +566,41 @@ export class FlowsService implements OnDestroy {
         }
         try {
           const status = await GetBoardExecutionStatus(boardId);
+          consecutiveErrors = 0;
           if (status && status.status !== 'running') {
             doResolve(status.status);
           }
         } catch {
-          // Board removed from activeFlows — wait for the event to arrive
+          // Board removed from activeFlows — execution likely completed already
+          consecutiveErrors++;
+          console.warn(`[FlowsService] GetBoardExecutionStatus failed (attempt ${consecutiveErrors})`);
+          // After 3 consecutive failures (6 seconds), assume the execution completed
+          // and the event was missed. Resolve as 'completed' (the board was removed
+          // from activeFlows which only happens after execution finishes).
+          if (consecutiveErrors >= 3) {
+            console.warn(`[FlowsService] Board ${boardId} presumed completed after ${consecutiveErrors} polling failures`);
+            doResolve('completed');
+          }
         }
       }, 2000);
     });
   }
 
   private handleBoardCompletionEvent(event: BoardEvent): void {
+    console.log(`[FlowsService] handleBoardCompletionEvent: type=${event.type} boardId=${event.boardId} waiting=${this.boardCompletionBoardId}`);
     if (!this.boardCompletionBoardId || event.boardId !== this.boardCompletionBoardId) return;
 
     switch (event.type) {
       case 'board:execution:completed':
+        console.log(`[FlowsService] Board execution completed event received`);
         this.boardCompletionResolve?.('completed');
         break;
       case 'board:execution:failed':
+        console.log(`[FlowsService] Board execution failed event received`);
         this.boardCompletionResolve?.('failed');
         break;
       case 'board:execution:cancelled':
+        console.log(`[FlowsService] Board execution cancelled event received`);
         this.boardCompletionResolve?.('cancelled');
         break;
     }
@@ -562,6 +610,11 @@ export class FlowsService implements OnDestroy {
     const board = new models.Board();
     board.id = `board-${generateId()}`;
     board.name = `__temp_${generateId()}__`;
+
+    // Set valid dates — Wails v3 can't deserialize null into Go's non-pointer time.Time
+    const now = new Date().toISOString();
+    board.created_at = now;
+    board.updated_at = now;
 
     // Source node
     const sourceNode = new models.BoardNode();
@@ -589,15 +642,122 @@ export class FlowsService implements OnDestroy {
     edge.source_id = sourceNode.id;
     edge.target_id = targetNode.id;
     edge.action = operation.syncConfig.action;
-
-    const profile = new models.Profile();
-    profile.parallel = operation.syncConfig.parallel || 8;
-    profile.bandwidth = operation.syncConfig.bandwidth ? parseInt(operation.syncConfig.bandwidth.replace('M', '')) : 0;
-    edge.sync_config = profile;
+    edge.sync_config = this.syncConfigToProfile(operation.syncConfig);
 
     board.edges = [edge];
 
+    console.log(`[FlowsService] operationToBoard: board=${board.id} nodes=${board.nodes.length} edges=${board.edges.length} action=${edge.action}`);
     return board;
+  }
+
+  private syncConfigToProfile(sc: SyncConfig): models.Profile {
+    const p = new models.Profile();
+    // Performance
+    p.parallel = sc.parallel || 0;
+    p.bandwidth = sc.bandwidth || 0;
+    if (sc.multiThreadStreams) p.multi_thread_streams = sc.multiThreadStreams;
+    if (sc.bufferSize) p.buffer_size = sc.bufferSize;
+    if (sc.fastList) p.fast_list = true;
+    if (sc.retries) p.retries = sc.retries;
+    if (sc.lowLevelRetries) p.low_level_retries = sc.lowLevelRetries;
+    if (sc.maxDuration) p.max_duration = sc.maxDuration;
+    if (sc.checkFirst) p.check_first = true;
+    if (sc.orderBy) p.order_by = sc.orderBy;
+    if (sc.retriesSleep) p.retries_sleep = sc.retriesSleep;
+    if (sc.tpsLimit) p.tps_limit = sc.tpsLimit;
+    if (sc.connTimeout) p.conn_timeout = sc.connTimeout;
+    if (sc.ioTimeout) p.io_timeout = sc.ioTimeout;
+    // Filtering
+    p.included_paths = sc.includedPaths || [];
+    p.excluded_paths = sc.excludedPaths || [];
+    if (sc.minSize) p.min_size = sc.minSize;
+    if (sc.maxSize) p.max_size = sc.maxSize;
+    if (sc.maxAge) p.max_age = sc.maxAge;
+    if (sc.minAge) p.min_age = sc.minAge;
+    if (sc.maxDepth != null) p.max_depth = sc.maxDepth;
+    if (sc.filterFromFile) p.filter_from_file = sc.filterFromFile;
+    if (sc.excludeIfPresent) p.exclude_if_present = sc.excludeIfPresent;
+    if (sc.useRegex) p.use_regex = true;
+    if (sc.deleteExcluded) p.delete_excluded = true;
+    // Safety
+    if (sc.dryRun) p.dry_run = true;
+    if (sc.maxDelete) p.max_delete = sc.maxDelete;
+    if (sc.immutable) p.immutable = true;
+    if (sc.maxTransfer) p.max_transfer = sc.maxTransfer;
+    if (sc.maxDeleteSize) p.max_delete_size = sc.maxDeleteSize;
+    if (sc.suffix) p.suffix = sc.suffix;
+    if (sc.suffixKeepExtension) p.suffix_keep_extension = true;
+    if (sc.backupPath) p.backup_path = sc.backupPath;
+    // Comparison
+    if (sc.sizeOnly) p.size_only = true;
+    if (sc.updateMode) p.update_mode = true;
+    if (sc.ignoreExisting) p.ignore_existing = true;
+    // Sync-specific
+    if (sc.deleteTiming) p.delete_timing = sc.deleteTiming;
+    // Bisync
+    if (sc.conflictResolution) p.conflict_resolution = sc.conflictResolution;
+    if (sc.resilient) p.resilient = true;
+    if (sc.maxLock) p.max_lock = sc.maxLock;
+    if (sc.checkAccess) p.check_access = true;
+    if (sc.conflictLoser) p.conflict_loser = sc.conflictLoser;
+    if (sc.conflictSuffix) p.conflict_suffix = sc.conflictSuffix;
+    return p;
+  }
+
+  private profileToSyncConfig(p: models.Profile, action: string): SyncConfig {
+    const sc: SyncConfig = {
+      action: (action || 'push') as SyncAction,
+    };
+    // Performance
+    if (p.parallel) sc.parallel = p.parallel;
+    if (p.bandwidth) sc.bandwidth = p.bandwidth;
+    if (p.multi_thread_streams) sc.multiThreadStreams = p.multi_thread_streams;
+    if (p.buffer_size) sc.bufferSize = p.buffer_size;
+    if (p.fast_list) sc.fastList = true;
+    if (p.retries) sc.retries = p.retries;
+    if (p.low_level_retries) sc.lowLevelRetries = p.low_level_retries;
+    if (p.max_duration) sc.maxDuration = p.max_duration;
+    if (p.check_first) sc.checkFirst = true;
+    if (p.order_by) sc.orderBy = p.order_by;
+    if (p.retries_sleep) sc.retriesSleep = p.retries_sleep;
+    if (p.tps_limit) sc.tpsLimit = p.tps_limit;
+    if (p.conn_timeout) sc.connTimeout = p.conn_timeout;
+    if (p.io_timeout) sc.ioTimeout = p.io_timeout;
+    // Filtering
+    if (p.included_paths?.length) sc.includedPaths = p.included_paths;
+    if (p.excluded_paths?.length) sc.excludedPaths = p.excluded_paths;
+    if (p.min_size) sc.minSize = p.min_size;
+    if (p.max_size) sc.maxSize = p.max_size;
+    if (p.max_age) sc.maxAge = p.max_age;
+    if (p.min_age) sc.minAge = p.min_age;
+    if (p.max_depth != null) sc.maxDepth = p.max_depth;
+    if (p.filter_from_file) sc.filterFromFile = p.filter_from_file;
+    if (p.exclude_if_present) sc.excludeIfPresent = p.exclude_if_present;
+    if (p.use_regex) sc.useRegex = true;
+    if (p.delete_excluded) sc.deleteExcluded = true;
+    // Safety
+    if (p.dry_run) sc.dryRun = true;
+    if (p.max_delete) sc.maxDelete = p.max_delete;
+    if (p.immutable) sc.immutable = true;
+    if (p.max_transfer) sc.maxTransfer = p.max_transfer;
+    if (p.max_delete_size) sc.maxDeleteSize = p.max_delete_size;
+    if (p.suffix) sc.suffix = p.suffix;
+    if (p.suffix_keep_extension) sc.suffixKeepExtension = true;
+    if (p.backup_path) sc.backupPath = p.backup_path;
+    // Comparison
+    if (p.size_only) sc.sizeOnly = true;
+    if (p.update_mode) sc.updateMode = true;
+    if (p.ignore_existing) sc.ignoreExisting = true;
+    // Sync-specific
+    if (p.delete_timing) sc.deleteTiming = p.delete_timing as SyncConfig['deleteTiming'];
+    // Bisync
+    if (p.conflict_resolution) sc.conflictResolution = p.conflict_resolution as SyncConfig['conflictResolution'];
+    if (p.resilient) sc.resilient = true;
+    if (p.max_lock) sc.maxLock = p.max_lock;
+    if (p.check_access) sc.checkAccess = true;
+    if (p.conflict_loser) sc.conflictLoser = p.conflict_loser as SyncConfig['conflictLoser'];
+    if (p.conflict_suffix) sc.conflictSuffix = p.conflict_suffix;
+    return sc;
   }
 
   private async cleanupTempBoard(): Promise<void> {
@@ -746,15 +906,7 @@ export class FlowsService implements OnDestroy {
         sourcePath: bo.source_path || '/',
         targetRemote: bo.target_remote || '',
         targetPath: bo.target_path || '/',
-        syncConfig: {
-          action: (bo.action || 'push') as SyncAction,
-          parallel: bo.parallel || undefined,
-          bandwidth: bo.bandwidth || undefined,
-          includedPaths: bo.included_paths || undefined,
-          excludedPaths: bo.excluded_paths || undefined,
-          conflictResolution: (bo.conflict_resolution || undefined) as SyncConfig['conflictResolution'],
-          dryRun: bo.dry_run || undefined,
-        },
+        syncConfig: this.profileToSyncConfig(bo.sync_config || new models.Profile(), bo.action),
         status: 'idle' as const,
         logs: [] as string[],
         isExpanded: bo.is_expanded || false,
@@ -779,12 +931,7 @@ export class FlowsService implements OnDestroy {
       bo.target_remote = op.targetRemote;
       bo.target_path = op.targetPath;
       bo.action = op.syncConfig.action;
-      bo.parallel = op.syncConfig.parallel || 0;
-      bo.bandwidth = op.syncConfig.bandwidth || '';
-      bo.included_paths = op.syncConfig.includedPaths || [];
-      bo.excluded_paths = op.syncConfig.excludedPaths || [];
-      bo.conflict_resolution = op.syncConfig.conflictResolution || '';
-      bo.dry_run = op.syncConfig.dryRun || false;
+      bo.sync_config = this.syncConfigToProfile(op.syncConfig);
       bo.is_expanded = op.isExpanded;
       bo.sort_order = opIdx;
       return bo;

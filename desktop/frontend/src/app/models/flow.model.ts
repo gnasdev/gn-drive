@@ -11,17 +11,58 @@ export interface SyncConfig {
 
   // Performance
   parallel?: number;
-  bandwidth?: string; // e.g., "10M"
+  bandwidth?: number; // MB/s
+  multiThreadStreams?: number;
+  bufferSize?: string; // e.g., "16M"
+  fastList?: boolean;
+  retries?: number;
+  lowLevelRetries?: number;
+  maxDuration?: string; // e.g., "1h30m"
+  checkFirst?: boolean;
+  orderBy?: string; // e.g., "size,desc"
+  retriesSleep?: string; // e.g., "10s"
+  tpsLimit?: number;
+  connTimeout?: string; // e.g., "30s"
+  ioTimeout?: string; // e.g., "5m"
 
-  // Filters
+  // Filtering
   includedPaths?: string[];
   excludedPaths?: string[];
-
-  // Conflict resolution (for bisync)
-  conflictResolution?: 'newer' | 'older' | 'larger' | 'smaller' | 'path1' | 'path2';
+  minSize?: string; // e.g., "100k"
+  maxSize?: string; // e.g., "1G"
+  maxAge?: string; // e.g., "24h", "7d"
+  minAge?: string;
+  maxDepth?: number;
+  filterFromFile?: string;
+  excludeIfPresent?: string; // e.g., ".nosync"
+  useRegex?: boolean;
+  deleteExcluded?: boolean;
 
   // Safety
   dryRun?: boolean;
+  maxDelete?: number; // percentage 0-100
+  immutable?: boolean;
+  maxTransfer?: string; // e.g., "10G"
+  maxDeleteSize?: string; // e.g., "1G"
+  suffix?: string;
+  suffixKeepExtension?: boolean;
+  backupPath?: string;
+
+  // Comparison
+  sizeOnly?: boolean;
+  updateMode?: boolean;
+  ignoreExisting?: boolean;
+
+  // Sync-specific (push/pull)
+  deleteTiming?: 'before' | 'during' | 'after';
+
+  // Bisync
+  conflictResolution?: 'newer' | 'older' | 'larger' | 'smaller' | 'path1' | 'path2';
+  resilient?: boolean;
+  maxLock?: string; // e.g., "15m"
+  checkAccess?: boolean;
+  conflictLoser?: 'num' | 'pathname' | 'delete';
+  conflictSuffix?: string;
 }
 
 export type SyncAction = 'push' | 'pull' | 'bi' | 'bi-resync';

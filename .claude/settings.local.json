@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:v3alpha.wails.io)",
       "mcp__acp__Bash",
-      "mcp__acp__Edit"
+      "mcp__acp__Edit",
+      "WebFetch(domain:rclone.org)"
     ]
   }
 }

@@ -223,10 +223,22 @@ func GetSize(ctx context.Context, remotePath string) (int64, int64, error) {
 // applyFiltersAndBandwidth sets up filter rules and bandwidth from profile.
 // Returns the updated context.
 func applyFiltersAndBandwidth(ctx context.Context, fsConfig *fs.ConfigInfo, profile models.Profile) context.Context {
-	// Set up filter rules
+	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
 	filterOpt := filter.GetConfig(ctx).Opt
-	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
-	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
+	for _, p := range profile.IncludedPaths {
+		if profile.UseRegex {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, p)
+		}
+	}
+	for _, p := range profile.ExcludedPaths {
+		if profile.UseRegex {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, p)
+		}
+	}
 	newFilter, err := filter.NewFilter(&filterOpt)
 	if err == nil {
 		ctx = filter.ReplaceConfig(ctx, newFilter)

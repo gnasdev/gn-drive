@@ -182,12 +182,34 @@ func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.C
 		filterOpt.ExcludeFile = append(filterOpt.ExcludeFile, profile.ExcludeIfPresent)
 	}
 
+	// Filtering: max/min age
+	if profile.MaxAge != "" {
+		if err := filterOpt.MaxAge.Set(profile.MaxAge); err != nil {
+			return ctx, fmt.Errorf("invalid max_age %q: %w", profile.MaxAge, err)
+		}
+	}
+	if profile.MinAge != "" {
+		if err := filterOpt.MinAge.Set(profile.MinAge); err != nil {
+			return ctx, fmt.Errorf("invalid min_age %q: %w", profile.MinAge, err)
+		}
+	}
+
+	// Filtering: delete excluded files on destination
+	if profile.DeleteExcluded {
+		filterOpt.DeleteExcluded = true
+	}
+
 	// Rebuild filter with updated options
 	newFilter, err := filter.NewFilter(&filterOpt)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to create filter: %w", err)
 	}
 	ctx = filter.ReplaceConfig(ctx, newFilter)
+
+	// Filtering: max depth
+	if profile.MaxDepth != nil {
+		fsConfig.MaxDepth = *profile.MaxDepth
+	}
 
 	// Safety: backup directory
 	if profile.BackupPath != "" {
@@ -202,6 +224,33 @@ func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.C
 	// Safety: immutable mode
 	if profile.Immutable {
 		fsConfig.Immutable = true
+	}
+
+	// Safety: dry run
+	if profile.DryRun {
+		fsConfig.DryRun = true
+	}
+
+	// Safety: max transfer
+	if profile.MaxTransfer != "" {
+		if err := fsConfig.MaxTransfer.Set(profile.MaxTransfer); err != nil {
+			return ctx, fmt.Errorf("invalid max_transfer %q: %w", profile.MaxTransfer, err)
+		}
+	}
+
+	// Safety: max delete size
+	if profile.MaxDeleteSize != "" {
+		if err := fsConfig.MaxDeleteSize.Set(profile.MaxDeleteSize); err != nil {
+			return ctx, fmt.Errorf("invalid max_delete_size %q: %w", profile.MaxDeleteSize, err)
+		}
+	}
+
+	// Safety: suffix for changed files
+	if profile.Suffix != "" {
+		fsConfig.Suffix = profile.Suffix
+	}
+	if profile.SuffixKeepExtension {
+		fsConfig.SuffixKeepExtension = true
 	}
 
 	// Performance: multi-thread streams
@@ -236,6 +285,75 @@ func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.C
 			return ctx, fmt.Errorf("invalid max_duration %q: %w", profile.MaxDuration, err)
 		}
 		fsConfig.MaxDuration = maxDuration
+	}
+
+	// Performance: check first
+	if profile.CheckFirst {
+		fsConfig.CheckFirst = true
+	}
+
+	// Performance: order by
+	if profile.OrderBy != "" {
+		fsConfig.OrderBy = profile.OrderBy
+	}
+
+	// Performance: retries sleep
+	if profile.RetriesSleep != "" {
+		var d fs.Duration
+		if err := d.Set(profile.RetriesSleep); err != nil {
+			return ctx, fmt.Errorf("invalid retries_sleep %q: %w", profile.RetriesSleep, err)
+		}
+		fsConfig.RetriesInterval = d
+	}
+
+	// Performance: TPS limit
+	if profile.TpsLimit != nil {
+		fsConfig.TPSLimit = *profile.TpsLimit
+	}
+
+	// Performance: connect timeout
+	if profile.ConnTimeout != "" {
+		var d fs.Duration
+		if err := d.Set(profile.ConnTimeout); err != nil {
+			return ctx, fmt.Errorf("invalid conn_timeout %q: %w", profile.ConnTimeout, err)
+		}
+		fsConfig.ConnectTimeout = d
+	}
+
+	// Performance: IO timeout
+	if profile.IoTimeout != "" {
+		var d fs.Duration
+		if err := d.Set(profile.IoTimeout); err != nil {
+			return ctx, fmt.Errorf("invalid io_timeout %q: %w", profile.IoTimeout, err)
+		}
+		fsConfig.Timeout = d
+	}
+
+	// Comparison: size only
+	if profile.SizeOnly {
+		fsConfig.SizeOnly = true
+	}
+
+	// Comparison: update mode (skip newer destination files)
+	if profile.UpdateMode {
+		fsConfig.UpdateOlder = true
+	}
+
+	// Comparison: ignore existing
+	if profile.IgnoreExisting {
+		fsConfig.IgnoreExisting = true
+	}
+
+	// Sync-specific: delete timing
+	if profile.DeleteTiming != "" {
+		switch profile.DeleteTiming {
+		case "before":
+			fsConfig.DeleteMode = fs.DeleteModeBefore
+		case "during":
+			fsConfig.DeleteMode = fs.DeleteModeDuring
+		case "after":
+			fsConfig.DeleteMode = fs.DeleteModeAfter
+		}
 	}
 
 	return ctx, nil

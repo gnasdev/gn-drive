@@ -15,19 +15,14 @@ type Flow struct {
 
 // Operation represents a single sync operation between two remotes
 type Operation struct {
-	Id                 string   `json:"id"`
-	FlowId             string   `json:"flow_id"`
-	SourceRemote       string   `json:"source_remote"`
-	SourcePath         string   `json:"source_path"`
-	TargetRemote       string   `json:"target_remote"`
-	TargetPath         string   `json:"target_path"`
-	Action             string   `json:"action"`
-	Parallel           int      `json:"parallel,omitempty"`
-	Bandwidth          string   `json:"bandwidth,omitempty"`
-	IncludedPaths      []string `json:"included_paths,omitempty"`
-	ExcludedPaths      []string `json:"excluded_paths,omitempty"`
-	ConflictResolution string   `json:"conflict_resolution,omitempty"`
-	DryRun             bool     `json:"dry_run,omitempty"`
-	IsExpanded         bool     `json:"is_expanded"`
-	SortOrder          int      `json:"sort_order"`
+	Id           string  `json:"id"`
+	FlowId       string  `json:"flow_id"`
+	SourceRemote string  `json:"source_remote"`
+	SourcePath   string  `json:"source_path"`
+	TargetRemote string  `json:"target_remote"`
+	TargetPath   string  `json:"target_path"`
+	Action       string  `json:"action"`
+	SyncConfig   Profile `json:"sync_config"`  // JSON-serialized Profile with all rclone options
+	IsExpanded   bool    `json:"is_expanded"`
+	SortOrder    int     `json:"sort_order"`
 }

@@ -56,10 +56,22 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		}
 	}
 
-	// Set up filter rules (include/exclude patterns)
+	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
 	filterOpt := filter.GetConfig(ctx).Opt
-	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
-	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
+	for _, p := range profile.IncludedPaths {
+		if profile.UseRegex {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, p)
+		}
+	}
+	for _, p := range profile.ExcludedPaths {
+		if profile.UseRegex {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, p)
+		}
+	}
 	newFilter, err := filter.NewFilter(&filterOpt)
 	if err := utils.HandleError(err, "Invalid filters file", nil, func() {
 		ctx = filter.ReplaceConfig(ctx, newFilter)

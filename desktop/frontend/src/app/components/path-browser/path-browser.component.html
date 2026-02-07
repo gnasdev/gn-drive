@@ -1,69 +1,74 @@
 <div class="relative" (clickOutside)="closeDropdown()">
   <div class="flex items-center gap-1">
     <input
-      pInputText
-      [value]="path"
-      (input)="onInputChange($event)"
+      type="text"
+      [ngModel]="path"
+      (ngModelChange)="onInputChange($event)"
       [placeholder]="placeholder"
-      class="flex-1"
+      [disabled]="disabled"
+      class="flex-1 w-full px-4 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
     />
-    <p-button
-      icon="pi pi-folder-open"
-      [text]="true"
-      [rounded]="true"
-      size="small"
-      (onClick)="toggleDropdown()"
-      [loading]="isLoading"
-    />
+    <button
+      type="button"
+      class="p-2 border-2 border-sys-border bg-sys-bg shadow-neo-sm hover:bg-sys-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+      [disabled]="disabled || isLoading"
+      (click)="toggleDropdown()"
+    >
+      @if (isLoading) {
+        <i class="pi pi-spin pi-spinner text-sys-fg-muted"></i>
+      } @else {
+        <i class="pi pi-folder-open text-sys-fg"></i>
+      }
+    </button>
   </div>
 
   @if (showDropdown) {
-  <div class="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-auto">
-    @if (isLoading) {
-    <div class="flex items-center justify-center p-3">
-      <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-400 mr-2"></div>
-      <span class="text-xs text-gray-400">Loading...</span>
+    <div class="absolute z-50 w-full mt-1 bg-sys-bg border-2 border-sys-border shadow-neo max-h-48 overflow-auto">
+      @if (isLoading) {
+        <div class="flex items-center justify-center p-3">
+          <i class="pi pi-spin pi-spinner text-sys-fg-muted mr-2"></i>
+          <span class="text-xs text-sys-fg-muted">Loading...</span>
+        </div>
+      } @else if (errorMessage) {
+        <div class="p-3 text-xs text-sys-status-error text-center">
+          <i class="pi pi-exclamation-triangle mr-1"></i>{{ errorMessage }}
+        </div>
+      } @else {
+        <!-- Current browsing path -->
+        @if (browsingPath) {
+          <div class="px-3 py-1.5 text-xs text-sys-fg-muted border-b-2 border-sys-border truncate">
+            {{ browsingPath }}
+          </div>
+        }
+
+        <!-- Go up entry -->
+        @if (browsingPath) {
+          <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+          <div
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-sys-accent/20 text-sys-fg text-sm"
+            (click)="goUp()"
+          >
+            <i class="pi pi-arrow-up text-sys-fg-muted"></i>
+            <span>..</span>
+          </div>
+        }
+
+        <!-- File/folder entries -->
+        @for (entry of filteredEntries; track entry.name) {
+          <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+          <div
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-sys-accent/20 text-sm"
+            (click)="selectEntry(entry)"
+          >
+            <i [class]="entry.is_dir ? 'pi pi-folder text-sys-accent' : 'pi pi-file text-sys-fg-muted'"></i>
+            <span class="truncate" [class]="entry.is_dir ? 'text-sys-fg' : 'text-sys-fg-muted'">{{ entry.name }}</span>
+          </div>
+        }
+
+        @if (filteredEntries.length === 0) {
+          <div class="p-3 text-xs text-sys-fg-muted text-center">Empty directory</div>
+        }
+      }
     </div>
-    } @else if (errorMessage) {
-    <div class="p-3 text-xs text-red-400 text-center">
-      <i class="pi pi-exclamation-triangle mr-1"></i>{{ errorMessage }}
-    </div>
-    } @else {
-      <!-- Current browsing path -->
-      @if (browsingPath) {
-      <div class="px-3 py-1.5 text-xs text-gray-500 border-b border-gray-700 truncate">
-        {{ browsingPath }}
-      </div>
-      }
-
-      <!-- Go up entry -->
-      @if (browsingPath) {
-      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-      <div
-        class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-700 text-gray-300 text-sm"
-        (click)="goUp()"
-      >
-        <i class="pi pi-arrow-up text-gray-500"></i>
-        <span>..</span>
-      </div>
-      }
-
-      <!-- File/folder entries -->
-      @for (entry of filteredEntries; track entry.name) {
-      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-      <div
-        class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-700 text-sm"
-        (click)="selectEntry(entry)"
-      >
-        <i [class]="entry.is_dir ? 'pi pi-folder text-yellow-400' : 'pi pi-file text-gray-400'"></i>
-        <span class="truncate" [class]="entry.is_dir ? 'text-gray-200' : 'text-gray-400'">{{ entry.name }}</span>
-      </div>
-      }
-
-      @if (filteredEntries.length === 0) {
-      <div class="p-3 text-xs text-gray-500 text-center">Empty directory</div>
-      }
-    }
-  </div>
   }
 </div>

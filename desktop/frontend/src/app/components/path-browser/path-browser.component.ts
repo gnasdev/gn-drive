@@ -11,8 +11,7 @@ import {
   Output,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { InputText } from "primeng/inputtext";
-import { ButtonModule } from "primeng/button";
+import { FormsModule } from "@angular/forms";
 import { ListFiles } from "../../../../wailsjs/desktop/backend/services/operationservice.js";
 import * as models from "../../../../wailsjs/desktop/backend/models/models.js";
 
@@ -39,7 +38,7 @@ export class ClickOutsideDirective {
 
 @Component({
   selector: "app-path-browser",
-  imports: [CommonModule, InputText, ButtonModule, ClickOutsideDirective],
+  imports: [CommonModule, FormsModule, ClickOutsideDirective],
   templateUrl: "./path-browser.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -48,6 +47,7 @@ export class PathBrowserComponent {
   @Input() path = "";
   @Input() placeholder = "";
   @Input() filterMode: "folder" | "file" | "both" = "both";
+  @Input() disabled = false;
 
   @Output() pathChange = new EventEmitter<string>();
 
@@ -77,9 +77,8 @@ export class PathBrowserComponent {
     return result;
   }
 
-  onInputChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.path = target.value;
+  onInputChange(value: string): void {
+    this.path = value;
     this.pathChange.emit(this.path);
 
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
@@ -101,6 +100,7 @@ export class PathBrowserComponent {
   }
 
   toggleDropdown(): void {
+    if (this.disabled) return;
     if (this.showDropdown) {
       this.closeDropdown();
     } else {

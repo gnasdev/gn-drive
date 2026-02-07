@@ -9,6 +9,7 @@ import (
 	"desktop/backend/utils"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -260,7 +261,15 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 	o.emitOperationEvent(events.OperationProgress, task.TabId, task.Operation, "running", "Operation in progress")
 
 	config := o.envConfig
-	switch task.Operation {
+
+	// Handle dry-run prefix: "dryrun:copy" -> set DryRun flag and run "copy"
+	operation := task.Operation
+	if strings.HasPrefix(operation, "dryrun:") {
+		operation = strings.TrimPrefix(operation, "dryrun:")
+		task.Profile.DryRun = true
+	}
+
+	switch operation {
 	case "copy":
 		err = rclone.Copy(ctx, config, task.Profile, outLog)
 	case "move":
@@ -268,7 +277,7 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 	case "check":
 		err = rclone.Check(ctx, config, task.Profile, outLog)
 	default:
-		err = fmt.Errorf("unknown operation: %s", task.Operation)
+		err = fmt.Errorf("unknown operation: %s", operation)
 	}
 
 	stopSyncStatus()

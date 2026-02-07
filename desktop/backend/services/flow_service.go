@@ -191,8 +191,8 @@ func (s *FlowService) SaveFlows(ctx context.Context, flows []models.Flow) error 
 
 	// Insert operations
 	opStmt, err := tx.Prepare(`
-		INSERT INTO operations (id, flow_id, source_remote, source_path, target_remote, target_path, action, parallel, bandwidth, included_paths, excluded_paths, conflict_resolution, dry_run, is_expanded, sort_order)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO operations (id, flow_id, source_remote, source_path, target_remote, target_path, action, sync_config, is_expanded, sort_order)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare operation insert: %w", err)
@@ -218,18 +218,16 @@ func (s *FlowService) SaveFlows(ctx context.Context, flows []models.Flow) error 
 		}
 
 		for j, op := range f.Operations {
-			includedPaths := marshalStringSlice(op.IncludedPaths)
-			excludedPaths := marshalStringSlice(op.ExcludedPaths)
-			dryRun := 0
-			if op.DryRun {
-				dryRun = 1
+			syncConfigJSON, err := json.Marshal(op.SyncConfig)
+			if err != nil {
+				return fmt.Errorf("failed to marshal sync_config for operation %s: %w", op.Id, err)
 			}
 			isExpanded := 0
 			if op.IsExpanded {
 				isExpanded = 1
 			}
 
-			if _, err := opStmt.Exec(op.Id, f.Id, op.SourceRemote, op.SourcePath, op.TargetRemote, op.TargetPath, op.Action, op.Parallel, op.Bandwidth, includedPaths, excludedPaths, op.ConflictResolution, dryRun, isExpanded, j); err != nil {
+			if _, err := opStmt.Exec(op.Id, f.Id, op.SourceRemote, op.SourcePath, op.TargetRemote, op.TargetPath, op.Action, string(syncConfigJSON), isExpanded, j); err != nil {
 				return fmt.Errorf("failed to insert operation %s: %w", op.Id, err)
 			}
 		}
@@ -277,7 +275,7 @@ func (s *FlowService) getOperationsForFlow(flowId string) ([]models.Operation, e
 
 	rows, err := db.Query(`
 		SELECT id, flow_id, source_remote, source_path, target_remote, target_path, action,
-		       parallel, bandwidth, included_paths, excluded_paths, conflict_resolution, dry_run, is_expanded, sort_order
+		       sync_config, is_expanded, sort_order
 		FROM operations WHERE flow_id = ? ORDER BY sort_order
 	`, flowId)
 	if err != nil {
@@ -288,15 +286,17 @@ func (s *FlowService) getOperationsForFlow(flowId string) ([]models.Operation, e
 	var ops []models.Operation
 	for rows.Next() {
 		var op models.Operation
-		var includedPaths, excludedPaths string
-		var dryRun, isExpanded int
+		var syncConfigJSON string
+		var isExpanded int
 		if err := rows.Scan(&op.Id, &op.FlowId, &op.SourceRemote, &op.SourcePath, &op.TargetRemote, &op.TargetPath, &op.Action,
-			&op.Parallel, &op.Bandwidth, &includedPaths, &excludedPaths, &op.ConflictResolution, &dryRun, &isExpanded, &op.SortOrder); err != nil {
+			&syncConfigJSON, &isExpanded, &op.SortOrder); err != nil {
 			return nil, fmt.Errorf("failed to scan operation: %w", err)
 		}
-		op.IncludedPaths = unmarshalStringSlice(includedPaths)
-		op.ExcludedPaths = unmarshalStringSlice(excludedPaths)
-		op.DryRun = dryRun != 0
+		if syncConfigJSON != "" && syncConfigJSON != "{}" {
+			if err := json.Unmarshal([]byte(syncConfigJSON), &op.SyncConfig); err != nil {
+				log.Printf("warning: failed to unmarshal sync_config for operation %s: %v", op.Id, err)
+			}
+		}
 		op.IsExpanded = isExpanded != 0
 		ops = append(ops, op)
 	}

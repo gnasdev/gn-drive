@@ -182,12 +182,15 @@ func (s *SyncService) ServiceShutdown(ctx context.Context) error {
 
 // StartSync starts a sync operation with context support
 func (s *SyncService) StartSync(ctx context.Context, action string, profile models.Profile, tabId string) (*SyncResult, error) {
+	log.Printf("[SyncService] StartSync called: action=%s tabId=%s from=%s to=%s", action, tabId, profile.From, profile.To)
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	// Check if context is already cancelled
 	select {
 	case <-ctx.Done():
+		log.Printf("[SyncService] StartSync: context already cancelled")
 		return nil, ctx.Err()
 	default:
 	}
@@ -195,6 +198,7 @@ func (s *SyncService) StartSync(ctx context.Context, action string, profile mode
 	// Create new task
 	s.taskCounter++
 	taskId := s.taskCounter
+	log.Printf("[SyncService] StartSync: created taskId=%d", taskId)
 
 	// Create cancellable context for the task
 	taskCtx, cancel := context.WithCancel(ctx)
@@ -290,8 +294,10 @@ func (s *SyncService) WaitForTask(ctx context.Context, taskId int) error {
 
 // executeSyncTask executes the sync operation using the rclone Go library
 func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
+	log.Printf("[SyncService] executeSyncTask started: taskId=%d action=%s tabId=%s from=%s to=%s", task.Id, task.Action, task.TabId, task.Profile.From, task.Profile.To)
 	var taskErr error
 	defer func() {
+		log.Printf("[SyncService] executeSyncTask finished: taskId=%d err=%v", task.Id, taskErr)
 		task.Done <- taskErr
 		close(task.Done)
 		s.mutex.Lock()

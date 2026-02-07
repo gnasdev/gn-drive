@@ -193,7 +193,10 @@ func (b *BoardService) GetBoard(ctx context.Context, boardId string) (*models.Bo
 
 // AddBoard creates a new board
 func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
+	log.Printf("[BoardService] AddBoard called: id=%s name=%s nodes=%d edges=%d", board.Id, board.Name, len(board.Nodes), len(board.Edges))
+
 	if err := b.ensureInitialized(); err != nil {
+		log.Printf("[BoardService] AddBoard: ensureInitialized failed: %v", err)
 		return err
 	}
 	b.mutex.Lock()
@@ -201,12 +204,14 @@ func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
 
 	// Validate
 	if err := b.validateBoard(&board); err != nil {
+		log.Printf("[BoardService] AddBoard: validation failed: %v", err)
 		return fmt.Errorf("invalid board: %w", err)
 	}
 
 	// Check name uniqueness
 	for _, existing := range b.boards {
 		if existing.Name == board.Name {
+			log.Printf("[BoardService] AddBoard: name conflict: '%s'", board.Name)
 			return fmt.Errorf("board with name '%s' already exists", board.Name)
 		}
 	}
@@ -217,17 +222,21 @@ func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
 	board.UpdatedAt = time.Now()
 
 	// Save to database
+	log.Printf("[BoardService] AddBoard: saving to DB...")
 	if err := b.saveBoardToDB(board); err != nil {
+		log.Printf("[BoardService] AddBoard: saveBoardToDB failed: %v", err)
 		return fmt.Errorf("failed to save board: %w", err)
 	}
+	log.Printf("[BoardService] AddBoard: saved to DB successfully")
 
 	b.boards = append(b.boards, board)
 
 	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "added", "Board created")
+	log.Printf("[BoardService] AddBoard: completed successfully for board %s", board.Id)
 
 	// Refresh system tray menu
 	if ts := GetTrayService(); ts != nil {
-		ts.RefreshMenu()
+		go ts.RefreshMenu()
 	}
 
 	return nil
@@ -278,7 +287,7 @@ func (b *BoardService) UpdateBoard(ctx context.Context, board models.Board) erro
 
 	// Refresh system tray menu
 	if ts := GetTrayService(); ts != nil {
-		ts.RefreshMenu()
+		go ts.RefreshMenu()
 	}
 
 	return nil
@@ -316,7 +325,7 @@ func (b *BoardService) DeleteBoard(ctx context.Context, boardId string) error {
 
 	// Refresh system tray menu
 	if ts := GetTrayService(); ts != nil {
-		ts.RefreshMenu()
+		go ts.RefreshMenu()
 	}
 
 	return nil
@@ -324,11 +333,15 @@ func (b *BoardService) DeleteBoard(ctx context.Context, boardId string) error {
 
 // ExecuteBoard starts executing a board flow
 func (b *BoardService) ExecuteBoard(ctx context.Context, boardId string) (*models.BoardExecutionStatus, error) {
+	log.Printf("[BoardService] ExecuteBoard called: boardId=%s", boardId)
+
 	if err := b.ensureInitialized(); err != nil {
+		log.Printf("[BoardService] ExecuteBoard: ensureInitialized failed: %v", err)
 		return nil, err
 	}
 
 	if b.syncService == nil {
+		log.Printf("[BoardService] ExecuteBoard: sync service not available")
 		return nil, fmt.Errorf("sync service not available")
 	}
 
@@ -353,8 +366,11 @@ func (b *BoardService) ExecuteBoard(ctx context.Context, boardId string) (*model
 	b.mutex.RUnlock()
 
 	if board == nil {
+		log.Printf("[BoardService] ExecuteBoard: board '%s' not found", boardId)
 		return nil, fmt.Errorf("board '%s' not found", boardId)
 	}
+
+	log.Printf("[BoardService] ExecuteBoard: found board '%s' with %d nodes, %d edges", board.Name, len(board.Nodes), len(board.Edges))
 
 	if len(board.Edges) == 0 {
 		return nil, fmt.Errorf("board '%s' has no edges to execute", board.Name)
@@ -362,11 +378,13 @@ func (b *BoardService) ExecuteBoard(ctx context.Context, boardId string) (*model
 
 	// Validate DAG (cycle detection)
 	if err := b.detectCycles(board); err != nil {
+		log.Printf("[BoardService] ExecuteBoard: cycle detection failed: %v", err)
 		return nil, err
 	}
 
 	// Compute execution layers
 	layers := b.computeExecutionLayers(board)
+	log.Printf("[BoardService] ExecuteBoard: computed %d execution layers", len(layers))
 
 	// Initialize execution status
 	edgeStatuses := make([]models.EdgeExecutionStatus, len(board.Edges))
@@ -444,12 +462,14 @@ func (b *BoardService) GetBoardExecutionStatus(ctx context.Context, boardId stri
 
 // executeFlow runs the board execution through layers
 func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, layers [][]models.BoardEdge, flow *FlowExecution) {
+	log.Printf("[BoardService] executeFlow started: boardId=%s layers=%d totalEdges=%d", board.Id, len(layers), len(board.Edges))
 	defer func() {
 		endTime := time.Now()
 		flow.Status.EndTime = &endTime
 		b.flowMutex.Lock()
 		delete(b.activeFlows, board.Id)
 		b.flowMutex.Unlock()
+		log.Printf("[BoardService] executeFlow finished: boardId=%s finalStatus=%s", board.Id, flow.Status.Status)
 	}()
 
 	// Track failed nodes to skip downstream
@@ -564,6 +584,8 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 		profile.Name = fmt.Sprintf("%s->%s", sourceNode.Label, targetNode.Label)
 	}
 
+	log.Printf("[BoardService] executeEdge: action=%s from=%s to=%s", edge.Action, profile.From, profile.To)
+
 	// Mark edge as running
 	startTime := time.Now()
 	flow.StatusMu.Lock()
@@ -574,7 +596,9 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 	// Start sync via SyncService
 	// Use IDs directly since they already have "board-" and "edge-" prefixes
 	tabId := fmt.Sprintf("%s-%s", board.Id, edge.Id)
+	log.Printf("[BoardService] executeEdge: starting sync with tabId=%s profile=%+v", tabId, profile)
 	result, err := b.syncService.StartSync(ctx, edge.Action, profile, tabId)
+	log.Printf("[BoardService] executeEdge: StartSync returned: result=%+v err=%v", result, err)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to start sync: %v", err)
 		endTime := time.Now()
@@ -586,11 +610,14 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 	}
 
 	// Wait for task completion
+	log.Printf("[BoardService] executeEdge: waiting for task %d to complete", result.TaskId)
 	err = b.syncService.WaitForTask(ctx, result.TaskId)
+	log.Printf("[BoardService] executeEdge: WaitForTask returned: err=%v", err)
 
 	endTime := time.Now()
 	if err != nil {
 		msg := fmt.Sprintf("Sync failed: %v", err)
+		log.Printf("[BoardService] executeEdge: sync failed: %s", msg)
 		flow.StatusMu.Lock()
 		b.updateEdgeStatusWithTime(flow.Status, edge.Id, "failed", msg, nil, &endTime)
 		flow.StatusMu.Unlock()
@@ -598,6 +625,7 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 		return err
 	}
 
+	log.Printf("[BoardService] executeEdge: sync completed successfully for edge %s", edge.Id)
 	flow.StatusMu.Lock()
 	b.updateEdgeStatusWithTime(flow.Status, edge.Id, "completed", "Sync completed", nil, &endTime)
 	flow.StatusMu.Unlock()
@@ -1077,7 +1105,9 @@ func (b *BoardService) loadBoardEdgesFromDB(boardId string) ([]models.BoardEdge,
 			return nil, fmt.Errorf("failed to scan board edge: %w", err)
 		}
 		if syncConfigJSON != "" && syncConfigJSON != "{}" {
-			_ = json.Unmarshal([]byte(syncConfigJSON), &edge.SyncConfig)
+			if jsonErr := json.Unmarshal([]byte(syncConfigJSON), &edge.SyncConfig); jsonErr != nil {
+				log.Printf("[BoardService] Warning: failed to unmarshal sync_config for edge %s: %v", edge.Id, jsonErr)
+			}
 		}
 		edges = append(edges, edge)
 	}
@@ -1130,7 +1160,11 @@ func (b *BoardService) saveBoardToDB(board models.Board) error {
 
 	// Insert edges
 	for _, edge := range board.Edges {
-		syncConfigJSON, _ := json.Marshal(edge.SyncConfig)
+		syncConfigJSON, jsonErr := json.Marshal(edge.SyncConfig)
+		if jsonErr != nil {
+			log.Printf("[BoardService] Warning: failed to marshal sync_config for edge %s: %v", edge.Id, jsonErr)
+			syncConfigJSON = []byte("{}")
+		}
 		if _, err := tx.Exec(`INSERT INTO board_edges (id, board_id, source_id, target_id, action, sync_config)
 			VALUES (?, ?, ?, ?, ?, ?)`,
 			edge.Id, board.Id, edge.SourceId, edge.TargetId, edge.Action, string(syncConfigJSON)); err != nil {

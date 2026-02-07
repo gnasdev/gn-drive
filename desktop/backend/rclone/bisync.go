@@ -36,12 +36,40 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		return fmt.Errorf("invalid conflict_resolution %q: %w", conflictStrategy, err)
 	}
 
-	if err = opt.ConflictLoser.Set(bisync.ConflictLoserDelete.String()); err != nil {
-		return err
+	// Conflict loser: use profile setting or default to "delete"
+	conflictLoser := profile.ConflictLoser
+	if conflictLoser == "" {
+		conflictLoser = bisync.ConflictLoserDelete.String()
+	}
+	if err = opt.ConflictLoser.Set(conflictLoser); err != nil {
+		return fmt.Errorf("invalid conflict_loser %q: %w", conflictLoser, err)
+	}
+
+	// Conflict suffix
+	if profile.ConflictSuffix != "" {
+		opt.ConflictSuffixFlag = profile.ConflictSuffix
 	}
 
 	if err = opt.CheckSync.Set(bisync.CheckSyncTrue.String()); err != nil {
 		return err
+	}
+
+	// Bisync-specific options from profile
+	if profile.Resilient {
+		opt.Resilient = true
+	}
+	if profile.MaxLock != "" {
+		var d fs.Duration
+		if parseErr := d.Set(profile.MaxLock); parseErr != nil {
+			return fmt.Errorf("invalid max_lock %q: %w", profile.MaxLock, parseErr)
+		}
+		opt.MaxLock = d
+	}
+	if profile.CheckAccess {
+		opt.CheckAccess = true
+	}
+	if profile.DryRun {
+		opt.DryRun = true
 	}
 
 	// Handle resync
@@ -121,10 +149,22 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		return err
 	}
 
-	// Set up filter rules
+	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
 	filterOpt := filter.GetConfig(ctx).Opt
-	filterOpt.IncludeRule = append(filterOpt.IncludeRule, profile.IncludedPaths...)
-	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, profile.ExcludedPaths...)
+	for _, p := range profile.IncludedPaths {
+		if profile.UseRegex {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, p)
+		}
+	}
+	for _, p := range profile.ExcludedPaths {
+		if profile.UseRegex {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, "{{regexp:}}"+p)
+		} else {
+			filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, p)
+		}
+	}
 	newFilter, err := filter.NewFilter(&filterOpt)
 	if err := utils.HandleError(err, "Invalid filters file", nil, func() {
 		ctx = filter.ReplaceConfig(ctx, newFilter)

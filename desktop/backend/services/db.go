@@ -70,9 +70,15 @@ func InitDatabase() error {
 		return err
 	}
 
+	// Migrate operations table from flat columns to sync_config JSON (must run before createAllTables)
+	migrateOperationsToSyncConfig(db)
+
 	if err := createAllTables(db); err != nil {
 		return fmt.Errorf("failed to create tables: %w", err)
 	}
+
+	// Add new columns to profiles table
+	migrateProfilesNewColumns(db)
 
 	migrateFromJSON(db)
 	return nil
@@ -200,21 +206,16 @@ func createAllTables(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_flows_sort_order ON flows(sort_order);
 
 		CREATE TABLE IF NOT EXISTS operations (
-			id                  TEXT PRIMARY KEY,
-			flow_id             TEXT NOT NULL,
-			source_remote       TEXT NOT NULL DEFAULT '',
-			source_path         TEXT NOT NULL DEFAULT '/',
-			target_remote       TEXT NOT NULL DEFAULT '',
-			target_path         TEXT NOT NULL DEFAULT '/',
-			action              TEXT NOT NULL DEFAULT 'push',
-			parallel            INTEGER NOT NULL DEFAULT 0,
-			bandwidth           TEXT NOT NULL DEFAULT '',
-			included_paths      TEXT NOT NULL DEFAULT '[]',
-			excluded_paths      TEXT NOT NULL DEFAULT '[]',
-			conflict_resolution TEXT NOT NULL DEFAULT '',
-			dry_run             INTEGER NOT NULL DEFAULT 0,
-			is_expanded         INTEGER NOT NULL DEFAULT 0,
-			sort_order          INTEGER NOT NULL DEFAULT 0,
+			id            TEXT PRIMARY KEY,
+			flow_id       TEXT NOT NULL,
+			source_remote TEXT NOT NULL DEFAULT '',
+			source_path   TEXT NOT NULL DEFAULT '/',
+			target_remote TEXT NOT NULL DEFAULT '',
+			target_path   TEXT NOT NULL DEFAULT '/',
+			action        TEXT NOT NULL DEFAULT 'push',
+			sync_config   TEXT NOT NULL DEFAULT '{}',
+			is_expanded   INTEGER NOT NULL DEFAULT 0,
+			sort_order    INTEGER NOT NULL DEFAULT 0,
 			FOREIGN KEY (flow_id) REFERENCES flows(id) ON DELETE CASCADE
 		);
 		CREATE INDEX IF NOT EXISTS idx_operations_flow_id ON operations(flow_id);
@@ -555,14 +556,14 @@ func migrateFlowsDB(db *sql.DB, cfg *SharedConfig) {
 	}
 	rows.Close()
 
-	// Read operations from old DB
+	// Read operations from old DB and convert to sync_config JSON format
 	opRows, err := oldDB.Query("SELECT id, flow_id, source_remote, source_path, target_remote, target_path, action, parallel, bandwidth, included_paths, excluded_paths, conflict_resolution, dry_run, is_expanded, sort_order FROM operations ORDER BY sort_order")
 	if err != nil {
 		log.Printf("Warning: failed to read operations from old DB: %v", err)
 		return
 	}
 
-	opStmt, err := tx.Prepare(`INSERT INTO operations (id, flow_id, source_remote, source_path, target_remote, target_path, action, parallel, bandwidth, included_paths, excluded_paths, conflict_resolution, dry_run, is_expanded, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	opStmt, err := tx.Prepare(`INSERT INTO operations (id, flow_id, source_remote, source_path, target_remote, target_path, action, sync_config, is_expanded, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		opRows.Close()
 		return
@@ -570,12 +571,25 @@ func migrateFlowsDB(db *sql.DB, cfg *SharedConfig) {
 	defer opStmt.Close()
 
 	for opRows.Next() {
-		var id, flowId, sourceRemote, sourcePath, targetRemote, targetPath, action, bandwidth, includedPaths, excludedPaths, conflictResolution string
+		var id, flowId, sourceRemote, sourcePath, targetRemote, targetPath, action, bandwidth, includedPathsStr, excludedPathsStr, conflictResolution string
 		var parallel, dryRun, isExpanded, sortOrder int
-		if err := opRows.Scan(&id, &flowId, &sourceRemote, &sourcePath, &targetRemote, &targetPath, &action, &parallel, &bandwidth, &includedPaths, &excludedPaths, &conflictResolution, &dryRun, &isExpanded, &sortOrder); err != nil {
+		if err := opRows.Scan(&id, &flowId, &sourceRemote, &sourcePath, &targetRemote, &targetPath, &action, &parallel, &bandwidth, &includedPathsStr, &excludedPathsStr, &conflictResolution, &dryRun, &isExpanded, &sortOrder); err != nil {
 			continue
 		}
-		opStmt.Exec(id, flowId, sourceRemote, sourcePath, targetRemote, targetPath, action, parallel, bandwidth, includedPaths, excludedPaths, conflictResolution, dryRun, isExpanded, sortOrder)
+		bw := 0
+		if bandwidth != "" {
+			fmt.Sscanf(bandwidth, "%d", &bw)
+		}
+		profile := models.Profile{
+			Parallel:           parallel,
+			Bandwidth:          bw,
+			IncludedPaths:      unmarshalStringSlice(includedPathsStr),
+			ExcludedPaths:      unmarshalStringSlice(excludedPathsStr),
+			ConflictResolution: conflictResolution,
+			DryRun:             dryRun != 0,
+		}
+		syncConfigJSON, _ := json.Marshal(profile)
+		opStmt.Exec(id, flowId, sourceRemote, sourcePath, targetRemote, targetPath, action, string(syncConfigJSON), isExpanded, sortOrder)
 	}
 	opRows.Close()
 
@@ -585,6 +599,154 @@ func migrateFlowsDB(db *sql.DB, cfg *SharedConfig) {
 		os.Remove(oldDBPath)
 		os.Remove(oldDBPath + "-wal")
 		os.Remove(oldDBPath + "-shm")
+	}
+}
+
+// ============ Schema Migrations ============
+
+// migrateOperationsToSyncConfig migrates the operations table from flat columns to sync_config JSON.
+func migrateOperationsToSyncConfig(db *sql.DB) {
+	// Check if migration is needed: does the old 'parallel' column exist?
+	var oldColCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('operations') WHERE name='parallel'").Scan(&oldColCount); err != nil {
+		return // table doesn't exist yet
+	}
+	if oldColCount == 0 {
+		return // already migrated or fresh install
+	}
+
+	log.Printf("Migrating operations table from flat columns to sync_config JSON...")
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Printf("Warning: failed to begin operations migration: %v", err)
+		return
+	}
+	defer tx.Rollback()
+
+	// Read all operations with old schema
+	rows, err := tx.Query(`SELECT id, flow_id, source_remote, source_path, target_remote, target_path,
+		action, parallel, bandwidth, included_paths, excluded_paths, conflict_resolution, dry_run,
+		is_expanded, sort_order FROM operations`)
+	if err != nil {
+		log.Printf("Warning: failed to read operations for migration: %v", err)
+		return
+	}
+
+	type oldOp struct {
+		id, flowId, sourceRemote, sourcePath, targetRemote, targetPath string
+		action, bandwidth, includedPaths, excludedPaths, conflictResolution string
+		parallel, dryRun, isExpanded, sortOrder                            int
+	}
+	var ops []oldOp
+	for rows.Next() {
+		var o oldOp
+		if err := rows.Scan(&o.id, &o.flowId, &o.sourceRemote, &o.sourcePath, &o.targetRemote, &o.targetPath,
+			&o.action, &o.parallel, &o.bandwidth, &o.includedPaths, &o.excludedPaths,
+			&o.conflictResolution, &o.dryRun, &o.isExpanded, &o.sortOrder); err != nil {
+			log.Printf("Warning: failed to scan operation for migration: %v", err)
+			continue
+		}
+		ops = append(ops, o)
+	}
+	rows.Close()
+
+	// Create new table
+	if _, err := tx.Exec(`CREATE TABLE operations_new (
+		id            TEXT PRIMARY KEY,
+		flow_id       TEXT NOT NULL,
+		source_remote TEXT NOT NULL DEFAULT '',
+		source_path   TEXT NOT NULL DEFAULT '/',
+		target_remote TEXT NOT NULL DEFAULT '',
+		target_path   TEXT NOT NULL DEFAULT '/',
+		action        TEXT NOT NULL DEFAULT 'push',
+		sync_config   TEXT NOT NULL DEFAULT '{}',
+		is_expanded   INTEGER NOT NULL DEFAULT 0,
+		sort_order    INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (flow_id) REFERENCES flows(id) ON DELETE CASCADE
+	)`); err != nil {
+		log.Printf("Warning: failed to create operations_new table: %v", err)
+		return
+	}
+
+	// Insert with converted sync_config JSON
+	stmt, err := tx.Prepare(`INSERT INTO operations_new (id, flow_id, source_remote, source_path, target_remote, target_path, action, sync_config, is_expanded, sort_order)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("Warning: failed to prepare operations_new insert: %v", err)
+		return
+	}
+	defer stmt.Close()
+
+	for _, o := range ops {
+		// Parse bandwidth string to int
+		bw := 0
+		if o.bandwidth != "" {
+			fmt.Sscanf(o.bandwidth, "%d", &bw)
+		}
+
+		profile := models.Profile{
+			Parallel:           o.parallel,
+			Bandwidth:          bw,
+			IncludedPaths:      unmarshalStringSlice(o.includedPaths),
+			ExcludedPaths:      unmarshalStringSlice(o.excludedPaths),
+			ConflictResolution: o.conflictResolution,
+			DryRun:             o.dryRun != 0,
+		}
+		syncConfigJSON, _ := json.Marshal(profile)
+		stmt.Exec(o.id, o.flowId, o.sourceRemote, o.sourcePath, o.targetRemote, o.targetPath,
+			o.action, string(syncConfigJSON), o.isExpanded, o.sortOrder)
+	}
+
+	// Swap tables
+	if _, err := tx.Exec("DROP TABLE operations"); err != nil {
+		log.Printf("Warning: failed to drop old operations table: %v", err)
+		return
+	}
+	if _, err := tx.Exec("ALTER TABLE operations_new RENAME TO operations"); err != nil {
+		log.Printf("Warning: failed to rename operations_new: %v", err)
+		return
+	}
+	tx.Exec("CREATE INDEX IF NOT EXISTS idx_operations_flow_id ON operations(flow_id)")
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("Warning: failed to commit operations migration: %v", err)
+		return
+	}
+	log.Printf("Migrated %d operations to sync_config JSON format", len(ops))
+}
+
+// migrateProfilesNewColumns adds new columns to the profiles table for new rclone flags.
+func migrateProfilesNewColumns(db *sql.DB) {
+	newCols := []struct{ name, typeDef string }{
+		{"max_age", "TEXT NOT NULL DEFAULT ''"},
+		{"min_age", "TEXT NOT NULL DEFAULT ''"},
+		{"max_depth", "INTEGER"},
+		{"delete_excluded", "INTEGER NOT NULL DEFAULT 0"},
+		{"dry_run", "INTEGER NOT NULL DEFAULT 0"},
+		{"max_transfer", "TEXT NOT NULL DEFAULT ''"},
+		{"max_delete_size", "TEXT NOT NULL DEFAULT ''"},
+		{"suffix", "TEXT NOT NULL DEFAULT ''"},
+		{"suffix_keep_extension", "INTEGER NOT NULL DEFAULT 0"},
+		{"check_first", "INTEGER NOT NULL DEFAULT 0"},
+		{"order_by", "TEXT NOT NULL DEFAULT ''"},
+		{"retries_sleep", "TEXT NOT NULL DEFAULT ''"},
+		{"tps_limit", "REAL"},
+		{"conn_timeout", "TEXT NOT NULL DEFAULT ''"},
+		{"io_timeout", "TEXT NOT NULL DEFAULT ''"},
+		{"size_only", "INTEGER NOT NULL DEFAULT 0"},
+		{"update_mode", "INTEGER NOT NULL DEFAULT 0"},
+		{"ignore_existing", "INTEGER NOT NULL DEFAULT 0"},
+		{"delete_timing", "TEXT NOT NULL DEFAULT ''"},
+		{"resilient", "INTEGER NOT NULL DEFAULT 0"},
+		{"max_lock", "TEXT NOT NULL DEFAULT ''"},
+		{"check_access", "INTEGER NOT NULL DEFAULT 0"},
+		{"conflict_loser", "TEXT NOT NULL DEFAULT ''"},
+		{"conflict_suffix", "TEXT NOT NULL DEFAULT ''"},
+	}
+	for _, col := range newCols {
+		// Errors are expected for columns that already exist; silently ignore
+		db.Exec(fmt.Sprintf("ALTER TABLE profiles ADD COLUMN %s %s", col.name, col.typeDef))
 	}
 }
 
