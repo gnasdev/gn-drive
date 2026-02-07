@@ -1,47 +1,24 @@
-<!-- Sidebar + Content Layout -->
-<div class="flex h-screen bg-gray-900">
-  <!-- Sidebar Navigation -->
-  <app-sidebar></app-sidebar>
+<!-- Single Page Layout -->
+<div class="flex flex-col h-screen bg-sys-bg-secondary">
+  <!-- Topbar -->
+  <app-topbar (onSettingsClick)="openSettings()"></app-topbar>
 
-  <!-- Main Content Area -->
-  <main class="flex-1 overflow-auto">
-    @switch ((navigationService.currentState$ | async)?.page) {
-      @case ('board') {
-        @defer {
-          <app-board></app-board>
-        } @placeholder {
-          <div class="flex items-center justify-center h-full">
-            <span class="text-gray-400">Loading...</span>
-          </div>
-        }
-      }
-      @case ('remotes') {
-        @defer {
-          <app-remotes></app-remotes>
-        } @placeholder {
-          <div class="flex items-center justify-center h-full">
-            <span class="text-gray-400">Loading...</span>
-          </div>
-        }
-      }
-      @case ('settings') {
-        @defer {
-          <app-settings></app-settings>
-        } @placeholder {
-          <div class="flex items-center justify-center h-full">
-            <span class="text-gray-400">Loading...</span>
-          </div>
-        }
-      }
-    }
+  <!-- Main Content - Operations Tree -->
+  <main class="flex-1 overflow-hidden">
+    <app-operations-tree></app-operations-tree>
   </main>
 </div>
+
+<!-- Settings Dialog -->
+<app-settings-dialog
+  [(visible)]="showSettingsDialog"
+></app-settings-dialog>
 
 <!-- Error Display Component -->
 <app-error-display></app-error-display>
 
-<!-- PrimeNG Toast Notifications -->
+<!-- PrimeNG Toast Notifications (keeping for now) -->
 <p-toast></p-toast>
 
-<!-- PrimeNG Confirm Dialog -->
+<!-- PrimeNG Confirm Dialog (keeping for now) -->
 <p-confirmdialog [dismissableMask]="true"></p-confirmdialog>

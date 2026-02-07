@@ -2,6 +2,50 @@
 
 @config "../tailwind.config.js";
 
+/* ========================================
+   System Colors - CSS Custom Properties
+   ======================================== */
+:root {
+  /* Background colors */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F3F4F6;
+  --color-bg-tertiary: #E5E7EB;
+  --color-bg-inverse: #111827;
+
+  /* Foreground/Text colors */
+  --color-fg-primary: #111827;
+  --color-fg-secondary: #374151;
+  --color-fg-tertiary: #6B7280;
+  --color-fg-inverse: #F9FAFB;
+  --color-fg-muted: #4B5563;
+
+  /* Border colors */
+  --color-border-default: #000000;
+  --color-border-subtle: #E5E7EB;
+  --color-border-muted: #D1D5DB;
+
+  /* Accent colors (NeoBrutalism palette) */
+  --color-accent-primary: #FEF08A;     /* Yellow - primary actions */
+  --color-accent-secondary: #BFDBFE;   /* Blue */
+  --color-accent-success: #BBF7D0;     /* Green */
+  --color-accent-warning: #FED7AA;     /* Orange */
+  --color-accent-danger: #FECACA;      /* Red */
+  --color-accent-info: #FBCFE8;        /* Pink */
+
+  /* Shadow */
+  --color-shadow: rgba(0, 0, 0, 1);
+
+  /* Status colors (for badges, indicators) */
+  --color-status-success: #22C55E;
+  --color-status-success-bg: #DCFCE7;
+  --color-status-warning: #F59E0B;
+  --color-status-warning-bg: #FEF3C7;
+  --color-status-error: #EF4444;
+  --color-status-error-bg: #FEE2E2;
+  --color-status-info: #3B82F6;
+  --color-status-info-bg: #DBEAFE;
+}
+
 /* Override primeicons font-display from 'block' to 'swap' to prevent render-blocking */
 @font-face {
   font-family: 'primeicons';

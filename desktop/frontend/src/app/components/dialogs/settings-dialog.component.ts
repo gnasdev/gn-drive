@@ -1,0 +1,497 @@
+import { CommonModule, DatePipe } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  inject,
+  Input,
+  OnInit,
+  Output,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { MessageService } from 'primeng/api';
+import {
+  ExportToFile,
+  GetExportPreview,
+  SelectExportFile,
+} from '../../../../wailsjs/desktop/backend/services/exportservice';
+import {
+  ImportFromFile,
+  SelectImportFile,
+  ValidateImportFile,
+} from '../../../../wailsjs/desktop/backend/services/importservice';
+import type {
+  ExportOptions,
+  ImportOptions,
+  ImportPreview,
+} from '../../../../wailsjs/desktop/backend/services/models';
+import {
+  GetSettings,
+  SetEnabled,
+  SetMinimizeToTray,
+  SetStartAtLogin,
+} from '../../../../wailsjs/desktop/backend/services/notificationservice';
+import { NeoButtonComponent } from '../neo/neo-button.component';
+import { NeoCardComponent } from '../neo/neo-card.component';
+import { NeoDialogComponent } from '../neo/neo-dialog.component';
+import { NeoToggleComponent } from '../neo/neo-toggle.component';
+
+@Component({
+  selector: 'app-settings-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    DatePipe,
+    NeoDialogComponent,
+    NeoButtonComponent,
+    NeoCardComponent,
+    NeoToggleComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <neo-dialog
+      [visible]="visible"
+      (visibleChange)="visibleChange.emit($event)"
+      title="Settings"
+      maxWidth="500px"
+    >
+      <div class="space-y-4 max-h-[70vh] overflow-auto">
+        <!-- Backup & Restore -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-download"></i>
+            <h2 class="font-bold">Backup & Restore</h2>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm font-medium">Export Configuration</p>
+                <p class="text-xs text-sys-fg-muted">Save boards, remotes, and settings</p>
+              </div>
+              <neo-button variant="secondary" size="sm" (onClick)="openExportDialog()">
+                <i class="pi pi-upload mr-1"></i> Export
+              </neo-button>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm font-medium">Import Configuration</p>
+                <p class="text-xs text-sys-fg-muted">Restore from backup file</p>
+              </div>
+              <neo-button variant="secondary" size="sm" (onClick)="openImportDialog()">
+                <i class="pi pi-download mr-1"></i> Import
+              </neo-button>
+            </div>
+          </div>
+        </neo-card>
+
+        <!-- Startup -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-power-off"></i>
+            <h2 class="font-bold">Startup</h2>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium">Start at Login</p>
+                <p class="text-xs text-sys-fg-muted">Auto-start when you log in</p>
+              </div>
+              <neo-toggle
+                [(ngModel)]="startAtLogin"
+                (ngModelChange)="saveStartAtLoginSetting()"
+              ></neo-toggle>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium">Minimize to Tray</p>
+                <p class="text-xs text-sys-fg-muted">Keep running when closed</p>
+              </div>
+              <neo-toggle
+                [(ngModel)]="minimizeToTray"
+                (ngModelChange)="saveMinimizeToTraySetting()"
+              ></neo-toggle>
+            </div>
+          </div>
+        </neo-card>
+
+        <!-- Notifications -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-bell"></i>
+            <h2 class="font-bold">Notifications</h2>
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium">Desktop Notifications</p>
+              <p class="text-xs text-sys-fg-muted">Show on complete/fail</p>
+            </div>
+            <neo-toggle
+              [(ngModel)]="notificationsEnabled"
+              (ngModelChange)="saveNotificationSetting()"
+            ></neo-toggle>
+          </div>
+        </neo-card>
+
+        <!-- Paths -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-folder-open"></i>
+            <h2 class="font-bold">Configuration Paths</h2>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">Boards</span>
+              <code class="text-xs bg-sys-accent/30 px-1">~/.config/ns-drive/boards.json</code>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">Rclone</span>
+              <code class="text-xs bg-sys-accent/30 px-1">~/.config/ns-drive/rclone.conf</code>
+            </div>
+          </div>
+        </neo-card>
+
+        <!-- About -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-info-circle"></i>
+            <h2 class="font-bold">About</h2>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">Version</span>
+              <span class="font-medium">1.0.0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">Powered by</span>
+              <span class="font-medium">rclone + Wails v3</span>
+            </div>
+          </div>
+        </neo-card>
+      </div>
+    </neo-dialog>
+
+    <!-- Export Sub-Dialog -->
+    <neo-dialog
+      [(visible)]="showExportDialog"
+      title="Export Configuration"
+      maxWidth="400px"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-sys-fg-muted">Select what to include:</p>
+
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" [(ngModel)]="exportOptions.include_boards"
+                   class="w-4 h-4 border-2 border-sys-border" />
+            <span>Boards ({{ exportPreview?.board_count || 0 }})</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" [(ngModel)]="exportOptions.include_remotes"
+                   class="w-4 h-4 border-2 border-sys-border" />
+            <span>Remotes ({{ exportPreview?.remote_count || 0 }})</span>
+          </label>
+        </div>
+
+        @if (exportOptions.include_remotes) {
+          <div class="p-3 bg-sys-accent-warning/30 border-2 border-sys-border text-sm">
+            <i class="pi pi-exclamation-triangle mr-1"></i>
+            Remotes contain auth tokens. Keep backup secure.
+          </div>
+
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" [(ngModel)]="exportOptions.exclude_tokens"
+                   class="w-4 h-4 border-2 border-sys-border" />
+            <span class="text-sm text-sys-fg-muted">Exclude tokens (re-auth required)</span>
+          </label>
+        }
+
+        <div class="flex justify-end gap-2 pt-2">
+          <neo-button variant="secondary" (onClick)="showExportDialog = false">
+            Cancel
+          </neo-button>
+          <neo-button
+            [disabled]="!exportOptions.include_boards && !exportOptions.include_remotes"
+            [loading]="isExporting"
+            (onClick)="doExport()"
+          >
+            Export
+          </neo-button>
+        </div>
+      </div>
+    </neo-dialog>
+
+    <!-- Import Sub-Dialog -->
+    <neo-dialog
+      [(visible)]="showImportDialog"
+      title="Import Configuration"
+      maxWidth="450px"
+    >
+      @if (!importPreview) {
+        <div class="text-center py-4">
+          <p class="text-sm text-sys-fg-muted mb-4">Select a backup file (.nsd)</p>
+          <neo-button [loading]="isLoadingPreview" (onClick)="selectImportFile()">
+            <i class="pi pi-folder-open mr-1"></i> Select File
+          </neo-button>
+        </div>
+      } @else {
+        <div class="space-y-4">
+          <div class="p-3 bg-sys-accent-secondary/20 border-2 border-sys-border text-sm">
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">Date:</span>
+              <span>{{ importPreview.manifest?.export_date | date:'medium' }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sys-fg-muted">File:</span>
+              <span class="truncate max-w-[200px]">{{ importFileName }}</span>
+            </div>
+          </div>
+
+          @if (importPreview.boards) {
+            <div class="p-3 border-2 border-sys-border">
+              <h4 class="font-bold mb-2">Boards ({{ importPreview.boards.total }})</h4>
+              <div class="text-xs space-y-1">
+                @if (importPreview.boards.to_add.length) {
+                  <div class="text-sys-status-success">+ {{ importPreview.boards.to_add.length }} new</div>
+                }
+                @if (importPreview.boards.to_update.length) {
+                  <div class="text-sys-status-warning">~ {{ importPreview.boards.to_update.length }} existing</div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (importPreview.remotes) {
+            <div class="p-3 border-2 border-sys-border">
+              <h4 class="font-bold mb-2">Remotes ({{ importPreview.remotes.total }})</h4>
+              <div class="text-xs space-y-1">
+                @if (importPreview.remotes.to_add.length) {
+                  <div class="text-sys-status-success">+ {{ importPreview.remotes.to_add.length }} new</div>
+                }
+                @if (importPreview.remotes.to_update.length) {
+                  <div class="text-sys-status-warning">~ {{ importPreview.remotes.to_update.length }} existing</div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (importPreview.warnings.length) {
+            <div class="p-3 bg-sys-accent-warning/30 border-2 border-sys-border text-sm">
+              <div class="font-bold mb-1">Warnings:</div>
+              @for (warning of importPreview.warnings; track warning) {
+                <div>{{ warning }}</div>
+              }
+            </div>
+          }
+
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" [(ngModel)]="importOptions.overwrite_boards"
+                     class="w-4 h-4 border-2 border-sys-border" />
+              <span class="text-sm">Overwrite existing boards</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" [(ngModel)]="importOptions.overwrite_remotes"
+                     class="w-4 h-4 border-2 border-sys-border" />
+              <span class="text-sm">Overwrite existing remotes</span>
+            </label>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <neo-button variant="secondary" (onClick)="cancelImport()">
+              Cancel
+            </neo-button>
+            <neo-button [loading]="isImporting" (onClick)="doImport()">
+              Import
+            </neo-button>
+          </div>
+        </div>
+      }
+    </neo-dialog>
+  `,
+})
+export class SettingsDialogComponent implements OnInit {
+  @Input() visible = false;
+  @Output() visibleChange = new EventEmitter<boolean>();
+
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly messageService = inject(MessageService);
+
+  // Settings state
+  startAtLogin = false;
+  minimizeToTray = false;
+  notificationsEnabled = true;
+
+  // Export dialog
+  showExportDialog = false;
+  isExporting = false;
+  exportOptions: ExportOptions = {
+    include_boards: true,
+    include_remotes: true,
+    include_settings: false,
+    exclude_tokens: false,
+  };
+  exportPreview: { board_count: number; remote_count: number } | null = null;
+
+  // Import dialog
+  showImportDialog = false;
+  isImporting = false;
+  isLoadingPreview = false;
+  importFilePath = '';
+  importFileName = '';
+  importPreview: ImportPreview | null = null;
+  importOptions: ImportOptions = {
+    overwrite_boards: false,
+    overwrite_remotes: false,
+    merge_mode: false,
+  };
+
+  async ngOnInit(): Promise<void> {
+    await this.loadSettings();
+  }
+
+  private async loadSettings(): Promise<void> {
+    try {
+      const settings = await GetSettings();
+      this.startAtLogin = settings.start_at_login;
+      this.minimizeToTray = settings.minimize_to_tray;
+      this.notificationsEnabled = settings.notifications_enabled;
+      this.cdr.markForCheck();
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    }
+  }
+
+  async saveStartAtLoginSetting(): Promise<void> {
+    try {
+      await SetStartAtLogin(this.startAtLogin);
+    } catch (err) {
+      console.error('Failed to save setting:', err);
+    }
+  }
+
+  async saveMinimizeToTraySetting(): Promise<void> {
+    try {
+      await SetMinimizeToTray(this.minimizeToTray);
+    } catch (err) {
+      console.error('Failed to save setting:', err);
+    }
+  }
+
+  async saveNotificationSetting(): Promise<void> {
+    try {
+      await SetEnabled(this.notificationsEnabled);
+    } catch (err) {
+      console.error('Failed to save setting:', err);
+    }
+  }
+
+  async openExportDialog(): Promise<void> {
+    try {
+      this.exportPreview = await GetExportPreview(this.exportOptions);
+      this.showExportDialog = true;
+      this.cdr.markForCheck();
+    } catch (err) {
+      console.error('Failed to get export preview:', err);
+    }
+  }
+
+  async doExport(): Promise<void> {
+    this.isExporting = true;
+    this.cdr.markForCheck();
+
+    try {
+      const filePath = await SelectExportFile();
+      if (!filePath) {
+        this.isExporting = false;
+        this.cdr.markForCheck();
+        return;
+      }
+
+      await ExportToFile(filePath, this.exportOptions);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Export Complete',
+        detail: 'Configuration exported successfully',
+      });
+      this.showExportDialog = false;
+    } catch (err) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Export Failed',
+        detail: String(err),
+      });
+    } finally {
+      this.isExporting = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  openImportDialog(): void {
+    this.importPreview = null;
+    this.importFilePath = '';
+    this.importFileName = '';
+    this.showImportDialog = true;
+    this.cdr.markForCheck();
+  }
+
+  async selectImportFile(): Promise<void> {
+    this.isLoadingPreview = true;
+    this.cdr.markForCheck();
+
+    try {
+      const filePath = await SelectImportFile();
+      if (!filePath) {
+        this.isLoadingPreview = false;
+        this.cdr.markForCheck();
+        return;
+      }
+
+      this.importFilePath = filePath;
+      this.importFileName = filePath.split('/').pop() || filePath;
+      this.importPreview = await ValidateImportFile(filePath);
+    } catch (err) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Invalid File',
+        detail: String(err),
+      });
+    } finally {
+      this.isLoadingPreview = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  cancelImport(): void {
+    this.importPreview = null;
+    this.showImportDialog = false;
+    this.cdr.markForCheck();
+  }
+
+  async doImport(): Promise<void> {
+    if (!this.importFilePath) return;
+
+    this.isImporting = true;
+    this.cdr.markForCheck();
+
+    try {
+      await ImportFromFile(this.importFilePath, this.importOptions);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Import Complete',
+        detail: 'Configuration imported successfully',
+      });
+      this.showImportDialog = false;
+    } catch (err) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Import Failed',
+        detail: String(err),
+      });
+    } finally {
+      this.isImporting = false;
+      this.cdr.markForCheck();
+    }
+  }
+}

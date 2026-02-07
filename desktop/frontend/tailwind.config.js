@@ -15,6 +15,41 @@ module.exports = {
     },
     extend: {
       colors: {
+        // System colors using CSS variables
+        sys: {
+          // Background
+          'bg': 'var(--color-bg-primary)',
+          'bg-secondary': 'var(--color-bg-secondary)',
+          'bg-tertiary': 'var(--color-bg-tertiary)',
+          'bg-inverse': 'var(--color-bg-inverse)',
+          // Foreground
+          'fg': 'var(--color-fg-primary)',
+          'fg-secondary': 'var(--color-fg-secondary)',
+          'fg-tertiary': 'var(--color-fg-tertiary)',
+          'fg-inverse': 'var(--color-fg-inverse)',
+          'fg-muted': 'var(--color-fg-muted)',
+          // Border
+          'border': 'var(--color-border-default)',
+          'border-subtle': 'var(--color-border-subtle)',
+          'border-muted': 'var(--color-border-muted)',
+          // Accent
+          'accent': 'var(--color-accent-primary)',
+          'accent-secondary': 'var(--color-accent-secondary)',
+          'accent-success': 'var(--color-accent-success)',
+          'accent-warning': 'var(--color-accent-warning)',
+          'accent-danger': 'var(--color-accent-danger)',
+          'accent-info': 'var(--color-accent-info)',
+          // Status
+          'status-success': 'var(--color-status-success)',
+          'status-success-bg': 'var(--color-status-success-bg)',
+          'status-warning': 'var(--color-status-warning)',
+          'status-warning-bg': 'var(--color-status-warning-bg)',
+          'status-error': 'var(--color-status-error)',
+          'status-error-bg': 'var(--color-status-error-bg)',
+          'status-info': 'var(--color-status-info)',
+          'status-info-bg': 'var(--color-status-info-bg)',
+        },
+        // Keep existing colors for backward compatibility
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -39,6 +74,11 @@ module.exports = {
           800: '#1f2937',
           900: '#111827',
         },
+      },
+      boxShadow: {
+        'neo': '4px 4px 0px 0px var(--color-shadow)',
+        'neo-sm': '2px 2px 0px 0px var(--color-shadow)',
+        'neo-lg': '6px 6px 0px 0px var(--color-shadow)',
       },
       fontFamily: {
         sans: ['Roboto', 'sans-serif'],
