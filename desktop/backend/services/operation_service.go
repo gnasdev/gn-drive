@@ -59,6 +59,10 @@ func (o *OperationService) SetApp(app *application.App) {
 // SetEnvConfig sets the environment configuration
 func (o *OperationService) SetEnvConfig(config beConfig.Config) {
 	o.envConfig = config
+	// Initialize rclone global state once
+	if err := rclone.InitGlobal(config.DebugMode); err != nil {
+		log.Printf("WARNING: Failed to initialize rclone: %v", err)
+	}
 }
 
 // ServiceName returns the name of the service
@@ -107,7 +111,7 @@ func (o *OperationService) DryRun(ctx context.Context, action string, profile mo
 
 // ListFiles lists files at the given remote path
 func (o *OperationService) ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models.FileEntry, error) {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -116,7 +120,7 @@ func (o *OperationService) ListFiles(ctx context.Context, remotePath string, rec
 
 // DeleteFile deletes a single file at the given remote path
 func (o *OperationService) DeleteFile(ctx context.Context, remotePath string) error {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -125,7 +129,7 @@ func (o *OperationService) DeleteFile(ctx context.Context, remotePath string) er
 
 // PurgeDir removes the directory and all its contents
 func (o *OperationService) PurgeDir(ctx context.Context, remotePath string) error {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -134,7 +138,7 @@ func (o *OperationService) PurgeDir(ctx context.Context, remotePath string) erro
 
 // MakeDir creates a directory at the given remote path
 func (o *OperationService) MakeDir(ctx context.Context, remotePath string) error {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -143,7 +147,7 @@ func (o *OperationService) MakeDir(ctx context.Context, remotePath string) error
 
 // GetAbout returns quota information for the given remote
 func (o *OperationService) GetAbout(ctx context.Context, remoteName string) (*models.QuotaInfo, error) {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -152,7 +156,7 @@ func (o *OperationService) GetAbout(ctx context.Context, remoteName string) (*mo
 
 // GetSize returns the total objects and size at the given remote path
 func (o *OperationService) GetSize(ctx context.Context, remotePath string) (int64, int64, error) {
-	opCtx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	opCtx, err := rclone.SimpleContext(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to initialize rclone config: %w", err)
 	}
@@ -225,15 +229,15 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 		o.mutex.Unlock()
 	}()
 
-	// Initialize rclone config
-	ctx, err := rclone.InitConfig(ctx, o.envConfig.DebugMode)
+	// Initialize rclone config with isolated context
+	ctx, err := rclone.NewTaskContext(ctx, task.Id)
 	if err != nil {
 		o.handleOperationError(task, fmt.Sprintf("Failed to initialize rclone config: %v", err))
 		return
 	}
 
 	outLog := make(chan string, 100)
-	stopSyncStatus := utils.StartSyncStatusReporting(nil, task.Id, task.Operation, task.TabId)
+	stopSyncStatus := utils.StartSyncStatusReporting(ctx, nil, task.Id, task.Operation, task.TabId)
 
 	utils.AddCmd(task.Id, func() {
 		stopSyncStatus()

@@ -10,7 +10,6 @@ import (
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/filter"
-
 	fssync "github.com/rclone/rclone/fs/sync"
 
 	// import fs drivers
@@ -35,7 +34,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 	fsConfig.Checkers = profile.Parallel
 
 	switch task {
-	case "push":
+	case "pull":
 		profile.From, profile.To = profile.To, profile.From
 	}
 
@@ -57,7 +56,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 	}
 
 	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
-	filterOpt := filter.GetConfig(ctx).Opt
+	filterOpt := CopyFilterOpt(ctx)
 	for _, p := range profile.IncludedPaths {
 		if profile.UseRegex {
 			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)

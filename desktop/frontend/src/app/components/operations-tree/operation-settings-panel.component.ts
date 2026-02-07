@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SyncConfig } from '../../models/flow.model';
@@ -193,46 +193,95 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
         <details class="mt-2">
           <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Filtering</summary>
           <div class="grid grid-cols-2 gap-3 mt-2">
-            <neo-input
-              label="Min Size"
-              placeholder="e.g. 100k"
-              [(ngModel)]="config.minSize"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Max Size"
-              placeholder="e.g. 1G"
-              [(ngModel)]="config.maxSize"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Max Age"
-              placeholder="e.g. 24h, 7d"
-              [(ngModel)]="config.maxAge"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Min Age"
-              placeholder="e.g. 1h"
-              [(ngModel)]="config.minAge"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
+            <!-- Min Size: number + unit -->
+            <div>
+              <span class="block text-sm font-medium mb-1">Min Size</span>
+              <div class="flex gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                  placeholder="0"
+                  [(ngModel)]="minSizeNum"
+                  (ngModelChange)="onSizeFieldChange('minSize')"
+                  [disabled]="disabled"
+                />
+                <neo-dropdown
+                  [options]="sizeUnitOptions"
+                  [(ngModel)]="minSizeUnit"
+                  (ngModelChange)="onSizeFieldChange('minSize')"
+                  [disabled]="disabled"
+                ></neo-dropdown>
+              </div>
+            </div>
+            <!-- Max Size: number + unit -->
+            <div>
+              <span class="block text-sm font-medium mb-1">Max Size</span>
+              <div class="flex gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                  placeholder="0"
+                  [(ngModel)]="maxSizeNum"
+                  (ngModelChange)="onSizeFieldChange('maxSize')"
+                  [disabled]="disabled"
+                />
+                <neo-dropdown
+                  [options]="sizeUnitOptions"
+                  [(ngModel)]="maxSizeUnit"
+                  (ngModelChange)="onSizeFieldChange('maxSize')"
+                  [disabled]="disabled"
+                ></neo-dropdown>
+              </div>
+            </div>
+            <!-- Max Age: number + unit -->
+            <div>
+              <span class="block text-sm font-medium mb-1">Max Age</span>
+              <div class="flex gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                  placeholder="0"
+                  [(ngModel)]="maxAgeNum"
+                  (ngModelChange)="onAgeFieldChange('maxAge')"
+                  [disabled]="disabled"
+                />
+                <neo-dropdown
+                  [options]="ageUnitOptions"
+                  [(ngModel)]="maxAgeUnit"
+                  (ngModelChange)="onAgeFieldChange('maxAge')"
+                  [disabled]="disabled"
+                ></neo-dropdown>
+              </div>
+            </div>
+            <!-- Min Age: number + unit -->
+            <div>
+              <span class="block text-sm font-medium mb-1">Min Age</span>
+              <div class="flex gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                  placeholder="0"
+                  [(ngModel)]="minAgeNum"
+                  (ngModelChange)="onAgeFieldChange('minAge')"
+                  [disabled]="disabled"
+                />
+                <neo-dropdown
+                  [options]="ageUnitOptions"
+                  [(ngModel)]="minAgeUnit"
+                  (ngModelChange)="onAgeFieldChange('minAge')"
+                  [disabled]="disabled"
+                ></neo-dropdown>
+              </div>
+            </div>
             <neo-input
               label="Max Depth"
               type="number"
-              placeholder="unlimited"
+              placeholder="empty = no limit"
               [(ngModel)]="config.maxDepth"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Filter From File"
-              placeholder="path to filter rules"
-              [(ngModel)]="config.filterFromFile"
               (ngModelChange)="onConfigChange()"
               [disabled]="disabled"
             ></neo-input>
@@ -464,7 +513,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
     </div>
   `,
 })
-export class OperationSettingsPanelComponent {
+export class OperationSettingsPanelComponent implements OnInit {
   @Input() config: SyncConfig = { action: 'push' };
   @Input() scheduleEnabled = false;
   @Input() cronExpr = '';
@@ -475,10 +524,10 @@ export class OperationSettingsPanelComponent {
   @Output() cronExprChange = new EventEmitter<string>();
 
   actionOptions: DropdownOption[] = [
-    { value: 'push', label: 'Push', icon: 'pi pi-arrow-right' },
-    { value: 'pull', label: 'Pull', icon: 'pi pi-arrow-left' },
-    { value: 'bi', label: 'Bi-directional', icon: 'pi pi-arrows-h' },
-    { value: 'bi-resync', label: 'Bi-directional (Resync)', icon: 'pi pi-refresh' },
+    { value: 'push', label: 'Push', icon: 'pi pi-arrow-right', description: 'Source \u2192 Target. Deletes target files not in source.' },
+    { value: 'pull', label: 'Pull', icon: 'pi pi-arrow-left', description: 'Target \u2192 Source. Deletes source files not in target.' },
+    { value: 'bi', label: 'Bi-directional', icon: 'pi pi-arrows-h', description: 'Syncs both ways. Changes on either side propagate to the other.' },
+    { value: 'bi-resync', label: 'Bi-directional (Resync)', icon: 'pi pi-refresh', description: 'Forces full re-sync. Use when sync state is lost or corrupted.' },
   ];
 
   conflictOptions: DropdownOption[] = [
@@ -509,6 +558,37 @@ export class OperationSettingsPanelComponent {
     { label: 'Daily', value: '0 0 * * *' },
     { label: 'Weekly', value: '0 0 * * 0' },
   ];
+
+  sizeUnitOptions = [
+    { value: 'k', label: 'KB' },
+    { value: 'M', label: 'MB' },
+    { value: 'G', label: 'GB' },
+    { value: 'T', label: 'TB' },
+  ];
+
+  ageUnitOptions = [
+    { value: 's', label: 'Sec' },
+    { value: 'm', label: 'Min' },
+    { value: 'h', label: 'Hour' },
+    { value: 'd', label: 'Day' },
+    { value: 'w', label: 'Week' },
+    { value: 'M', label: 'Month' },
+    { value: 'y', label: 'Year' },
+  ];
+
+  // Size/age split fields
+  minSizeNum = '';
+  minSizeUnit = 'M';
+  maxSizeNum = '';
+  maxSizeUnit = 'G';
+  minAgeNum = '';
+  minAgeUnit = 'h';
+  maxAgeNum = '';
+  maxAgeUnit = 'd';
+
+  ngOnInit(): void {
+    this.initSizeAgeFields();
+  }
 
   get includedPathsText(): string {
     return this.config.includedPaths?.join('\n') || '';
@@ -543,5 +623,53 @@ export class OperationSettingsPanelComponent {
   setCronPreset(value: string): void {
     this.cronExpr = value;
     this.onCronChange();
+  }
+
+  onSizeFieldChange(field: 'minSize' | 'maxSize'): void {
+    const num = field === 'minSize' ? this.minSizeNum : this.maxSizeNum;
+    const unit = field === 'minSize' ? this.minSizeUnit : this.maxSizeUnit;
+    this.config[field] = num ? `${num}${unit}` : '';
+    this.onConfigChange();
+  }
+
+  onAgeFieldChange(field: 'minAge' | 'maxAge'): void {
+    const num = field === 'minAge' ? this.minAgeNum : this.maxAgeNum;
+    const unit = field === 'minAge' ? this.minAgeUnit : this.maxAgeUnit;
+    this.config[field] = num ? `${num}${unit}` : '';
+    this.onConfigChange();
+  }
+
+  private initSizeAgeFields(): void {
+    const minSize = this.parseSizeValue(this.config.minSize);
+    this.minSizeNum = minSize.num;
+    this.minSizeUnit = minSize.unit;
+
+    const maxSize = this.parseSizeValue(this.config.maxSize);
+    this.maxSizeNum = maxSize.num;
+    this.maxSizeUnit = maxSize.unit;
+
+    const minAge = this.parseAgeValue(this.config.minAge);
+    this.minAgeNum = minAge.num;
+    this.minAgeUnit = minAge.unit;
+
+    const maxAge = this.parseAgeValue(this.config.maxAge);
+    this.maxAgeNum = maxAge.num;
+    this.maxAgeUnit = maxAge.unit;
+  }
+
+  private parseSizeValue(val?: string): { num: string; unit: string } {
+    if (!val) return { num: '', unit: 'M' };
+    const match = val.match(/^(\d+\.?\d*)\s*([kMGT]?)$/i);
+    if (!match) return { num: '', unit: 'M' };
+    const unit = match[2];
+    const normalized = unit.toLowerCase() === 'k' ? 'k' : unit.toUpperCase() || 'M';
+    return { num: match[1], unit: normalized };
+  }
+
+  private parseAgeValue(val?: string): { num: string; unit: string } {
+    if (!val) return { num: '', unit: 'h' };
+    const match = val.match(/^(\d+\.?\d*)\s*([smhdwMy]?)$/);
+    if (!match) return { num: '', unit: 'h' };
+    return { num: match[1], unit: match[2] || 'h' };
   }
 }

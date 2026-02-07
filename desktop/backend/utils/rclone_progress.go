@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -38,48 +39,30 @@ func shouldSkipLogMessage(message string) bool {
 }
 
 // formatToProgress prints the progress with an optional log
-func formatToProgress(logMessage string) string {
+func formatToProgress(ctx context.Context, logMessage string) string {
 	operations.StdoutMutex.Lock()
 	defer operations.StdoutMutex.Unlock()
 
 	var buf bytes.Buffer
-	// w, _ := terminal.GetSize()
-	stats := strings.TrimSpace(accounting.GlobalStats().String())
+	stats := strings.TrimSpace(accounting.Stats(ctx).String())
 	logMessage = strings.TrimSpace(logMessage)
 
 	out := func(s string) {
 		buf.WriteString(s)
 	}
 
-	// if logMessage != "" {
-	// 	out("\n")
-	// 	out(terminal.MoveUp)
-	// }
-	// // Move to the start of the block we wrote erasing all the previous lines
-	// for i := 0; i < nlines-1; i++ {
-	// 	out(terminal.EraseLine)
-	// 	out(terminal.MoveUp)
-	// }
-	// out(terminal.EraseLine)
-	// out(terminal.MoveToStartOfLine)
-
 	if logMessage != "" {
-		// out(terminal.EraseLine)
 		out(logMessage + "\n")
 	}
 
 	fixedLines := strings.Split(stats, "\n")
 	nlines = len(fixedLines)
 	for i, line := range fixedLines {
-		// if len(line) > w {
-		// 	line = line[:w]
-		// }
 		out(line)
 		if i != nlines-1 {
 			out("\n")
 		}
 	}
-	// terminal.Write(buf.Bytes())
 
 	return buf.String()
 }
@@ -87,7 +70,7 @@ func formatToProgress(logMessage string) string {
 // startProgress starts the progress bar printing
 //
 // It returns a func which should be called to stop the stats.
-func startProgress(outLog chan string) func() {
+func startProgress(ctx context.Context, outLog chan string) func() {
 	// Use atomic.Bool for thread-safe flag access (fixes race condition)
 	var isOutLogClosed atomic.Bool
 
@@ -119,13 +102,13 @@ func startProgress(outLog chan string) func() {
 		if text == "" || shouldSkipLogMessage(text) {
 			return
 		}
-		safeSend(formatToProgress(text))
+		safeSend(formatToProgress(ctx, text))
 	})
 
 	// Intercept output from functions such as HashLister to stdout
 	operations.SyncPrintf = func(format string, a ...interface{}) {
 		if !isOutLogClosed.Load() {
-			safeSend(formatToProgress(fmt.Sprintf(format, a...)))
+			safeSend(formatToProgress(ctx, fmt.Sprintf(format, a...)))
 		}
 	}
 
@@ -142,7 +125,7 @@ func startProgress(outLog chan string) func() {
 			select {
 			case <-ticker.C:
 				if !isOutLogClosed.Load() {
-					safeSend(formatToProgress(""))
+					safeSend(formatToProgress(ctx, ""))
 				}
 			case <-stopStats:
 				ticker.Stop()
@@ -166,7 +149,7 @@ func startProgress(outLog chan string) func() {
 	}
 }
 
-func startStats(outLog chan string) func() {
+func startStats(ctx context.Context, outLog chan string) func() {
 	// Use atomic.Bool for thread-safe flag access (fixes race condition)
 	var isOutLogClosed atomic.Bool
 
@@ -196,7 +179,7 @@ func startStats(outLog chan string) func() {
 			select {
 			case <-ticker.C:
 				if !isOutLogClosed.Load() {
-					safeSend(accounting.GlobalStats().String())
+					safeSend(accounting.Stats(ctx).String())
 				}
 			case <-stopStats:
 				ticker.Stop()

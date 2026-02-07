@@ -27,7 +27,7 @@ func resolveError(ctx context.Context, err error) error {
 
 	if err == nil {
 		if ci.ErrorOnNoTransfer {
-			if accounting.GlobalStats().GetTransfers() == 0 {
+			if accounting.Stats(ctx).GetTransfers() == 0 {
 				return errors.New("no files transferred")
 			}
 		}
@@ -41,6 +41,7 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 	var cmdErr error
 
 	fsConfig := fs.GetConfig(ctx)
+	stats := accounting.Stats(ctx)
 
 	stopStats := func() {}
 	if !showStats && cmd.ShowStats() {
@@ -48,9 +49,9 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 	}
 
 	if fsConfig.Progress {
-		stopStats = startProgress(outLog)
+		stopStats = startProgress(ctx, outLog)
 	} else if showStats {
-		stopStats = startStats(outLog)
+		stopStats = startStats(ctx, outLog)
 	}
 
 	cmd.SigInfoHandler()
@@ -58,25 +59,25 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 	for try := 1; try <= fsConfig.Retries; try++ {
 		cmdErr = cb()
 		cmdErr = fs.CountError(ctx, cmdErr)
-		lastErr := accounting.GlobalStats().GetLastError()
+		lastErr := stats.GetLastError()
 		if cmdErr == nil {
 			cmdErr = lastErr
 		}
-		if !retry || !accounting.GlobalStats().Errored() {
+		if !retry || !stats.Errored() {
 			if try > 1 {
 				fs.Errorf(nil, "Attempt %d/%d succeeded", try, fsConfig.Retries)
 			}
 			break
 		}
-		if accounting.GlobalStats().HadFatalError() {
+		if stats.HadFatalError() {
 			fs.Errorf(nil, "Fatal error received - not attempting retries")
 			break
 		}
-		if accounting.GlobalStats().Errored() && !accounting.GlobalStats().HadRetryError() {
+		if stats.Errored() && !stats.HadRetryError() {
 			fs.Errorf(nil, "Can't retry any of the errors - not attempting retries")
 			break
 		}
-		if retryAfter := accounting.GlobalStats().RetryAfter(); !retryAfter.IsZero() {
+		if retryAfter := stats.RetryAfter(); !retryAfter.IsZero() {
 			d := time.Until(retryAfter)
 			if d > 0 {
 				fs.Logf(nil, "Received retry after error - sleeping until %s (%v)", retryAfter.Format(time.RFC3339Nano), d)
@@ -84,12 +85,12 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 			}
 		}
 		if lastErr != nil {
-			fs.Errorf(nil, "Attempt %d/%d failed with %d errors and: %v", try, fsConfig.Retries, accounting.GlobalStats().GetErrors(), lastErr)
+			fs.Errorf(nil, "Attempt %d/%d failed with %d errors and: %v", try, fsConfig.Retries, stats.GetErrors(), lastErr)
 		} else {
-			fs.Errorf(nil, "Attempt %d/%d failed with %d errors", try, fsConfig.Retries, accounting.GlobalStats().GetErrors())
+			fs.Errorf(nil, "Attempt %d/%d failed with %d errors", try, fsConfig.Retries, stats.GetErrors())
 		}
 		if try < fsConfig.Retries {
-			accounting.GlobalStats().ResetErrors()
+			stats.ResetErrors()
 		}
 		if fsConfig.RetriesInterval > 0 {
 			time.Sleep(time.Duration(fsConfig.RetriesInterval))
@@ -97,8 +98,8 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 	}
 
 	stopStats()
-	if showStats && (accounting.GlobalStats().Errored() || statsInterval > 0) {
-		accounting.GlobalStats().Log()
+	if showStats && (stats.Errored() || statsInterval > 0) {
+		stats.Log()
 	}
 
 	fs.Debugf(nil, "%d go routines active\n", runtime.NumGoroutine())
@@ -124,13 +125,13 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 
 	// clear cache and shutdown backends
 	cache.Clear()
-	if lastErr := accounting.GlobalStats().GetLastError(); cmdErr == nil {
+	if lastErr := stats.GetLastError(); cmdErr == nil {
 		cmdErr = lastErr
 	}
 
 	// Log the final error message and exit
 	if cmdErr != nil {
-		nerrs := accounting.GlobalStats().GetErrors()
+		nerrs := stats.GetErrors()
 		if nerrs <= 1 {
 			fs.Logf(nil, "Failed: %v", cmdErr)
 		} else {

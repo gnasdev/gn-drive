@@ -6,6 +6,7 @@ export interface DropdownOption {
   label: string;
   value: string;
   icon?: string;
+  description?: string;
   disabled?: boolean;
   data?: unknown;
 }
@@ -57,16 +58,21 @@ export interface DropdownOption {
               type="button"
               (click)="selectOption(option)"
               [disabled]="option.disabled"
-              class="w-full px-4 py-2 text-left flex items-center hover:bg-sys-accent/30 disabled:opacity-50 disabled:cursor-not-allowed text-sys-fg"
+              class="w-full px-4 py-2 text-left flex items-start hover:bg-sys-accent/30 disabled:opacity-50 disabled:cursor-not-allowed text-sys-fg"
               [class.bg-sys-accent]="option.value === value"
             >
               @if (option.icon) {
-                <i [class]="option.icon + ' mr-2'"></i>
+                <i [class]="option.icon + ' mr-2 mt-0.5 shrink-0'"></i>
               }
               @if (optionTemplate) {
                 <ng-container *ngTemplateOutlet="optionTemplate; context: { $implicit: option }"></ng-container>
               } @else {
-                {{ option.label }}
+                <div>
+                  <span>{{ option.label }}</span>
+                  @if (option.description) {
+                    <span class="block text-xs text-sys-fg-muted font-normal mt-0.5">{{ option.description }}</span>
+                  }
+                </div>
               }
             </button>
           }

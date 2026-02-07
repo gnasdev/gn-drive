@@ -58,6 +58,20 @@ export interface RemoteInfo {
       <!-- Dropdown Panel -->
       @if (isOpen) {
         <div class="absolute top-full left-0 right-0 mt-1 z-50 bg-sys-bg border-2 border-sys-border shadow-neo max-h-60 overflow-auto text-sys-fg">
+          <!-- Local (always first, not deletable) -->
+          <div
+            class="flex items-center gap-2 px-3 py-2 hover:bg-sys-accent/30 cursor-pointer"
+            [class.bg-sys-accent]="value === ''"
+            tabindex="0"
+            role="option"
+            [attr.aria-selected]="value === ''"
+            (click)="selectLocal()"
+            (keydown.enter)="selectLocal()"
+          >
+            <i class="pi pi-folder text-lg text-sys-fg"></i>
+            <span class="truncate text-sys-fg">Local</span>
+          </div>
+
           <!-- Remote List -->
           @for (remote of remotes; track remote.name) {
             <div
@@ -139,6 +153,7 @@ export class RemoteDropdownComponent implements OnInit, OnDestroy, ControlValueA
   onTouched: () => void = () => { /* noop */ };
 
   get selectedRemote(): RemoteInfo | undefined {
+    if (this.value === '') return { name: 'Local', type: 'local' };
     return this.remotes.find((r) => r.name === this.value);
   }
 
@@ -174,6 +189,12 @@ export class RemoteDropdownComponent implements OnInit, OnDestroy, ControlValueA
     if (!this.disabled) {
       this.isOpen = !this.isOpen;
     }
+  }
+
+  selectLocal(): void {
+    this.value = '';
+    this.onChange(this.value);
+    this.isOpen = false;
   }
 
   selectRemote(remote: RemoteInfo): void {

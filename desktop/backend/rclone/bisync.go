@@ -150,7 +150,7 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 	}
 
 	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
-	filterOpt := filter.GetConfig(ctx).Opt
+	filterOpt := CopyFilterOpt(ctx)
 	for _, p := range profile.IncludedPaths {
 		if profile.UseRegex {
 			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)

@@ -224,7 +224,7 @@ func GetSize(ctx context.Context, remotePath string) (int64, int64, error) {
 // Returns the updated context.
 func applyFiltersAndBandwidth(ctx context.Context, fsConfig *fs.ConfigInfo, profile models.Profile) context.Context {
 	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
-	filterOpt := filter.GetConfig(ctx).Opt
+	filterOpt := CopyFilterOpt(ctx)
 	for _, p := range profile.IncludedPaths {
 		if profile.UseRegex {
 			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "{{regexp:}}"+p)

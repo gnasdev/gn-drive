@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+	"sync"
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
@@ -19,29 +20,40 @@ import (
 	"github.com/rclone/rclone/lib/terminal"
 )
 
-func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) {
+var (
+	initOnce      sync.Once
+	initErr       error
+	initDebugMode bool
+)
+
+// InitGlobal performs one-time global rclone initialization.
+// It is safe to call multiple times; only the first call takes effect.
+func InitGlobal(isDebugMode bool) error {
+	initOnce.Do(func() {
+		initDebugMode = isDebugMode
+		initErr = doInitGlobal(isDebugMode)
+	})
+	return initErr
+}
+
+func doInitGlobal(isDebugMode bool) error {
 	// Set the global options from the flags
 	err := fs.GlobalOptionsInit()
-
 	if utils.HandleError(err, "Failed to initialise global options", nil, nil) != nil {
-		return nil, err
+		return err
 	}
 
 	// Start the logger
 	fslog.InitLogging()
 
 	// Load the config
-	// config.SetConfigPath(filepath.Join(dir, "rclone.conf"))
 	configfile.Install()
 
-	// Start accounting and ensure clean state
-	stats := accounting.Stats(ctx)
-	stats.ResetCounters()
-	stats.ResetErrors()
-	accounting.Start(ctx)
+	// Start accounting
+	accounting.Start(context.Background())
 
-	// Initialize the global config
-	fsConfig := fs.GetConfig(ctx)
+	// Initialize the global config (baseline that fs.AddConfig will copy from)
+	fsConfig := fs.GetConfig(context.Background())
 	fsConfig.CheckSum = true
 	fsConfig.Progress = true
 	fsConfig.TrackRenames = true
@@ -55,12 +67,8 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 
 	// Configure console
 	if fsConfig.NoConsole {
-		// Hide the console window
 		terminal.HideConsole()
 	} else {
-		// Enable color support on stdout if possible.
-		// This enables virtual terminal processing on Windows 10,
-		// adding native support for ANSI/VT100 escape sequences.
 		terminal.EnableColorsStdout()
 	}
 
@@ -73,9 +81,9 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 	}
 
 	// Start the metrics server if configured
-	_, err = rcserver.MetricsStart(ctx, &rc.Opt)
+	_, err = rcserver.MetricsStart(context.Background(), &rc.Opt)
 	if utils.HandleError(err, "Failed to start metrics server", nil, nil) != nil {
-		return nil, err
+		return err
 	}
 
 	// Log level
@@ -83,74 +91,130 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 	if isDebugMode {
 		logLevel = fs.LogLevelDebug
 	}
-	err = fsConfig.StatsLogLevel.Set(logLevel.String()) // EMERGENCY ALERT CRITICAL ERROR WARNING NOTICE INFO DEBUG
+	err = fsConfig.StatsLogLevel.Set(logLevel.String())
 	if utils.HandleError(err, "Failed to set stats log level", nil, nil) != nil {
-		return nil, err
+		return err
 	}
 	err = fsConfig.LogLevel.Set(logLevel.String())
 	if utils.HandleError(err, "Failed to set log level", nil, nil) != nil {
-		return nil, err
+		return err
 	}
-
-	// Setup the default filters
-	filterOpts := filter.Options{
-		MinAge:  fs.DurationOff, // These have to be set here as the options are parsed once before the defaults are set
-		MaxAge:  fs.DurationOff,
-		MinSize: fs.SizeSuffix(-1),
-		MaxSize: fs.SizeSuffix(-1),
-	}
-	filterConfig, err := filter.NewFilter(&filterOpts)
-	if utils.HandleError(err, "Failed to load filter file", nil, nil) != nil {
-		return nil, err
-	}
-	ctx = filter.ReplaceConfig(ctx, filterConfig)
 
 	// Setup CPU profiling if desired
 	cpuProfile := ""
-	// cpuProfile := "Debugging"
 	if cpuProfile != "" {
 		fs.Infof(nil, "Creating CPU profile %q\n", cpuProfile)
 		f, err := os.Create(cpuProfile)
 		if utils.HandleError(err, "", nil, nil) != nil {
-			err = fs.CountError(ctx, err)
-			return nil, err
+			err = fs.CountError(context.Background(), err)
+			return err
 		}
 		err = pprof.StartCPUProfile(f)
 		if utils.HandleError(err, "", nil, nil) != nil {
-			err = fs.CountError(ctx, err)
-			return nil, err
+			err = fs.CountError(context.Background(), err)
+			return err
 		}
 		atexit.Register(func() {
 			pprof.StopCPUProfile()
 			err := f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				_ = fs.CountError(ctx, err)
+				_ = fs.CountError(context.Background(), err)
 			}
 		})
 	}
 
 	// Setup memory profiling if desired
 	memProfile := ""
-	// memProfile := "Debugging"
 	if memProfile != "" {
 		atexit.Register(func() {
 			fs.Infof(nil, "Saving Memory profile %q\n", memProfile)
 			f, err := os.Create(memProfile)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				_ = fs.CountError(ctx, err)
+				_ = fs.CountError(context.Background(), err)
 			}
 			err = pprof.WriteHeapProfile(f)
 			if utils.HandleError(err, "", nil, nil) != nil {
-				_ = fs.CountError(ctx, err)
+				_ = fs.CountError(context.Background(), err)
 			}
 			err = f.Close()
 			if utils.HandleError(err, "", nil, nil) != nil {
-				_ = fs.CountError(ctx, err)
+				_ = fs.CountError(context.Background(), err)
 			}
 		})
 	}
 
+	return nil
+}
+
+// newDefaultFilterOpts returns fresh default filter options for per-task isolation.
+func newDefaultFilterOpts() filter.Options {
+	return filter.Options{
+		MinAge:  fs.DurationOff,
+		MaxAge:  fs.DurationOff,
+		MinSize: fs.SizeSuffix(-1),
+		MaxSize: fs.SizeSuffix(-1),
+	}
+}
+
+// NewTaskContext creates an isolated rclone context for a sync/operation task.
+// Each task gets its own config copy, stats group, and fresh filter config.
+func NewTaskContext(parentCtx context.Context, taskId int) (context.Context, error) {
+	if err := InitGlobal(initDebugMode); err != nil {
+		return nil, err
+	}
+
+	// 1. Isolated config copy (shallow copy of global config stored in context)
+	ctx, _ := fs.AddConfig(parentCtx)
+
+	// 2. Isolated stats group
+	ctx = accounting.WithStatsGroup(ctx, fmt.Sprintf("task-%d", taskId))
+	stats := accounting.Stats(ctx)
+	stats.ResetCounters()
+	stats.ResetErrors()
+
+	// 3. Fresh default filter (no shared slices)
+	filterOpts := newDefaultFilterOpts()
+	f, err := filter.NewFilter(&filterOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create default filter: %w", err)
+	}
+	ctx = filter.ReplaceConfig(ctx, f)
+
 	return ctx, nil
+}
+
+// SimpleContext creates an isolated rclone context for lightweight operations
+// (ListFiles, Mkdir, etc.) that don't need stats isolation.
+func SimpleContext(parentCtx context.Context) (context.Context, error) {
+	if err := InitGlobal(initDebugMode); err != nil {
+		return nil, err
+	}
+
+	// Isolated config copy
+	ctx, _ := fs.AddConfig(parentCtx)
+
+	// Fresh default filter
+	filterOpts := newDefaultFilterOpts()
+	f, err := filter.NewFilter(&filterOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create default filter: %w", err)
+	}
+	ctx = filter.ReplaceConfig(ctx, f)
+
+	return ctx, nil
+}
+
+// CopyFilterOpt returns a deep copy of the current filter options from context,
+// safe to mutate without affecting other concurrent operations.
+func CopyFilterOpt(ctx context.Context) filter.Options {
+	existing := filter.GetConfig(ctx)
+	opt := existing.Opt // struct value copy
+	// Deep-copy slices to break aliasing with the original backing arrays
+	opt.IncludeRule = append([]string(nil), opt.IncludeRule...)
+	opt.ExcludeRule = append([]string(nil), opt.ExcludeRule...)
+	opt.FilterFrom = append([]string(nil), opt.FilterFrom...)
+	opt.ExcludeFile = append([]string(nil), opt.ExcludeFile...)
+	return opt
 }
 
 // ApplyProfileOptions maps Profile fields to rclone's fs.ConfigInfo and filter.Options.
@@ -158,7 +222,7 @@ func InitConfig(ctx context.Context, isDebugMode bool) (context.Context, error) 
 // Returns the updated context with new filter configuration.
 func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.Context, error) {
 	fsConfig := fs.GetConfig(ctx)
-	filterOpt := filter.GetConfig(ctx).Opt
+	filterOpt := CopyFilterOpt(ctx)
 
 	// Filtering: min/max size
 	if profile.MinSize != "" {

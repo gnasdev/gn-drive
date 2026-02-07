@@ -46,7 +46,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	}
 	a.oc <- j
 
-	ctx, err := rclone.InitConfig(ctx, config.DebugMode)
+	ctx, err := rclone.NewTaskContext(ctx, id)
 	if err != nil {
 		var j []byte
 		if tabId != "" {
@@ -62,7 +62,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	outLog := make(chan string, 100)
 
 	// Start sync status reporting
-	stopSyncStatus := utils.StartSyncStatusReporting(a.oc, id, task, tabId)
+	stopSyncStatus := utils.StartSyncStatusReporting(ctx, a.oc, id, task, tabId)
 
 	utils.AddCmd(id, func() {
 		stopSyncStatus()

@@ -455,6 +455,11 @@ export class FlowsService implements OnDestroy {
    * Stop executing a flow
    */
   async stopFlow(flowId: string): Promise<void> {
+    // Immediately resolve any pending board completion wait so executeFlow unblocks
+    if (this.boardCompletionResolve) {
+      this.boardCompletionResolve('cancelled');
+    }
+
     if (this.tempBoardId) {
       try {
         await StopBoardExecution(this.tempBoardId);
@@ -574,15 +579,12 @@ export class FlowsService implements OnDestroy {
           // Board removed from activeFlows — execution likely completed already
           consecutiveErrors++;
           console.warn(`[FlowsService] GetBoardExecutionStatus failed (attempt ${consecutiveErrors})`);
-          // After 3 consecutive failures (6 seconds), assume the execution completed
-          // and the event was missed. Resolve as 'completed' (the board was removed
-          // from activeFlows which only happens after execution finishes).
-          if (consecutiveErrors >= 3) {
-            console.warn(`[FlowsService] Board ${boardId} presumed completed after ${consecutiveErrors} polling failures`);
+          if (consecutiveErrors >= 1) {
+            console.warn(`[FlowsService] Board ${boardId} presumed completed after polling failure`);
             doResolve('completed');
           }
         }
-      }, 2000);
+      }, 1000);
     });
   }
 

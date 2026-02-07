@@ -48,10 +48,11 @@ func SetBoardServiceInstance(bs *BoardService) {
 
 // FlowExecution tracks a running board execution
 type FlowExecution struct {
-	BoardId  string
-	Cancel   context.CancelFunc
-	Status   *models.BoardExecutionStatus
-	StatusMu sync.Mutex // protects Status field from concurrent access
+	BoardId      string
+	Cancel       context.CancelFunc
+	Status       *models.BoardExecutionStatus
+	StatusMu     sync.Mutex  // protects Status field from concurrent access
+	CleanupTimer *time.Timer // delayed cleanup timer; nil while running
 }
 
 // NewBoardService creates a new board service
@@ -112,11 +113,14 @@ func (b *BoardService) ServiceStartup(ctx context.Context, options application.S
 // ServiceShutdown is called when the service shuts down
 func (b *BoardService) ServiceShutdown(ctx context.Context) error {
 	log.Printf("BoardService shutting down...")
-	// Cancel all active flows
+	// Cancel all active flows and stop cleanup timers
 	b.flowMutex.Lock()
 	for _, flow := range b.activeFlows {
 		if flow.Cancel != nil {
 			flow.Cancel()
+		}
+		if flow.CleanupTimer != nil {
+			flow.CleanupTimer.Stop()
 		}
 	}
 	b.flowMutex.Unlock()
@@ -346,12 +350,22 @@ func (b *BoardService) ExecuteBoard(ctx context.Context, boardId string) (*model
 	}
 
 	// Check if board is already executing
-	b.flowMutex.RLock()
-	if _, exists := b.activeFlows[boardId]; exists {
-		b.flowMutex.RUnlock()
-		return nil, fmt.Errorf("board '%s' is already executing", boardId)
+	b.flowMutex.Lock()
+	if existing, exists := b.activeFlows[boardId]; exists {
+		existing.StatusMu.Lock()
+		status := existing.Status.Status
+		existing.StatusMu.Unlock()
+		if status == "running" {
+			b.flowMutex.Unlock()
+			return nil, fmt.Errorf("board '%s' is already executing", boardId)
+		}
+		// Terminal state (completed/failed/cancelled): stop cleanup timer, remove stale entry
+		if existing.CleanupTimer != nil {
+			existing.CleanupTimer.Stop()
+		}
+		delete(b.activeFlows, boardId)
 	}
-	b.flowMutex.RUnlock()
+	b.flowMutex.Unlock()
 
 	// Get board
 	b.mutex.RLock()
@@ -465,11 +479,19 @@ func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, lay
 	log.Printf("[BoardService] executeFlow started: boardId=%s layers=%d totalEdges=%d", board.Id, len(layers), len(board.Edges))
 	defer func() {
 		endTime := time.Now()
+		flow.StatusMu.Lock()
 		flow.Status.EndTime = &endTime
-		b.flowMutex.Lock()
-		delete(b.activeFlows, board.Id)
-		b.flowMutex.Unlock()
+		flow.StatusMu.Unlock()
 		log.Printf("[BoardService] executeFlow finished: boardId=%s finalStatus=%s", board.Id, flow.Status.Status)
+		// Delay cleanup to give frontend polling time to catch the terminal status.
+		// The flow stays in activeFlows with its final status for a grace period.
+		// Store the timer so ExecuteBoard can cancel it for immediate re-execution.
+		flow.CleanupTimer = time.AfterFunc(10*time.Second, func() {
+			b.flowMutex.Lock()
+			delete(b.activeFlows, board.Id)
+			b.flowMutex.Unlock()
+			log.Printf("[BoardService] executeFlow cleaned up: boardId=%s", board.Id)
+		})
 	}()
 
 	// Track failed nodes to skip downstream
@@ -488,12 +510,9 @@ func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, lay
 		default:
 		}
 
-		var wg sync.WaitGroup
-		var layerMu sync.Mutex
-		layerHasFailure := false
-
+		// Pass 1: Sequential skip check (safe read of failedNodes, no concurrent writers yet)
+		var edgesToRun []models.BoardEdge
 		for _, edge := range layer {
-			// Check if this edge's source node is downstream of a failed node
 			if failedNodes[edge.SourceId] {
 				flow.StatusMu.Lock()
 				b.updateEdgeStatus(flow.Status, edge.Id, "skipped", "Skipped: upstream edge failed")
@@ -502,7 +521,15 @@ func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, lay
 				b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "skipped", "Skipped: upstream edge failed")
 				continue
 			}
+			edgesToRun = append(edgesToRun, edge)
+		}
 
+		// Pass 2: Parallel execution (writes to failedNodes are protected by layerMu)
+		var wg sync.WaitGroup
+		var layerMu sync.Mutex
+		layerHasFailure := false
+
+		for _, edge := range edgesToRun {
 			wg.Add(1)
 			go func(e models.BoardEdge) {
 				defer wg.Done()
@@ -518,6 +545,7 @@ func (b *BoardService) executeFlow(ctx context.Context, board *models.Board, lay
 			}(edge)
 		}
 
+		// After Wait(), failedNodes is safe to read in the next layer iteration
 		wg.Wait()
 
 		if layerHasFailure {

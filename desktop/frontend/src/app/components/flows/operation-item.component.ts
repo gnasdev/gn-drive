@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Operation, SyncConfig } from '../../models/flow.model';
 import { NeoButtonComponent } from '../neo/neo-button.component';
-import { NeoInputComponent } from '../neo/neo-input.component';
 import { RemoteDropdownComponent, RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
 import { PathBrowserComponent } from '../path-browser/path-browser.component';
 import { OperationSettingsPanelComponent } from '../operations-tree/operation-settings-panel.component';
@@ -16,7 +15,6 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
     CommonModule,
     FormsModule,
     NeoButtonComponent,
-    NeoInputComponent,
     RemoteDropdownComponent,
     PathBrowserComponent,
     OperationSettingsPanelComponent,
@@ -47,8 +45,9 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
 
         <!-- Source Remote + Path -->
         <div class="flex-1 min-w-0">
+          <span class="block text-xs font-bold text-sys-fg-muted mb-1">Source</span>
           <app-remote-dropdown
-            placeholder="Source"
+            placeholder="Select remote"
             [(ngModel)]="operation.sourceRemote"
             (ngModelChange)="onOperationChange()"
             (addRemote)="addRemote.emit()"
@@ -56,34 +55,15 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
             (removeRemote)="removeRemote.emit($event)"
             [disabled]="isExecuting"
           ></app-remote-dropdown>
-          <div class="flex items-center gap-1 mt-2">
-            @if (sourcePathMode === 'text') {
-              <neo-input
-                class="flex-1"
-                placeholder="/"
-                [(ngModel)]="operation.sourcePath"
-                (ngModelChange)="onOperationChange()"
-                [disabled]="isExecuting"
-              ></neo-input>
-            } @else {
-              <app-path-browser
-                class="flex-1"
-                [remoteName]="operation.sourceRemote"
-                [(path)]="operation.sourcePath"
-                (pathChange)="onOperationChange()"
-                placeholder="/"
-                filterMode="folder"
-                [disabled]="isExecuting"
-              ></app-path-browser>
-            }
-            <neo-button
-              variant="secondary"
-              size="sm"
-              (onClick)="sourcePathMode = sourcePathMode === 'text' ? 'browser' : 'text'"
+          <div class="mt-2">
+            <app-path-browser
+              [remoteName]="operation.sourceRemote"
+              [(path)]="operation.sourcePath"
+              (pathChange)="onOperationChange()"
+              placeholder="/"
+              filterMode="folder"
               [disabled]="isExecuting"
-            >
-              <i class="pi" [class.pi-folder-open]="sourcePathMode === 'text'" [class.pi-pencil]="sourcePathMode !== 'text'"></i>
-            </neo-button>
+            ></app-path-browser>
           </div>
         </div>
 
@@ -94,8 +74,9 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
 
         <!-- Target Remote + Path -->
         <div class="flex-1 min-w-0">
+          <span class="block text-xs font-bold text-sys-fg-muted mb-1">Target</span>
           <app-remote-dropdown
-            placeholder="Target"
+            placeholder="Select remote"
             [(ngModel)]="operation.targetRemote"
             (ngModelChange)="onOperationChange()"
             (addRemote)="addRemote.emit()"
@@ -103,34 +84,15 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
             (removeRemote)="removeRemote.emit($event)"
             [disabled]="isExecuting"
           ></app-remote-dropdown>
-          <div class="flex items-center gap-1 mt-2">
-            @if (targetPathMode === 'text') {
-              <neo-input
-                class="flex-1"
-                placeholder="/"
-                [(ngModel)]="operation.targetPath"
-                (ngModelChange)="onOperationChange()"
-                [disabled]="isExecuting"
-              ></neo-input>
-            } @else {
-              <app-path-browser
-                class="flex-1"
-                [remoteName]="operation.targetRemote"
-                [(path)]="operation.targetPath"
-                (pathChange)="onOperationChange()"
-                placeholder="/"
-                filterMode="folder"
-                [disabled]="isExecuting"
-              ></app-path-browser>
-            }
-            <neo-button
-              variant="secondary"
-              size="sm"
-              (onClick)="targetPathMode = targetPathMode === 'text' ? 'browser' : 'text'"
+          <div class="mt-2">
+            <app-path-browser
+              [remoteName]="operation.targetRemote"
+              [(path)]="operation.targetPath"
+              (pathChange)="onOperationChange()"
+              placeholder="/"
+              filterMode="folder"
               [disabled]="isExecuting"
-            >
-              <i class="pi" [class.pi-folder-open]="targetPathMode === 'text'" [class.pi-pencil]="targetPathMode !== 'text'"></i>
-            </neo-button>
+            ></app-path-browser>
           </div>
         </div>
 
@@ -196,9 +158,6 @@ export class FlowOperationItemComponent {
   @Input() isDragging = false;
   @Input() willBeDragged = false;
   @Input() showLogs = true;
-
-  sourcePathMode: 'text' | 'browser' = 'text';
-  targetPathMode: 'text' | 'browser' = 'text';
 
   @Output() operationChange = new EventEmitter<Operation>();
   @Output() remove = new EventEmitter<void>();

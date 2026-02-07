@@ -27,6 +27,7 @@ type SyncStatusHandler struct {
 	action              string
 	tabId               string
 	startTime           time.Time
+	ctx                 context.Context
 }
 
 func (h *SyncStatusHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -44,6 +45,7 @@ func (h *SyncStatusHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		action:              h.action,
 		tabId:               h.tabId,
 		startTime:           h.startTime,
+		ctx:                 h.ctx,
 	}
 }
 
@@ -57,6 +59,7 @@ func (h *SyncStatusHandler) WithGroup(name string) slog.Handler {
 		action:              h.action,
 		tabId:               h.tabId,
 		startTime:           h.startTime,
+		ctx:                 h.ctx,
 	}
 }
 
@@ -66,7 +69,7 @@ func (h *SyncStatusHandler) Enabled(ctx context.Context, level slog.Level) bool 
 
 // createSyncStatusFromStats creates a SyncStatusDTO from rclone accounting stats
 func (h *SyncStatusHandler) createSyncStatusFromStats() *dto.SyncStatusDTO {
-	stats := accounting.GlobalStats()
+	stats := accounting.Stats(h.ctx)
 
 	var syncStatus *dto.SyncStatusDTO
 	if h.tabId != "" {
@@ -149,7 +152,7 @@ func formatDuration(d time.Duration) string {
 }
 
 // StartSyncStatusReporting starts sending sync status updates
-func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action string, tabId string) func() {
+func StartSyncStatusReporting(ctx context.Context, statusChannel chan []byte, taskId int, action string, tabId string) func() {
 	isStatusClosed := false
 	statusClosedRecover := func() {
 		if r := recover(); r != nil {
@@ -168,6 +171,7 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 		action:              action,
 		tabId:               tabId,
 		startTime:           time.Now(),
+		ctx:                 ctx,
 	}
 
 	// Set the custom logger
@@ -192,7 +196,7 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 			syncPrintMu.Unlock()
 
 			logMsg := fmt.Sprintf(format, a...)
-			statusChannel <- []byte(formatToProgressCompat(logMsg))
+			statusChannel <- []byte(formatToProgressCompat(ctx, logMsg))
 		}
 	}
 
@@ -232,11 +236,11 @@ func StartSyncStatusReporting(statusChannel chan []byte, taskId int, action stri
 }
 
 // formatToProgressCompat prints the progress with an optional log (compatibility function)
-func formatToProgressCompat(logMessage string) string {
+func formatToProgressCompat(ctx context.Context, logMessage string) string {
 	operations.StdoutMutex.Lock()
 	defer operations.StdoutMutex.Unlock()
 
-	stats := strings.TrimSpace(accounting.GlobalStats().String())
+	stats := strings.TrimSpace(accounting.Stats(ctx).String())
 	logMessage = strings.TrimSpace(logMessage)
 
 	var result strings.Builder

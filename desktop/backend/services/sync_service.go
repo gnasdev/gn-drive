@@ -140,6 +140,10 @@ func (s *SyncService) SetApp(app *application.App) {
 // SetEnvConfig sets the environment configuration (needed for rclone init)
 func (s *SyncService) SetEnvConfig(config beConfig.Config) {
 	s.envConfig = config
+	// Initialize rclone global state once
+	if err := rclone.InitGlobal(config.DebugMode); err != nil {
+		log.Printf("WARNING: Failed to initialize rclone: %v", err)
+	}
 }
 
 // SetLogService sets the log service for reliable log delivery
@@ -305,10 +309,10 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		s.mutex.Unlock()
 	}()
 
-	// Initialize rclone config
-	ctx, err := rclone.InitConfig(ctx, s.envConfig.DebugMode)
+	// Create isolated rclone context for this task
+	ctx, err := rclone.NewTaskContext(ctx, task.Id)
 	if err != nil {
-		taskErr = fmt.Errorf("failed to initialize rclone config: %w", err)
+		taskErr = fmt.Errorf("failed to create rclone task context: %w", err)
 		s.handleSyncError(task, taskErr.Error())
 		return
 	}
@@ -327,7 +331,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	}
 
 	// Start sync status reporting
-	stopSyncStatus := utils.StartSyncStatusReporting(nil, task.Id, string(task.Action), task.TabId)
+	stopSyncStatus := utils.StartSyncStatusReporting(ctx, nil, task.Id, string(task.Action), task.TabId)
 
 	// Register cancel function in the global command store
 	utils.AddCmd(task.Id, func() {
