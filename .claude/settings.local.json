@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:v3alpha.wails.io)",
-      "mcp__acp__Bash"
+      "mcp__acp__Bash",
+      "mcp__acp__Edit"
     ]
   }
 }

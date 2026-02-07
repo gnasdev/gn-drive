@@ -54,10 +54,14 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
     <neo-dialog
       [visible]="visible"
       (visibleChange)="visibleChange.emit($event)"
-      title="Settings"
-      maxWidth="500px"
+      title="Settings v1.0.0"
+      width="80vw"
+      maxWidth="80vw"
+      height="80vh"
+      maxHeight="80vh"
+      [headerYellow]="true"
     >
-      <div class="space-y-4 max-h-[70vh] overflow-auto">
+      <div class="space-y-4 h-full overflow-auto hide-scrollbar">
         <!-- Backup & Restore -->
         <neo-card>
           <div class="flex items-center gap-2 mb-3">
@@ -152,23 +156,6 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
           </div>
         </neo-card>
 
-        <!-- About -->
-        <neo-card>
-          <div class="flex items-center gap-2 mb-3">
-            <i class="pi pi-info-circle"></i>
-            <h2 class="font-bold">About</h2>
-          </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-sys-fg-muted">Version</span>
-              <span class="font-medium">1.0.0</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-sys-fg-muted">Powered by</span>
-              <span class="font-medium">rclone + Wails v3</span>
-            </div>
-          </div>
-        </neo-card>
       </div>
     </neo-dialog>
 

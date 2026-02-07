@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SyncAction, SyncConfig } from '../../models/operation.model';
+import { SyncConfig } from '../../models/flow.model';
 import { NeoButtonComponent } from '../neo/neo-button.component';
 import { NeoInputComponent } from '../neo/neo-input.component';
 import { NeoToggleComponent } from '../neo/neo-toggle.component';
@@ -23,7 +23,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
       <!-- Action Type -->
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-bold mb-1">Action</label>
+          <span class="block text-sm font-bold mb-1">Action</span>
           <neo-dropdown
             [options]="actionOptions"
             [fullWidth]="true"
@@ -33,7 +33,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
           ></neo-dropdown>
         </div>
         <div>
-          <label class="block text-sm font-bold mb-1">Dry Run</label>
+          <span class="block text-sm font-bold mb-1">Dry Run</span>
           <neo-toggle
             [(ngModel)]="config.dryRun"
             (ngModelChange)="onConfigChange()"
@@ -48,7 +48,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
         <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
           <i class="pi pi-bolt"></i> Performance
         </h3>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <neo-input
             label="Parallel"
             type="number"
@@ -64,14 +64,6 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
             (ngModelChange)="onConfigChange()"
             [disabled]="disabled"
           ></neo-input>
-          <neo-input
-            label="Checkers"
-            type="number"
-            placeholder="8"
-            [(ngModel)]="config.checkers"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
         </div>
       </div>
 
@@ -81,8 +73,8 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
           <i class="pi pi-filter"></i> Filters
         </h3>
         <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-sm font-medium mb-1">Include Paths</label>
+          <label class="block">
+            <span class="block text-sm font-medium mb-1">Include Paths</span>
             <textarea
               class="w-full px-3 py-2 border-2 border-sys-border shadow-neo-sm font-mono text-sm resize-none"
               rows="3"
@@ -91,9 +83,9 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
               (ngModelChange)="updateIncludedPaths($event)"
               [disabled]="disabled"
             ></textarea>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Exclude Paths</label>
+          </label>
+          <label class="block">
+            <span class="block text-sm font-medium mb-1">Exclude Paths</span>
             <textarea
               class="w-full px-3 py-2 border-2 border-sys-border shadow-neo-sm font-mono text-sm resize-none"
               rows="3"
@@ -102,7 +94,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
               (ngModelChange)="updateExcludedPaths($event)"
               [disabled]="disabled"
             ></textarea>
-          </div>
+          </label>
         </div>
       </div>
 

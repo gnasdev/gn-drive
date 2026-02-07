@@ -8,7 +8,7 @@ import {
     OnInit,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ConfirmationService, MenuItem, MessageService } from "primeng/api";
+import { ConfirmationService, MenuItem } from "primeng/api";
 import { ButtonModule } from "primeng/button";
 import { Card } from "primeng/card";
 import { ContextMenu } from "primeng/contextmenu";
@@ -65,7 +65,6 @@ export class BoardComponent implements OnInit, OnDestroy {
     // Remote options for adding nodes (as draggable badges)
     remoteOptions: { label: string; value: string }[] = [];
     availableRemotes: { label: string; value: string }[] = []; // Remotes not yet added to board
-    draggingRemote: { label: string; value: string } | null = null;
     remoteProviders = new Map<string, string>(); // remote name -> provider label
 
     // Board name dialog (for creating new board)
@@ -168,7 +167,6 @@ export class BoardComponent implements OnInit, OnDestroy {
     private readonly appService = inject(AppService);
     private readonly cdr = inject(ChangeDetectorRef);
     private readonly confirmationService = inject(ConfirmationService);
-    private readonly messageService = inject(MessageService);
 
     ngOnInit(): void {
         this.boardService.loadBoards();
@@ -264,9 +262,10 @@ export class BoardComponent implements OnInit, OnDestroy {
 
     // --- List view actions ---
 
-    openBoard(board: models.Board): void {
-        this.boardService.setActiveBoard(board.id);
+    async openBoard(board: models.Board): Promise<void> {
+        await this.boardService.setActiveBoard(board.id);
         this.viewMode = "editor";
+        this.cdr.detectChanges();
     }
 
     backToList(): void {
@@ -353,63 +352,12 @@ export class BoardComponent implements OnInit, OnDestroy {
         );
     }
 
-    // Drag handlers for remote badges
-    onRemoteDragStart(
-        event: DragEvent,
-        remote: { label: string; value: string },
-    ): void {
-        if (this.isExecuting) {
-            event.preventDefault();
-            return;
-        }
-        this.draggingRemote = remote;
-        event.dataTransfer?.setData("text/plain", remote.value);
-    }
-
-    onRemoteDragEnd(): void {
-        this.draggingRemote = null;
-    }
-
-    onCanvasDragOver(event: DragEvent): void {
+    onRemoteClick(remote: { label: string; value: string }): void {
         if (this.isExecuting) return;
-        event.preventDefault();
-    }
-
-    onCanvasDrop(event: DragEvent): void {
-        if (this.isExecuting) return;
-        event.preventDefault();
-        // This is now handled by onCanvasDropAt via board-canvas component
-        this.draggingRemote = null;
-    }
-
-    onCanvasDropAt(position: { x: number; y: number }): void {
-        if (this.isExecuting) return;
-        if (this.draggingRemote) {
-            const remoteName = this.draggingRemote.value;
-            const label = remoteName === "local" ? "Local" : remoteName;
-            this.boardService.addNode(
-                remoteName,
-                "",
-                label,
-                position.x,
-                position.y,
-            );
-            this.updateAvailableRemotes();
-            this.cdr.detectChanges();
-        }
-        this.draggingRemote = null;
-    }
-
-    async saveBoard(): Promise<void> {
-        if (this.activeBoard) {
-            await this.boardService.saveBoard(this.activeBoard);
-            this.messageService.add({
-                severity: "success",
-                summary: "Saved",
-                detail: `Board "${this.activeBoard.name || "(Unnamed)"}" saved successfully.`,
-                life: 3000,
-            });
-        }
+        const label = remote.value === "local" ? "Local" : remote.value;
+        this.boardService.addNode(remote.value, "", label, 350, 200);
+        this.updateAvailableRemotes();
+        this.cdr.detectChanges();
     }
 
     async executeBoard(): Promise<void> {

@@ -4,18 +4,20 @@ import (
 	"context"
 	"desktop/backend/models"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func newTestBoardService(t *testing.T) *BoardService {
 	t.Helper()
-	tmpDir := t.TempDir()
+	// Clean DB tables for test isolation
+	db, _ := GetSharedDB()
+	db.Exec("DELETE FROM board_edges")
+	db.Exec("DELETE FROM board_nodes")
+	db.Exec("DELETE FROM boards")
 	return &BoardService{
 		boards:      []models.Board{},
 		activeFlows: make(map[string]*FlowExecution),
-		filePath:    filepath.Join(tmpDir, "boards.json"),
 		initialized: true,
 	}
 }
@@ -817,50 +819,38 @@ func TestBoardService_GetExecutionStatus_NotRunning(t *testing.T) {
 // --- Persistence Tests ---
 
 func TestBoardService_Persistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "boards.json")
 	ctx := context.Background()
 
-	// Create and save
+	// Create first service instance and add a board
 	s1 := &BoardService{
 		boards:      []models.Board{},
 		activeFlows: make(map[string]*FlowExecution),
-		filePath:    filePath,
 		initialized: true,
 	}
 
-	board := makeTestBoard("board-1", "Persistent Board")
+	board := makeTestBoard("persist-board-1", "Persistent Board")
 	if err := s1.AddBoard(ctx, board); err != nil {
 		t.Fatalf("AddBoard failed: %v", err)
 	}
 
-	// Load in a new service instance
+	// Create second service instance and load from DB
 	s2 := &BoardService{
 		boards:      []models.Board{},
 		activeFlows: make(map[string]*FlowExecution),
-		filePath:    filePath,
-		initialized: true,
 	}
-	if err := s2.loadFromFile(); err != nil {
-		t.Fatalf("loadFromFile failed: %v", err)
+	if err := s2.initialize(); err != nil {
+		t.Fatalf("initialize failed: %v", err)
 	}
 
-	if len(s2.boards) != 1 {
-		t.Fatalf("expected 1 board after reload, got %d", len(s2.boards))
+	found := false
+	for _, b := range s2.boards {
+		if b.Id == "persist-board-1" && b.Name == "Persistent Board" {
+			found = true
+			break
+		}
 	}
-	if s2.boards[0].Name != "Persistent Board" {
-		t.Errorf("expected name 'Persistent Board', got %q", s2.boards[0].Name)
-	}
-}
-
-func TestBoardService_LoadFromFile_NotExists(t *testing.T) {
-	s := &BoardService{
-		filePath: filepath.Join(t.TempDir(), "nonexistent.json"),
-	}
-
-	err := s.loadFromFile()
-	if err != nil {
-		t.Errorf("loadFromFile should not error for missing file, got: %v", err)
+	if !found {
+		t.Error("expected to find 'Persistent Board' after loading from DB")
 	}
 }
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from "@angular/core";
+import { Component, OnInit, OnDestroy, inject } from "@angular/core";
 import { Subscription } from "rxjs";
 import {
   ErrorService,
@@ -16,13 +16,11 @@ import { MessageService } from "primeng/api";
   template: "",
 })
 export class ToastComponent implements OnInit, OnDestroy {
+  private readonly errorService = inject(ErrorService);
+  private readonly messageService = inject(MessageService);
+
   private subscription?: Subscription;
   private shownIds = new Set<string>();
-
-  constructor(
-    private errorService: ErrorService,
-    private messageService: MessageService
-  ) {}
 
   ngOnInit(): void {
     this.subscription = this.errorService.errors$.subscribe((errors) => {

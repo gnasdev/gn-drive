@@ -181,15 +181,3 @@ func (t *TrayService) quit() {
 		t.app.Quit()
 	}
 }
-
-// Destroy cleans up the system tray
-func (t *TrayService) Destroy() {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	if t.tray != nil {
-		t.tray.Destroy()
-		t.tray = nil
-	}
-	t.initialized = false
-}

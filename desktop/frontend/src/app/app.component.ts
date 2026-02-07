@@ -1,18 +1,12 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-  Component,
-  OnDestroy,
-  OnInit,
-} from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ConfirmDialog } from 'primeng/confirmdialog';
 import { ToastModule } from 'primeng/toast';
 import { Subscription } from 'rxjs';
 import { AppService } from './app.service.js';
 import { ErrorDisplayComponent } from './components/error-display/error-display.component.js';
 import { TopbarComponent } from './components/topbar/topbar.component.js';
-import { OperationsTreeComponent } from './components/operations-tree/operations-tree.component.js';
+import { FlowsContainerComponent } from './components/flows/flows-container.component.js';
 import { SettingsDialogComponent } from './components/dialogs/settings-dialog.component.js';
 import { ConsoleLoggerService } from './services/console-logger.service.js';
 import { LoggingService } from './services/logging.service.js';
@@ -23,7 +17,7 @@ import { LoggingService } from './services/logging.service.js';
   imports: [
     CommonModule,
     TopbarComponent,
-    OperationsTreeComponent,
+    FlowsContainerComponent,
     SettingsDialogComponent,
     ErrorDisplayComponent,
     ToastModule,
@@ -34,17 +28,15 @@ import { LoggingService } from './services/logging.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
+  readonly appService = inject(AppService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly loggingService = inject(LoggingService);
+  private readonly consoleLoggerService = inject(ConsoleLoggerService);
+
   private subscriptions = new Subscription();
   private isInitialized = false;
 
   showSettingsDialog = false;
-
-  constructor(
-    public readonly appService: AppService,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly loggingService: LoggingService,
-    private readonly consoleLoggerService: ConsoleLoggerService
-  ) {}
 
   ngOnInit() {
     if (this.isInitialized) {

@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from "@angular/core";
+import { Injectable, NgZone, OnDestroy, inject } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 // Import models from the new v3 bindings
 import * as models from "../../wailsjs/desktop/backend/models/models.js";
@@ -60,6 +60,11 @@ export enum Action {
     providedIn: "root",
 })
 export class AppService implements OnDestroy {
+    private tabService = inject(TabService);
+    private errorService = inject(ErrorService);
+    private logConsumerService = inject(LogConsumerService);
+    private readonly ngZone = inject(NgZone);
+
     readonly currentId$ = new BehaviorSubject<number>(0);
     readonly currentAction$ = new BehaviorSubject<Action | undefined>(
         undefined,
@@ -71,50 +76,48 @@ export class AppService implements OnDestroy {
 
     private eventCleanup: (() => void) | undefined;
 
-    constructor(
-        private tabService: TabService,
-        private errorService: ErrorService,
-        private logConsumerService: LogConsumerService,
-    ) {
+    constructor() {
         const configInfo = new models.ConfigInfo();
         configInfo.profiles = [];
         this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
         // Store cleanup function for event listener
         this.eventCleanup = Events.On("tofe", (event) => {
-            const rawData = event.data;
-            const parsedEvent = parseEvent(rawData);
-            if (!parsedEvent) {
-                console.error("AppService: Failed to parse event");
-                return;
-            }
-            // Handle new typed events
-            if (isSyncEvent(parsedEvent)) {
-                this.handleSyncEvent(parsedEvent);
-                return;
-            }
+            this.ngZone.run(() => {
+                const rawData = event.data;
+                const parsedEvent = parseEvent(rawData);
+                if (!parsedEvent) {
+                    console.error("AppService: Failed to parse event");
+                    return;
+                }
+                // Handle new typed events
+                if (isSyncEvent(parsedEvent)) {
+                    this.handleSyncEvent(parsedEvent);
+                    return;
+                }
 
-            if (isConfigEvent(parsedEvent)) {
-                this.handleConfigEvent(parsedEvent);
-                return;
-            }
+                if (isConfigEvent(parsedEvent)) {
+                    this.handleConfigEvent(parsedEvent);
+                    return;
+                }
 
-            if (isErrorEvent(parsedEvent)) {
-                this.handleErrorEvent(parsedEvent);
-                return;
-            }
+                if (isErrorEvent(parsedEvent)) {
+                    this.handleErrorEvent(parsedEvent);
+                    return;
+                }
 
-            // Handle legacy command DTOs
-            if (isLegacyCommandDTO(parsedEvent)) {
-                this.handleLegacyCommand(parsedEvent as LegacyCommandDTO);
-                return;
-            }
+                // Handle legacy command DTOs
+                if (isLegacyCommandDTO(parsedEvent)) {
+                    this.handleLegacyCommand(parsedEvent as LegacyCommandDTO);
+                    return;
+                }
 
-            // Fallback: try to handle as legacy command if it has command field
-            if ("command" in parsedEvent) {
-                this.handleLegacyCommand(
-                    parsedEvent as unknown as LegacyCommandDTO,
-                );
-            }
+                // Fallback: try to handle as legacy command if it has command field
+                if ("command" in parsedEvent) {
+                    this.handleLegacyCommand(
+                        parsedEvent as unknown as LegacyCommandDTO,
+                    );
+                }
+            });
         });
     }
 

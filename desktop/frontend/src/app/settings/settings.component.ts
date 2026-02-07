@@ -4,6 +4,7 @@ import {
     ChangeDetectorRef,
     Component,
     OnInit,
+    inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MessageService } from "primeng/api";
@@ -541,6 +542,9 @@ import {
     `,
 })
 export class SettingsComponent implements OnInit {
+    private readonly cdr = inject(ChangeDetectorRef);
+    private readonly messageService = inject(MessageService);
+
     notificationsEnabled = true;
     minimizeToTray = false;
     startAtLogin = false;
@@ -573,11 +577,6 @@ export class SettingsComponent implements OnInit {
         if (!this.importFilePath) return "";
         return this.importFilePath.split("/").pop() || this.importFilePath;
     }
-
-    constructor(
-        private readonly cdr: ChangeDetectorRef,
-        private readonly messageService: MessageService,
-    ) {}
 
     async ngOnInit() {
         try {

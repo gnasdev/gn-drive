@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import { LoggingService } from "./logging.service";
 import { LogLevel } from "../models/logging.interface";
 
@@ -6,6 +6,8 @@ import { LogLevel } from "../models/logging.interface";
   providedIn: "root",
 })
 export class ConsoleLoggerService {
+  private loggingService = inject(LoggingService);
+
   private originalConsole: {
     log: typeof console.log;
     warn: typeof console.warn;
@@ -16,7 +18,7 @@ export class ConsoleLoggerService {
 
   private isInitialized = false;
 
-  constructor(private loggingService: LoggingService) {
+  constructor() {
     // Store original console methods
     this.originalConsole = {
       log: console.log.bind(console),

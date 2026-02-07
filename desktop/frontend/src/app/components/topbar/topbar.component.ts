@@ -7,7 +7,7 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
   standalone: true,
   imports: [CommonModule, NeoButtonComponent],
   template: `
-    <header class="h-14 bg-sys-bg border-b-2 border-sys-border px-4 flex items-center justify-between">
+    <header class="h-14 bg-sys-accent border-b-2 border-sys-border px-4 flex items-center justify-between">
       <!-- App Name -->
       <div class="flex items-center gap-2">
         <i class="pi pi-cloud text-xl text-sys-fg"></i>
@@ -18,7 +18,7 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
       <neo-button
         variant="ghost"
         size="sm"
-        (onClick)="onSettingsClick.emit()"
+        (onClick)="settingsClick.emit()"
       >
         <i class="pi pi-cog text-lg"></i>
       </neo-button>
@@ -26,5 +26,5 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
   `,
 })
 export class TopbarComponent {
-  @Output() onSettingsClick = new EventEmitter<void>();
+  @Output() settingsClick = new EventEmitter<void>();
 }

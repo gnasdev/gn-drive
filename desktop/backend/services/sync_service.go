@@ -338,6 +338,9 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	go func() {
 		isBoardTask := strings.HasPrefix(task.TabId, "board-")
 		for logEntry := range outLog {
+			// Always log to backend console for visibility
+			log.Printf("[sync:%s:%s] %s", string(task.Action), task.TabId, logEntry)
+
 			// For board tasks, also append to the board log buffer for polling
 			if isBoardTask {
 				AppendBoardLog(logEntry)
@@ -423,6 +426,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 
 // emitSyncEvent emits a sync event to the frontend via unified EventBus
 func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, status, message string) {
+	log.Printf("[sync:%s:%s] %s: %s", action, tabId, status, message)
 	event := events.NewSyncEvent(eventType, tabId, action, status, message)
 	if s.eventBus != nil {
 		if err := s.eventBus.EmitSyncEvent(event); err != nil {

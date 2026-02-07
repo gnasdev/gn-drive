@@ -27,16 +27,4 @@ export class NavigationService {
     navigateTo(page: PageName) {
         this.navigationState$.next({ page } as NavigationState);
     }
-
-    navigateToBoard() {
-        this.navigationState$.next({ page: "board" });
-    }
-
-    navigateToRemotes() {
-        this.navigationState$.next({ page: "remotes" });
-    }
-
-    navigateToSettings() {
-        this.navigationState$.next({ page: "settings" });
-    }
 }

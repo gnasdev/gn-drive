@@ -1,6 +1,7 @@
 import { inject, Injectable, NgZone, OnDestroy } from "@angular/core";
 import { Events } from "@wailsio/runtime";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, Subject, Subscription } from "rxjs";
+import { debounceTime } from "rxjs/operators";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 import {
     AddBoard,
@@ -44,6 +45,8 @@ export class BoardService implements OnDestroy {
     private readonly ngZone = inject(NgZone);
     private eventCleanup: (() => void) | undefined;
     private logPollingInterval: ReturnType<typeof setInterval> | null = null;
+    private autoSaveSubscription: Subscription | null = null;
+    private autoSaveTrigger$ = new Subject<void>();
 
     constructor() {
         this.eventCleanup = Events.On("tofe", (event) => {
@@ -55,11 +58,22 @@ export class BoardService implements OnDestroy {
                 this.ngZone.run(() => this.handleSyncLogEvent(parsedEvent));
             }
         });
+
+        // Auto-save active board on changes (debounced)
+        this.autoSaveSubscription = this.autoSaveTrigger$
+            .pipe(debounceTime(500))
+            .subscribe(() => {
+                const board = this.activeBoard$.value;
+                if (board) {
+                    this.persistBoard(board);
+                }
+            });
     }
 
     ngOnDestroy(): void {
         this.eventCleanup?.();
         this.stopLogPolling();
+        this.autoSaveSubscription?.unsubscribe();
     }
 
     // Start polling for logs and status (workaround for Wails v3 event issues)
@@ -177,6 +191,19 @@ export class BoardService implements OnDestroy {
         }
     }
 
+    private async persistBoard(board: models.Board): Promise<void> {
+        try {
+            await UpdateBoard(board);
+            await this.loadBoards();
+        } catch (err) {
+            this.errorService.handleApiError(err, "Failed to auto-save board");
+        }
+    }
+
+    private triggerAutoSave(): void {
+        this.autoSaveTrigger$.next();
+    }
+
     async deleteBoard(boardId: string): Promise<void> {
         try {
             await DeleteBoard(boardId);
@@ -272,6 +299,7 @@ export class BoardService implements OnDestroy {
 
         board.nodes = [...(board.nodes || []), node];
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
     }
 
     removeNode(nodeId: string): void {
@@ -284,6 +312,7 @@ export class BoardService implements OnDestroy {
             (e) => e.source_id !== nodeId && e.target_id !== nodeId,
         );
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
         this.selectedNodeId$.next(null);
         this.selectedEdgeId$.next(null);
     }
@@ -297,6 +326,7 @@ export class BoardService implements OnDestroy {
             node.x = x;
             node.y = y;
             this.activeBoard$.next({ ...board });
+            this.triggerAutoSave();
         }
     }
 
@@ -329,6 +359,7 @@ export class BoardService implements OnDestroy {
 
         board.edges = [...(board.edges || []), edge];
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
     }
 
     removeEdge(edgeId: string): void {
@@ -337,6 +368,7 @@ export class BoardService implements OnDestroy {
 
         board.edges = (board.edges || []).filter((e) => e.id !== edgeId);
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
         this.selectedEdgeId$.next(null);
     }
 
@@ -374,10 +406,12 @@ export class BoardService implements OnDestroy {
         }
 
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
     }
 
     updateNodeInPlace(board: models.Board): void {
         this.activeBoard$.next({ ...board });
+        this.triggerAutoSave();
     }
 
     updateEdgeConfig(edgeId: string, updates: Partial<models.BoardEdge>): void {
@@ -388,6 +422,7 @@ export class BoardService implements OnDestroy {
         if (edge) {
             Object.assign(edge, updates);
             this.activeBoard$.next({ ...board });
+            this.triggerAutoSave();
         }
     }
 

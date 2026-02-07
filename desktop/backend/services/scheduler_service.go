@@ -4,11 +4,8 @@ import (
 	"context"
 	"desktop/backend/events"
 	"desktop/backend/models"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -23,7 +20,6 @@ type SchedulerService struct {
 	cron        *cron.Cron
 	schedules   []models.ScheduleEntry
 	cronEntries map[string]cron.EntryID // scheduleId -> cron entry ID
-	filePath    string
 	mutex       sync.RWMutex
 	initialized bool
 
@@ -93,7 +89,7 @@ func (s *SchedulerService) ServiceShutdown(ctx context.Context) error {
 	return nil
 }
 
-// initialize sets up the file path and loads existing schedules
+// initialize loads existing schedules from SQLite and registers cron jobs
 func (s *SchedulerService) initialize() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -102,25 +98,12 @@ func (s *SchedulerService) initialize() error {
 		return nil
 	}
 
-	// Use shared config to avoid duplicate os.UserHomeDir() calls
-	shared := GetSharedConfig()
-	if shared != nil {
-		s.filePath = filepath.Join(shared.ConfigDir, "schedules.json")
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "."
-		}
-		s.filePath = filepath.Join(homeDir, ".config", "ns-drive", "schedules.json")
-	}
-
-	if err := os.MkdirAll(filepath.Dir(s.filePath), 0755); err != nil {
-		return fmt.Errorf("failed to create schedules directory: %w", err)
-	}
-
-	if err := s.loadFromFile(); err != nil {
+	schedules, err := s.loadSchedulesFromDB()
+	if err != nil {
 		log.Printf("Warning: Could not load schedules: %v", err)
 		s.schedules = []models.ScheduleEntry{}
+	} else {
+		s.schedules = schedules
 	}
 
 	// Register enabled schedules with cron
@@ -163,10 +146,10 @@ func (s *SchedulerService) AddSchedule(ctx context.Context, entry models.Schedul
 		}
 	}
 
-	if err := s.saveToFile(); err != nil {
+	if err := s.saveScheduleToDB(s.schedules[len(s.schedules)-1]); err != nil {
 		s.unregisterCronJob(entry.Id)
 		s.schedules = s.schedules[:len(s.schedules)-1]
-		return fmt.Errorf("failed to save schedules: %w", err)
+		return fmt.Errorf("failed to save schedule: %w", err)
 	}
 
 	s.emitScheduleEvent(events.ScheduleAdded, entry.Id, entry)
@@ -211,7 +194,7 @@ func (s *SchedulerService) UpdateSchedule(ctx context.Context, entry models.Sche
 		return fmt.Errorf("schedule '%s' not found", entry.Id)
 	}
 
-	if err := s.saveToFile(); err != nil {
+	if err := s.saveScheduleToDB(entry); err != nil {
 		// Rollback
 		for i, existing := range s.schedules {
 			if existing.Id == entry.Id {
@@ -223,7 +206,7 @@ func (s *SchedulerService) UpdateSchedule(ctx context.Context, entry models.Sche
 				break
 			}
 		}
-		return fmt.Errorf("failed to save schedules: %w", err)
+		return fmt.Errorf("failed to save schedule: %w", err)
 	}
 
 	s.emitScheduleEvent(events.ScheduleUpdated, entry.Id, entry)
@@ -254,9 +237,9 @@ func (s *SchedulerService) DeleteSchedule(ctx context.Context, scheduleId string
 		return fmt.Errorf("schedule '%s' not found", scheduleId)
 	}
 
-	if err := s.saveToFile(); err != nil {
+	if err := s.deleteScheduleFromDB(scheduleId); err != nil {
 		s.schedules = append(s.schedules, deletedEntry)
-		return fmt.Errorf("failed to save schedules: %w", err)
+		return fmt.Errorf("failed to delete schedule: %w", err)
 	}
 
 	s.emitScheduleEvent(events.ScheduleDeleted, scheduleId, deletedEntry)
@@ -290,7 +273,7 @@ func (s *SchedulerService) EnableSchedule(ctx context.Context, scheduleId string
 			if err := s.registerCronJob(&s.schedules[i]); err != nil {
 				return fmt.Errorf("failed to register cron job: %w", err)
 			}
-			if err := s.saveToFile(); err != nil {
+			if err := s.saveScheduleToDB(s.schedules[i]); err != nil {
 				s.unregisterCronJob(scheduleId)
 				s.schedules[i].Enabled = false
 				return fmt.Errorf("failed to save schedules: %w", err)
@@ -314,7 +297,7 @@ func (s *SchedulerService) DisableSchedule(ctx context.Context, scheduleId strin
 		if entry.Id == scheduleId {
 			s.schedules[i].Enabled = false
 			s.unregisterCronJob(scheduleId)
-			if err := s.saveToFile(); err != nil {
+			if err := s.saveScheduleToDB(s.schedules[i]); err != nil {
 				s.schedules[i].Enabled = true
 				return fmt.Errorf("failed to save schedules: %w", err)
 			}
@@ -394,7 +377,7 @@ func (s *SchedulerService) triggerSchedule(scheduleId, profileName, action strin
 				default:
 					s.schedules[i].LastResult = "failed"
 					log.Printf("Unknown action '%s' for schedule '%s'", action, scheduleId)
-					_ = s.saveToFile()
+					_ = s.saveScheduleToDB(s.schedules[i])
 					s.mutex.Unlock()
 					return
 				}
@@ -425,37 +408,79 @@ func (s *SchedulerService) triggerSchedule(scheduleId, profileName, action strin
 				}
 			}
 
-			_ = s.saveToFile()
+			_ = s.saveScheduleToDB(s.schedules[i])
 			break
 		}
 	}
 	s.mutex.Unlock()
 }
 
-// loadFromFile loads schedules from the JSON file
-func (s *SchedulerService) loadFromFile() error {
-	data, err := os.ReadFile(s.filePath)
+// loadSchedulesFromDB loads all schedules from SQLite
+func (s *SchedulerService) loadSchedulesFromDB() ([]models.ScheduleEntry, error) {
+	db, err := GetSharedDB()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+		return nil, err
+	}
+
+	rows, err := db.Query("SELECT id, profile_name, action, cron_expr, enabled, last_run, next_run, last_result, created_at FROM schedules")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var schedules []models.ScheduleEntry
+	for rows.Next() {
+		var e models.ScheduleEntry
+		var enabled int
+		var lastRun, nextRun *string
+		var createdAt string
+		if err := rows.Scan(&e.Id, &e.ProfileName, &e.Action, &e.CronExpr, &enabled, &lastRun, &nextRun, &e.LastResult, &createdAt); err != nil {
+			return nil, fmt.Errorf("failed to scan schedule: %w", err)
 		}
-		return err
+		e.Enabled = enabled != 0
+		if lastRun != nil {
+			if t, err := time.Parse(time.RFC3339, *lastRun); err == nil {
+				e.LastRun = &t
+			}
+		}
+		if nextRun != nil {
+			if t, err := time.Parse(time.RFC3339, *nextRun); err == nil {
+				e.NextRun = &t
+			}
+		}
+		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+			e.CreatedAt = t
+		}
+		schedules = append(schedules, e)
 	}
-
-	if len(data) == 0 {
-		return nil
+	if schedules == nil {
+		schedules = []models.ScheduleEntry{}
 	}
-
-	return json.Unmarshal(data, &s.schedules)
+	return schedules, rows.Err()
 }
 
-// saveToFile saves schedules to the JSON file
-func (s *SchedulerService) saveToFile() error {
-	data, err := json.MarshalIndent(s.schedules, "", "  ")
+// saveScheduleToDB saves a single schedule to the database
+func (s *SchedulerService) saveScheduleToDB(e models.ScheduleEntry) error {
+	db, err := GetSharedDB()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.filePath, data, 0644)
+	_, err = db.Exec(`INSERT OR REPLACE INTO schedules (id, profile_name, action, cron_expr, enabled, last_run, next_run, last_result, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.Id, e.ProfileName, e.Action, e.CronExpr, boolToInt(e.Enabled),
+		timePtrToNullable(e.LastRun), timePtrToNullable(e.NextRun),
+		e.LastResult, e.CreatedAt.UTC().Format(time.RFC3339))
+	return err
+}
+
+// deleteScheduleFromDB removes a schedule from the database
+func (s *SchedulerService) deleteScheduleFromDB(id string) error {
+	db, err := GetSharedDB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("DELETE FROM schedules WHERE id = ?", id)
+	return err
 }
 
 // emitScheduleEvent emits a schedule event

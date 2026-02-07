@@ -53,6 +53,11 @@ func (a *App) SetApp(app *application.App) {
 //go:embed .env
 var envConfigStr string
 
+// GetEmbeddedEnvConfigStr returns the embedded .env config string for use by main.go
+func GetEmbeddedEnvConfigStr() string {
+	return envConfigStr
+}
+
 // ServiceStartup is called when the service starts
 func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	// Note: In Wails v3, we don't have direct access to the application instance from ServiceOptions

@@ -1,6 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'neo-card',
   standalone: true,

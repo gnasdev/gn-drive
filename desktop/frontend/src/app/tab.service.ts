@@ -39,8 +39,6 @@ export class TabService {
     private tabs$ = new BehaviorSubject<Tab[]>([]);
     private activeTabId$ = new BehaviorSubject<string | null>(null);
 
-    constructor() {}
-
     get tabs() {
         return this.tabs$.asObservable();
     }

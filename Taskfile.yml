@@ -36,8 +36,10 @@ tasks:
   dev:be:
     summary: Runs the application in development mode (run 'task dev:frontend' in another terminal first)
     dir: desktop
+    env:
+      NS_DRIVE_DEBUG: "true"
     cmds:
-      - echo "Starting Wails development mode..."
+      - echo "Starting Wails development mode (debug mode enabled)..."
       - echo "Make sure frontend dev server is running on port {{.VITE_PORT}}"
       - '{{env "GOPATH"}}/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}'
 

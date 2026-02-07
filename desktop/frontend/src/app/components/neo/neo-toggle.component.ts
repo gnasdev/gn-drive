@@ -2,6 +2,7 @@ import { Component, Input, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'neo-toggle',
   standalone: true,
@@ -14,6 +15,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     },
   ],
   template: `
+    <!-- eslint-disable-next-line @angular-eslint/template/label-has-associated-control -->
     <label class="inline-flex items-center gap-3 cursor-pointer" [class.opacity-50]="disabled" [class.cursor-not-allowed]="disabled">
       <button
         type="button"
@@ -21,15 +23,19 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
         [attr.aria-checked]="value"
         (click)="toggle()"
         [disabled]="disabled"
-        [class]="toggleClasses"
+        class="relative w-10 h-6 border-2 border-sys-border shadow-neo-sm transition-colors duration-100"
+        [class.bg-sys-accent-success]="value && !disabled"
+        [class.bg-sys-bg]="!value && !disabled"
+        [class.bg-sys-bg-tertiary]="disabled"
       >
+        <!-- Knob -->
         <span
-          class="absolute top-0.5 left-0.5 w-5 h-5 bg-sys-fg transition-transform duration-200"
-          [class.translate-x-6]="value"
+          class="absolute -top-0.5 -left-0.5 w-6 h-6 bg-sys-fg border-2 border-sys-border shadow-neo-sm transition-transform duration-100"
+          [class.translate-x-4]="value"
         ></span>
       </button>
       @if (label) {
-        <span class="font-medium text-sys-fg">{{ label }}</span>
+        <span class="font-bold text-sm text-sys-fg">{{ label }}</span>
       }
     </label>
   `,
@@ -39,14 +45,8 @@ export class NeoToggleComponent implements ControlValueAccessor {
   @Input() disabled = false;
 
   value = false;
-  onChange: (value: boolean) => void = () => {};
-  onTouched: () => void = () => {};
-
-  get toggleClasses(): string {
-    const base = 'relative w-12 h-6 border-2 border-sys-border transition-colors duration-200';
-    const bgColor = this.value ? 'bg-sys-accent-success' : 'bg-sys-bg';
-    return `${base} ${bgColor}`;
-  }
+  onChange: (value: boolean) => void = () => { /* noop */ };
+  onTouched: () => void = () => { /* noop */ };
 
   toggle(): void {
     if (this.disabled) return;

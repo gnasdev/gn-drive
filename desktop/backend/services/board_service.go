@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -20,7 +18,6 @@ type BoardService struct {
 	app         *application.App
 	eventBus    *events.WailsEventBus
 	boards      []models.Board
-	filePath    string
 	mutex       sync.RWMutex
 	initialized bool
 
@@ -137,7 +134,7 @@ func (b *BoardService) ensureInitialized() error {
 	return b.initialize()
 }
 
-// initialize sets up file path and loads existing boards
+// initialize loads existing boards from SQLite
 func (b *BoardService) initialize() error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -146,24 +143,12 @@ func (b *BoardService) initialize() error {
 		return nil
 	}
 
-	shared := GetSharedConfig()
-	if shared != nil {
-		b.filePath = filepath.Join(shared.ConfigDir, "boards.json")
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "."
-		}
-		b.filePath = filepath.Join(homeDir, ".config", "ns-drive", "boards.json")
-	}
-
-	if err := os.MkdirAll(filepath.Dir(b.filePath), 0755); err != nil {
-		return fmt.Errorf("failed to create boards directory: %w", err)
-	}
-
-	if err := b.loadFromFile(); err != nil {
+	boards, err := b.loadBoardsFromDB()
+	if err != nil {
 		log.Printf("Warning: Could not load boards: %v", err)
 		b.boards = []models.Board{}
+	} else {
+		b.boards = boards
 	}
 
 	// Auto-migrate from profiles if no boards exist
@@ -231,12 +216,12 @@ func (b *BoardService) AddBoard(ctx context.Context, board models.Board) error {
 	}
 	board.UpdatedAt = time.Now()
 
-	b.boards = append(b.boards, board)
-
-	if err := b.saveToFile(); err != nil {
-		b.boards = b.boards[:len(b.boards)-1]
-		return fmt.Errorf("failed to save boards: %w", err)
+	// Save to database
+	if err := b.saveBoardToDB(board); err != nil {
+		return fmt.Errorf("failed to save board: %w", err)
 	}
+
+	b.boards = append(b.boards, board)
 
 	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "added", "Board created")
 
@@ -278,7 +263,7 @@ func (b *BoardService) UpdateBoard(ctx context.Context, board models.Board) erro
 		return fmt.Errorf("board '%s' not found", board.Id)
 	}
 
-	if err := b.saveToFile(); err != nil {
+	if err := b.saveBoardToDB(board); err != nil {
 		// Rollback
 		for i, existing := range b.boards {
 			if existing.Id == board.Id {
@@ -286,7 +271,7 @@ func (b *BoardService) UpdateBoard(ctx context.Context, board models.Board) erro
 				break
 			}
 		}
-		return fmt.Errorf("failed to save boards: %w", err)
+		return fmt.Errorf("failed to save board: %w", err)
 	}
 
 	b.emitBoardEvent(events.BoardUpdated, board.Id, "", "updated", "Board updated")
@@ -322,9 +307,9 @@ func (b *BoardService) DeleteBoard(ctx context.Context, boardId string) error {
 		return fmt.Errorf("board '%s' not found", boardId)
 	}
 
-	if err := b.saveToFile(); err != nil {
+	if err := b.deleteBoardFromDB(boardId); err != nil {
 		b.boards = append(b.boards, deletedBoard)
-		return fmt.Errorf("failed to save boards: %w", err)
+		return fmt.Errorf("failed to delete board: %w", err)
 	}
 
 	b.emitBoardEvent(events.BoardUpdated, boardId, "", "deleted", "Board deleted")
@@ -854,21 +839,30 @@ func (b *BoardService) markDownstreamSkipped(status *models.BoardExecutionStatus
 
 // migrateFromProfiles auto-migrates existing profiles to boards
 func (b *BoardService) migrateFromProfiles() {
-	shared := GetSharedConfig()
-	if shared == nil {
-		return
-	}
-
-	profilesPath := filepath.Join(shared.ConfigDir, "profiles.json")
-	data, err := os.ReadFile(profilesPath)
+	db, err := GetSharedDB()
 	if err != nil {
-		return // No profiles file, nothing to migrate
+		return
 	}
 
-	var profiles []models.Profile
-	if err := json.Unmarshal(data, &profiles); err != nil {
-		log.Printf("Warning: Could not parse profiles for migration: %v", err)
+	// Read profiles from the database
+	rows, err := db.Query("SELECT name, from_path, to_path FROM profiles")
+	if err != nil {
 		return
+	}
+	defer rows.Close()
+
+	type simpleProfile struct {
+		Name string
+		From string
+		To   string
+	}
+	var profiles []simpleProfile
+	for rows.Next() {
+		var p simpleProfile
+		if err := rows.Scan(&p.Name, &p.From, &p.To); err != nil {
+			continue
+		}
+		profiles = append(profiles, p)
 	}
 
 	if len(profiles) == 0 {
@@ -908,11 +902,10 @@ func (b *BoardService) migrateFromProfiles() {
 		}
 
 		edge := models.BoardEdge{
-			Id:         fmt.Sprintf("edge-%d", i),
-			SourceId:   sourceNode.Id,
-			TargetId:   targetNode.Id,
-			Action:     "push",
-			SyncConfig: profile,
+			Id:       fmt.Sprintf("edge-%d", i),
+			SourceId: sourceNode.Id,
+			TargetId: targetNode.Id,
+			Action:   "push",
 		}
 
 		board := models.Board{
@@ -927,11 +920,13 @@ func (b *BoardService) migrateFromProfiles() {
 		b.boards = append(b.boards, board)
 	}
 
-	if err := b.saveToFile(); err != nil {
-		log.Printf("Warning: Failed to save migrated boards: %v", err)
-	} else {
-		log.Printf("Migrated %d profiles to boards", len(profiles))
+	// Save all migrated boards to DB
+	for _, board := range b.boards {
+		if err := b.saveBoardToDB(board); err != nil {
+			log.Printf("Warning: Failed to save migrated board '%s': %v", board.Name, err)
+		}
 	}
+	log.Printf("Migrated %d profiles to boards", len(profiles))
 }
 
 // parseRemoteName extracts the remote name from an rclone path (e.g., "gdrive:/path" -> "gdrive")
@@ -963,30 +958,197 @@ func parseRemotePath(path string) string {
 	return path
 }
 
-// loadFromFile loads boards from the JSON file
-func (b *BoardService) loadFromFile() error {
-	data, err := os.ReadFile(b.filePath)
+// ============ SQLite Persistence ============
+
+// loadBoardsFromDB loads all boards with their nodes and edges from SQLite
+func (b *BoardService) loadBoardsFromDB() ([]models.Board, error) {
+	db, err := GetSharedDB()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+		return nil, err
+	}
+
+	rows, err := db.Query(`SELECT id, name, description, created_at, updated_at,
+		schedule_enabled, cron_expr, last_run, next_run, last_result
+		FROM boards ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query boards: %w", err)
+	}
+	defer rows.Close()
+
+	var boards []models.Board
+	for rows.Next() {
+		var board models.Board
+		var createdAt, updatedAt string
+		var scheduleEnabled int
+		var lastRun, nextRun *string
+		if err := rows.Scan(&board.Id, &board.Name, &board.Description, &createdAt, &updatedAt,
+			&scheduleEnabled, &board.CronExpr, &lastRun, &nextRun, &board.LastResult); err != nil {
+			return nil, fmt.Errorf("failed to scan board: %w", err)
 		}
-		return err
+		board.ScheduleEnabled = scheduleEnabled != 0
+		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+			board.CreatedAt = t
+		}
+		if t, err := time.Parse(time.RFC3339, updatedAt); err == nil {
+			board.UpdatedAt = t
+		}
+		if lastRun != nil {
+			if t, err := time.Parse(time.RFC3339, *lastRun); err == nil {
+				board.LastRun = &t
+			}
+		}
+		if nextRun != nil {
+			if t, err := time.Parse(time.RFC3339, *nextRun); err == nil {
+				board.NextRun = &t
+			}
+		}
+		board.Nodes = []models.BoardNode{}
+		board.Edges = []models.BoardEdge{}
+		boards = append(boards, board)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
-	if len(data) == 0 {
-		return nil
+	// Load nodes and edges for each board
+	for i := range boards {
+		nodes, err := b.loadBoardNodesFromDB(boards[i].Id)
+		if err != nil {
+			return nil, err
+		}
+		boards[i].Nodes = nodes
+
+		edges, err := b.loadBoardEdgesFromDB(boards[i].Id)
+		if err != nil {
+			return nil, err
+		}
+		boards[i].Edges = edges
 	}
 
-	return json.Unmarshal(data, &b.boards)
+	if boards == nil {
+		boards = []models.Board{}
+	}
+	return boards, nil
 }
 
-// saveToFile saves boards to the JSON file
-func (b *BoardService) saveToFile() error {
-	data, err := json.MarshalIndent(b.boards, "", "  ")
+func (b *BoardService) loadBoardNodesFromDB(boardId string) ([]models.BoardNode, error) {
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.Query("SELECT id, remote_name, path, label, x, y FROM board_nodes WHERE board_id = ?", boardId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query board nodes: %w", err)
+	}
+	defer rows.Close()
+
+	var nodes []models.BoardNode
+	for rows.Next() {
+		var node models.BoardNode
+		if err := rows.Scan(&node.Id, &node.RemoteName, &node.Path, &node.Label, &node.X, &node.Y); err != nil {
+			return nil, fmt.Errorf("failed to scan board node: %w", err)
+		}
+		nodes = append(nodes, node)
+	}
+	if nodes == nil {
+		nodes = []models.BoardNode{}
+	}
+	return nodes, rows.Err()
+}
+
+func (b *BoardService) loadBoardEdgesFromDB(boardId string) ([]models.BoardEdge, error) {
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.Query("SELECT id, source_id, target_id, action, sync_config FROM board_edges WHERE board_id = ?", boardId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query board edges: %w", err)
+	}
+	defer rows.Close()
+
+	var edges []models.BoardEdge
+	for rows.Next() {
+		var edge models.BoardEdge
+		var syncConfigJSON string
+		if err := rows.Scan(&edge.Id, &edge.SourceId, &edge.TargetId, &edge.Action, &syncConfigJSON); err != nil {
+			return nil, fmt.Errorf("failed to scan board edge: %w", err)
+		}
+		if syncConfigJSON != "" && syncConfigJSON != "{}" {
+			_ = json.Unmarshal([]byte(syncConfigJSON), &edge.SyncConfig)
+		}
+		edges = append(edges, edge)
+	}
+	if edges == nil {
+		edges = []models.BoardEdge{}
+	}
+	return edges, rows.Err()
+}
+
+// saveBoardToDB saves a board with all its nodes and edges to the database
+func (b *BoardService) saveBoardToDB(board models.Board) error {
+	db, err := GetSharedDB()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(b.filePath, data, 0644)
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Upsert the board
+	_, err = tx.Exec(`INSERT OR REPLACE INTO boards (id, name, description, created_at, updated_at, schedule_enabled, cron_expr, last_run, next_run, last_result)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		board.Id, board.Name, board.Description,
+		board.CreatedAt.UTC().Format(time.RFC3339), board.UpdatedAt.UTC().Format(time.RFC3339),
+		boolToInt(board.ScheduleEnabled), board.CronExpr,
+		timePtrToNullable(board.LastRun), timePtrToNullable(board.NextRun), board.LastResult)
+	if err != nil {
+		return fmt.Errorf("failed to save board: %w", err)
+	}
+
+	// Delete old nodes and edges, then insert new ones
+	if _, err := tx.Exec("DELETE FROM board_nodes WHERE board_id = ?", board.Id); err != nil {
+		return fmt.Errorf("failed to delete old nodes: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM board_edges WHERE board_id = ?", board.Id); err != nil {
+		return fmt.Errorf("failed to delete old edges: %w", err)
+	}
+
+	// Insert nodes
+	for _, node := range board.Nodes {
+		if _, err := tx.Exec(`INSERT INTO board_nodes (id, board_id, remote_name, path, label, x, y)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			node.Id, board.Id, node.RemoteName, node.Path, node.Label, node.X, node.Y); err != nil {
+			return fmt.Errorf("failed to save node: %w", err)
+		}
+	}
+
+	// Insert edges
+	for _, edge := range board.Edges {
+		syncConfigJSON, _ := json.Marshal(edge.SyncConfig)
+		if _, err := tx.Exec(`INSERT INTO board_edges (id, board_id, source_id, target_id, action, sync_config)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			edge.Id, board.Id, edge.SourceId, edge.TargetId, edge.Action, string(syncConfigJSON)); err != nil {
+			return fmt.Errorf("failed to save edge: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// deleteBoardFromDB removes a board and all its nodes/edges (via CASCADE)
+func (b *BoardService) deleteBoardFromDB(boardId string) error {
+	db, err := GetSharedDB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("DELETE FROM boards WHERE id = ?", boardId)
+	return err
 }
 
 // sendBoardNotification sends a desktop notification for board execution completion/failure
@@ -1086,14 +1248,16 @@ func (b *BoardService) OnRemoteDeleted(remoteName string) error {
 		board.UpdatedAt = time.Now()
 		modified = true
 
+		// Save updated board to DB
+		if err := b.saveBoardToDB(*board); err != nil {
+			log.Printf("Warning: failed to save board '%s' after remote deletion: %v", board.Name, err)
+		}
+
 		log.Printf("Board '%s': removed %d nodes and associated edges for deleted remote '%s'",
 			board.Name, len(nodesToRemove), remoteName)
 	}
 
 	if modified {
-		if err := b.saveToFile(); err != nil {
-			return fmt.Errorf("failed to save boards after remote deletion cleanup: %w", err)
-		}
 		// Emit event to notify frontend about board updates
 		b.emitBoardEvent(events.BoardUpdated, "", "", "remote_deleted", fmt.Sprintf("Boards updated: remote '%s' was deleted", remoteName))
 	}

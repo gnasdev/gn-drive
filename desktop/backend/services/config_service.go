@@ -71,7 +71,7 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 		return nil
 	}
 
-	// Use shared config to avoid duplicate os.UserHomeDir() and CdToNormalizeWorkingDir() calls
+	// Set up config paths (still needed for rclone config path)
 	shared := GetSharedConfig()
 	if shared != nil {
 		c.configInfo.EnvConfig = config.Config{
@@ -80,36 +80,31 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 		}
 		c.configInfo.WorkingDir = shared.WorkingDir
 	} else {
-		// Fallback if shared config not set
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			log.Printf("Warning: Could not get user home directory, using relative paths: %v", err)
 			homeDir = "."
 		}
 		c.configInfo.EnvConfig = config.Config{
 			ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
 			RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
 		}
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
+		wd, _ := os.Getwd()
 		c.configInfo.WorkingDir = wd
 	}
 
-	// Load profiles from file
-	if err := c.configInfo.ReadFromFile(c.configInfo.EnvConfig); err != nil {
-		log.Printf("Warning: Could not load profiles: %v", err)
-		// Initialize with empty profiles if file doesn't exist
+	// Load profiles from SQLite
+	profiles, err := c.loadProfilesFromDB()
+	if err != nil {
+		log.Printf("Warning: Could not load profiles from database: %v", err)
 		c.configInfo.Profiles = []models.Profile{}
+	} else {
+		c.configInfo.Profiles = profiles
 	}
 
 	c.initialized = true
 	log.Printf("ConfigService initialized with %d profiles", len(c.configInfo.Profiles))
 
-	// Emit config updated event
 	c.emitConfigEvent(events.ConfigUpdated, "", c.configInfo)
-
 	return nil
 }
 
@@ -181,15 +176,13 @@ func (c *ConfigService) AddProfile(ctx context.Context, profile models.Profile) 
 		}
 	}
 
-	// Add profile
-	c.configInfo.Profiles = append(c.configInfo.Profiles, profile)
-
-	// Save to file
-	if err := c.saveProfiles(); err != nil {
-		// Rollback
-		c.configInfo.Profiles = c.configInfo.Profiles[:len(c.configInfo.Profiles)-1]
-		return fmt.Errorf("failed to save profiles: %w", err)
+	// Save to database
+	if err := c.saveProfileToDB(profile); err != nil {
+		return fmt.Errorf("failed to save profile: %w", err)
 	}
+
+	// Add to in-memory cache
+	c.configInfo.Profiles = append(c.configInfo.Profiles, profile)
 
 	// Emit profile added event
 	c.emitConfigEvent(events.ProfileAdded, profile.Name, profile)
@@ -224,16 +217,16 @@ func (c *ConfigService) UpdateProfile(ctx context.Context, profile models.Profil
 		return fmt.Errorf("profile '%s' not found", profile.Name)
 	}
 
-	// Save to file
-	if err := c.saveProfiles(); err != nil {
-		// Rollback
+	// Save to database
+	if err := c.saveProfileToDB(profile); err != nil {
+		// Rollback in-memory
 		for i, existingProfile := range c.configInfo.Profiles {
 			if existingProfile.Name == profile.Name {
 				c.configInfo.Profiles[i] = oldProfile
 				break
 			}
 		}
-		return fmt.Errorf("failed to save profiles: %w", err)
+		return fmt.Errorf("failed to save profile: %w", err)
 	}
 
 	// Emit profile updated event
@@ -264,11 +257,11 @@ func (c *ConfigService) DeleteProfile(ctx context.Context, profileName string) e
 		return fmt.Errorf("profile '%s' not found", profileName)
 	}
 
-	// Save to file
-	if err := c.saveProfiles(); err != nil {
-		// Rollback
+	// Delete from database
+	if err := c.deleteProfileFromDB(profileName); err != nil {
+		// Rollback in-memory
 		c.configInfo.Profiles = append(c.configInfo.Profiles, deletedProfile)
-		return fmt.Errorf("failed to save profiles: %w", err)
+		return fmt.Errorf("failed to delete profile: %w", err)
 	}
 
 	// Emit profile deleted event
@@ -283,9 +276,89 @@ func (c *ConfigService) validateProfile(profile models.Profile) error {
 	return c.validator.ValidateProfile(profile)
 }
 
-// saveProfiles saves profiles to file
-func (c *ConfigService) saveProfiles() error {
-	return c.configInfo.WriteToFile(c.configInfo.EnvConfig)
+// saveProfiles saves a single profile to the database (INSERT or UPDATE)
+func (c *ConfigService) saveProfileToDB(p models.Profile) error {
+	db, err := GetSharedDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`INSERT OR REPLACE INTO profiles (name, from_path, to_path, included_paths, excluded_paths,
+		bandwidth, parallel, backup_path, cache_path, min_size, max_size, filter_from_file,
+		exclude_if_present, use_regex, max_delete, immutable, conflict_resolution,
+		multi_thread_streams, buffer_size, fast_list, retries, low_level_retries, max_duration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.Name, p.From, p.To,
+		marshalStringSlice(p.IncludedPaths), marshalStringSlice(p.ExcludedPaths),
+		p.Bandwidth, p.Parallel, p.BackupPath, p.CachePath,
+		p.MinSize, p.MaxSize, p.FilterFromFile, p.ExcludeIfPresent,
+		boolToInt(p.UseRegex), intPtrToNullable(p.MaxDelete), boolToInt(p.Immutable),
+		p.ConflictResolution, intPtrToNullable(p.MultiThreadStreams),
+		p.BufferSize, boolToInt(p.FastList),
+		intPtrToNullable(p.Retries), intPtrToNullable(p.LowLevelRetries), p.MaxDuration)
+	return err
+}
+
+// deleteProfileFromDB deletes a profile from the database
+func (c *ConfigService) deleteProfileFromDB(name string) error {
+	db, err := GetSharedDB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("DELETE FROM profiles WHERE name = ?", name)
+	return err
+}
+
+// loadProfilesFromDB loads all profiles from the database
+func (c *ConfigService) loadProfilesFromDB() ([]models.Profile, error) {
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.Query(`SELECT name, from_path, to_path, included_paths, excluded_paths,
+		bandwidth, parallel, backup_path, cache_path, min_size, max_size, filter_from_file,
+		exclude_if_present, use_regex, max_delete, immutable, conflict_resolution,
+		multi_thread_streams, buffer_size, fast_list, retries, low_level_retries, max_duration
+		FROM profiles ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var profiles []models.Profile
+	for rows.Next() {
+		var p models.Profile
+		var includedPaths, excludedPaths string
+		var useRegex, immutable, fastList int
+		var maxDelete, multiThreadStreams, retries, lowLevelRetries *int
+
+		if err := rows.Scan(&p.Name, &p.From, &p.To, &includedPaths, &excludedPaths,
+			&p.Bandwidth, &p.Parallel, &p.BackupPath, &p.CachePath,
+			&p.MinSize, &p.MaxSize, &p.FilterFromFile, &p.ExcludeIfPresent,
+			&useRegex, &maxDelete, &immutable, &p.ConflictResolution,
+			&multiThreadStreams, &p.BufferSize, &fastList,
+			&retries, &lowLevelRetries, &p.MaxDuration); err != nil {
+			return nil, fmt.Errorf("failed to scan profile: %w", err)
+		}
+
+		p.IncludedPaths = unmarshalStringSlice(includedPaths)
+		p.ExcludedPaths = unmarshalStringSlice(excludedPaths)
+		p.UseRegex = useRegex != 0
+		p.Immutable = immutable != 0
+		p.FastList = fastList != 0
+		p.MaxDelete = maxDelete
+		p.MultiThreadStreams = multiThreadStreams
+		p.Retries = retries
+		p.LowLevelRetries = lowLevelRetries
+
+		profiles = append(profiles, p)
+	}
+
+	if profiles == nil {
+		profiles = []models.Profile{}
+	}
+	return profiles, rows.Err()
 }
 
 // emitConfigEvent emits a configuration event via unified EventBus

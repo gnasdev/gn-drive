@@ -5,12 +5,11 @@ import "encoding/json"
 type Command string
 
 const (
-	CommandStoped     Command = "command_stoped"
-	CommandOutput     Command = "command_output"
-	CommandStarted    Command = "command_started"
-	WorkingDirUpdated Command = "working_dir_updated"
-	Error             Command = "error"
-	SyncStatus        Command = "sync_status"
+	CommandStoped  Command = "command_stoped"
+	CommandOutput  Command = "command_output"
+	CommandStarted Command = "command_started"
+	Error          Command = "error"
+	SyncStatus     Command = "sync_status"
 )
 
 func (c Command) String() string {

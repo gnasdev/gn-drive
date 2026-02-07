@@ -46,7 +46,7 @@ export interface ConfirmDialogData {
         />
         <p-button
           [label]="data.confirmText || 'Confirm'"
-          [severity]="(data.confirmSeverity as any) || 'primary'"
+          [severity]="$any(data.confirmSeverity) || 'primary'"
           (onClick)="onConfirm()"
         />
       </div>

@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"desktop/backend/models"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,12 +11,13 @@ import (
 
 func newTestSchedulerService(t *testing.T) *SchedulerService {
 	t.Helper()
-	tmpDir := t.TempDir()
+	// Clean DB table for test isolation
+	db, _ := GetSharedDB()
+	db.Exec("DELETE FROM schedules")
 	return &SchedulerService{
 		schedules:   []models.ScheduleEntry{},
 		cronEntries: make(map[string]cron.EntryID),
 		cron:        cron.New(),
-		filePath:    filepath.Join(tmpDir, "schedules.json"),
 		initialized: true,
 	}
 }
@@ -187,16 +187,13 @@ func TestSchedulerService_UpdateSchedule(t *testing.T) {
 }
 
 func TestSchedulerService_Persistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "schedules.json")
 	ctx := context.Background()
 
-	// Create and populate first instance
+	// Create first service instance and add a schedule
 	s1 := &SchedulerService{
 		schedules:   []models.ScheduleEntry{},
 		cronEntries: make(map[string]cron.EntryID),
 		cron:        cron.New(),
-		filePath:    filePath,
 		initialized: true,
 	}
 	s1.cron.Start()
@@ -214,22 +211,24 @@ func TestSchedulerService_Persistence(t *testing.T) {
 	}
 	s1.cron.Stop()
 
-	// Create second instance and load
+	// Create second service instance and load from DB
 	s2 := &SchedulerService{
 		schedules:   []models.ScheduleEntry{},
 		cronEntries: make(map[string]cron.EntryID),
 		cron:        cron.New(),
-		filePath:    filePath,
-		initialized: true,
 	}
-	if err := s2.loadFromFile(); err != nil {
-		t.Fatalf("loadFromFile failed: %v", err)
+	if err := s2.initialize(); err != nil {
+		t.Fatalf("initialize failed: %v", err)
 	}
 
-	if len(s2.schedules) != 1 {
-		t.Fatalf("expected 1 persisted schedule, got %d", len(s2.schedules))
+	found := false
+	for _, s := range s2.schedules {
+		if s.Id == "persist-sched" {
+			found = true
+			break
+		}
 	}
-	if s2.schedules[0].Id != "persist-sched" {
-		t.Errorf("expected 'persist-sched', got %q", s2.schedules[0].Id)
+	if !found {
+		t.Error("expected to find 'persist-sched' after loading from DB")
 	}
 }

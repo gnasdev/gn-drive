@@ -2,6 +2,7 @@ import { Component, Input, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'neo-input',
   standalone: true,
@@ -16,6 +17,7 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
   template: `
     <div class="flex flex-col gap-1">
       @if (label) {
+        <!-- eslint-disable-next-line @angular-eslint/template/label-has-associated-control -->
         <label class="font-bold text-sm text-sys-fg">{{ label }}</label>
       }
       <input
@@ -41,8 +43,8 @@ export class NeoInputComponent implements ControlValueAccessor {
   @Input() error?: string;
 
   value = '';
-  onChange: (value: string) => void = () => {};
-  onTouched: () => void = () => {};
+  onChange: (value: string) => void = () => { /* noop */ };
+  onTouched: () => void = () => { /* noop */ };
 
   get inputClasses(): string {
     const base = `

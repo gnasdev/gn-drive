@@ -2,6 +2,7 @@ package main
 
 import (
 	be "desktop/backend"
+	"desktop/backend/utils"
 	"desktop/backend/services"
 	"embed"
 	"log"
@@ -34,6 +35,7 @@ func main() {
 	boardService := services.NewBoardService(nil)
 	exportService := services.NewExportService(nil)
 	importService := services.NewImportService(nil)
+	flowService := services.NewFlowService(nil)
 	trayService := services.NewTrayService(appIcon)
 
 	// Create application with all services registered
@@ -58,6 +60,7 @@ func main() {
 			application.NewService(boardService),
 			application.NewService(exportService),
 			application.NewService(importService),
+			application.NewService(flowService),
 		},
 	})
 
@@ -76,6 +79,16 @@ func main() {
 	boardService.SetApp(app)
 	exportService.SetApp(app)
 	importService.SetApp(app)
+	flowService.SetApp(app)
+
+	// Load env config and wire to SyncService
+	envConfig := utils.LoadEnvConfigFromEnvStr(be.GetEmbeddedEnvConfigStr())
+	// Enable debug mode in dev environment (set NS_DRIVE_DEBUG=true)
+	if os.Getenv("NS_DRIVE_DEBUG") == "true" {
+		envConfig.DebugMode = true
+		log.Println("[main] Debug mode enabled via NS_DRIVE_DEBUG env var")
+	}
+	syncService.SetEnvConfig(envConfig)
 
 	// Wire up service dependencies
 	schedulerService.SetSyncService(syncService)
@@ -86,6 +99,7 @@ func main() {
 
 	// Set singleton instances for cross-service access
 	services.SetBoardServiceInstance(boardService)
+	services.SetFlowServiceInstance(flowService)
 	services.SetTrayServiceInstance(trayService)
 
 	// Wire up tray service dependencies
@@ -106,11 +120,17 @@ func main() {
 		WorkingDir: wd,
 	})
 
+	// Initialize shared SQLite database (creates tables, runs JSON migrations)
+	if err := services.InitDatabase(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer services.CloseDatabase()
+
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ns-drive",
-		Width:  768,
-		Height: 768,
+		Width:  1000,
+		Height: 1200,
 	})
 
 	// Set window reference on shared EventBus for window-specific events

@@ -242,6 +242,13 @@ func (r *RemoteService) DeleteRemote(ctx context.Context, name string) error {
 		}
 	}
 
+	// Cleanup flows that reference this remote
+	if flowService := GetFlowService(); flowService != nil {
+		if err := flowService.OnRemoteDeleted(context.Background(), name); err != nil {
+			log.Printf("Warning: failed to cleanup flows after remote deletion: %v", err)
+		}
+	}
+
 	// Create remote info for event
 	remoteInfo := RemoteInfo{
 		Name:        name,

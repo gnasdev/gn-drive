@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { LoggingService } from "./logging.service";
 
@@ -37,14 +37,12 @@ export interface ErrorNotification {
   providedIn: "root",
 })
 export class ErrorService {
+  private loggingService = inject(LoggingService);
+
   private errorsSubject = new BehaviorSubject<ErrorNotification[]>([]);
   public errors$ = this.errorsSubject.asObservable();
 
   private errorCounter = 0;
-
-  constructor(private loggingService: LoggingService) {
-    // Initialize service
-  }
 
   /**
    * Handle API errors from backend

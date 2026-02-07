@@ -4,11 +4,8 @@ import (
 	"context"
 	"desktop/backend/events"
 	"desktop/backend/models"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -17,12 +14,10 @@ import (
 
 const maxHistoryEntries = 1000
 
-// HistoryService manages operation history with JSON persistence
+// HistoryService manages operation history with SQLite persistence
 type HistoryService struct {
 	app         *application.App
 	eventBus    *events.WailsEventBus
-	entries     []models.HistoryEntry
-	filePath    string
 	mutex       sync.RWMutex
 	initialized bool
 }
@@ -30,8 +25,7 @@ type HistoryService struct {
 // NewHistoryService creates a new history service
 func NewHistoryService(app *application.App) *HistoryService {
 	return &HistoryService{
-		app:     app,
-		entries: []models.HistoryEntry{},
+		app: app,
 	}
 }
 
@@ -74,7 +68,7 @@ func (h *HistoryService) ServiceShutdown(ctx context.Context) error {
 	return nil
 }
 
-// initialize sets up the file path and loads existing history
+// initialize sets up the service
 func (h *HistoryService) initialize() error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
@@ -83,35 +77,12 @@ func (h *HistoryService) initialize() error {
 		return nil
 	}
 
-	// Use shared config to avoid duplicate os.UserHomeDir() calls
-	shared := GetSharedConfig()
-	if shared != nil {
-		h.filePath = filepath.Join(shared.ConfigDir, "history.json")
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "."
-		}
-		h.filePath = filepath.Join(homeDir, ".config", "ns-drive", "history.json")
-	}
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(h.filePath), 0755); err != nil {
-		return fmt.Errorf("failed to create history directory: %w", err)
-	}
-
-	// Load existing history
-	if err := h.loadFromFile(); err != nil {
-		log.Printf("Warning: Could not load history: %v", err)
-		h.entries = []models.HistoryEntry{}
-	}
-
 	h.initialized = true
-	log.Printf("HistoryService initialized with %d entries", len(h.entries))
+	log.Printf("HistoryService initialized")
 	return nil
 }
 
-// AddEntry adds a new history entry (FIFO capped at maxHistoryEntries)
+// AddEntry adds a new history entry (capped at maxHistoryEntries)
 func (h *HistoryService) AddEntry(ctx context.Context, entry models.HistoryEntry) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
@@ -124,19 +95,12 @@ func (h *HistoryService) AddEntry(ctx context.Context, entry models.HistoryEntry
 		h.mutex.Lock()
 	}
 
-	// Prepend (newest first)
-	h.entries = append([]models.HistoryEntry{entry}, h.entries...)
-
-	// Cap at max entries
-	if len(h.entries) > maxHistoryEntries {
-		h.entries = h.entries[:maxHistoryEntries]
-	}
-
-	if err := h.saveToFile(); err != nil {
-		// Rollback
-		h.entries = h.entries[1:]
+	if err := h.saveHistoryEntryToDB(entry); err != nil {
 		return fmt.Errorf("failed to save history: %w", err)
 	}
+
+	// Enforce cap
+	h.enforceHistoryCap()
 
 	h.emitHistoryEvent(events.HistoryAdded, entry)
 	return nil
@@ -147,21 +111,25 @@ func (h *HistoryService) GetHistory(ctx context.Context, limit, offset int) ([]m
 	if err := h.ensureInitialized(); err != nil {
 		return nil, err
 	}
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
 
-	if offset >= len(h.entries) {
-		return []models.HistoryEntry{}, nil
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
 	}
 
-	end := offset + limit
-	if end > len(h.entries) {
-		end = len(h.entries)
+	rows, err := db.Query(`SELECT id, profile_name, action, status, start_time, end_time,
+		duration, files_transferred, bytes_transferred, errors, error_message
+		FROM history ORDER BY start_time DESC LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query history: %w", err)
 	}
+	defer rows.Close()
 
-	result := make([]models.HistoryEntry, end-offset)
-	copy(result, h.entries[offset:end])
-	return result, nil
+	entries, err := h.scanHistoryRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 // GetHistoryForProfile returns history entries for a specific profile
@@ -169,16 +137,25 @@ func (h *HistoryService) GetHistoryForProfile(ctx context.Context, profileName s
 	if err := h.ensureInitialized(); err != nil {
 		return nil, err
 	}
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
 
-	var result []models.HistoryEntry
-	for _, entry := range h.entries {
-		if entry.ProfileName == profileName {
-			result = append(result, entry)
-		}
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
 	}
-	return result, nil
+
+	rows, err := db.Query(`SELECT id, profile_name, action, status, start_time, end_time,
+		duration, files_transferred, bytes_transferred, errors, error_message
+		FROM history WHERE profile_name = ? ORDER BY start_time DESC`, profileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query history for profile: %w", err)
+	}
+	defer rows.Close()
+
+	entries, err := h.scanHistoryRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 // GetStats returns aggregate statistics across all history
@@ -186,34 +163,55 @@ func (h *HistoryService) GetStats(ctx context.Context) (*models.AggregateStats, 
 	if err := h.ensureInitialized(); err != nil {
 		return nil, err
 	}
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
 
-	stats := &models.AggregateStats{
-		TotalOperations: len(h.entries),
+	db, err := GetSharedDB()
+	if err != nil {
+		return nil, err
 	}
 
-	var totalDuration time.Duration
-	for _, entry := range h.entries {
-		switch entry.Status {
-		case "completed":
-			stats.SuccessCount++
-		case "failed":
-			stats.FailureCount++
-		case "cancelled":
-			stats.CancelledCount++
-		}
-		stats.TotalBytes += entry.BytesTransferred
-		stats.TotalFiles += entry.FilesTransferred
+	stats := &models.AggregateStats{}
 
-		if d, err := time.ParseDuration(entry.Duration); err == nil {
-			totalDuration += d
-		}
+	// Get counts and totals via SQL aggregation
+	err = db.QueryRow(`SELECT
+		COUNT(*),
+		COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(bytes_transferred), 0),
+		COALESCE(SUM(files_transferred), 0)
+		FROM history`).Scan(
+		&stats.TotalOperations,
+		&stats.SuccessCount,
+		&stats.FailureCount,
+		&stats.CancelledCount,
+		&stats.TotalBytes,
+		&stats.TotalFiles,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get history stats: %w", err)
 	}
 
+	// Compute average duration from all duration strings
 	if stats.TotalOperations > 0 {
-		avg := totalDuration / time.Duration(stats.TotalOperations)
-		stats.AverageDuration = avg.String()
+		rows, err := db.Query("SELECT duration FROM history WHERE duration != ''")
+		if err == nil {
+			defer rows.Close()
+			var totalDuration time.Duration
+			var count int
+			for rows.Next() {
+				var dur string
+				if err := rows.Scan(&dur); err == nil {
+					if d, err := time.ParseDuration(dur); err == nil {
+						totalDuration += d
+						count++
+					}
+				}
+			}
+			if count > 0 {
+				avg := totalDuration / time.Duration(count)
+				stats.AverageDuration = avg.String()
+			}
+		}
 	}
 
 	return stats, nil
@@ -224,14 +222,13 @@ func (h *HistoryService) ClearHistory(ctx context.Context) error {
 	if err := h.ensureInitialized(); err != nil {
 		return err
 	}
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
 
-	oldEntries := h.entries
-	h.entries = []models.HistoryEntry{}
+	db, err := GetSharedDB()
+	if err != nil {
+		return err
+	}
 
-	if err := h.saveToFile(); err != nil {
-		h.entries = oldEntries
+	if _, err := db.Exec("DELETE FROM history"); err != nil {
 		return fmt.Errorf("failed to clear history: %w", err)
 	}
 
@@ -239,30 +236,59 @@ func (h *HistoryService) ClearHistory(ctx context.Context) error {
 	return nil
 }
 
-// loadFromFile loads history from the JSON file
-func (h *HistoryService) loadFromFile() error {
-	data, err := os.ReadFile(h.filePath)
+// saveHistoryEntryToDB inserts a single history entry into the database
+func (h *HistoryService) saveHistoryEntryToDB(e models.HistoryEntry) error {
+	db, err := GetSharedDB()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
 
-	if len(data) == 0 {
-		return nil
-	}
-
-	return json.Unmarshal(data, &h.entries)
+	_, err = db.Exec(`INSERT OR REPLACE INTO history (id, profile_name, action, status, start_time, end_time,
+		duration, files_transferred, bytes_transferred, errors, error_message)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.Id, e.ProfileName, e.Action, e.Status,
+		e.StartTime.UTC().Format(time.RFC3339), e.EndTime.UTC().Format(time.RFC3339),
+		e.Duration, e.FilesTransferred, e.BytesTransferred, e.Errors, e.ErrorMessage)
+	return err
 }
 
-// saveToFile saves history to the JSON file
-func (h *HistoryService) saveToFile() error {
-	data, err := json.MarshalIndent(h.entries, "", "  ")
+// enforceHistoryCap deletes oldest entries exceeding the max count
+func (h *HistoryService) enforceHistoryCap() {
+	db, err := GetSharedDB()
 	if err != nil {
-		return err
+		return
 	}
-	return os.WriteFile(h.filePath, data, 0644)
+
+	_, _ = db.Exec(`DELETE FROM history WHERE id NOT IN (
+		SELECT id FROM history ORDER BY start_time DESC LIMIT ?
+	)`, maxHistoryEntries)
+}
+
+// scanHistoryRows scans rows into HistoryEntry slice
+func (h *HistoryService) scanHistoryRows(rows interface{ Next() bool; Scan(...interface{}) error; Err() error }) ([]models.HistoryEntry, error) {
+	var entries []models.HistoryEntry
+	for rows.Next() {
+		var e models.HistoryEntry
+		var startTime, endTime string
+		if err := rows.Scan(&e.Id, &e.ProfileName, &e.Action, &e.Status, &startTime, &endTime,
+			&e.Duration, &e.FilesTransferred, &e.BytesTransferred, &e.Errors, &e.ErrorMessage); err != nil {
+			return nil, fmt.Errorf("failed to scan history entry: %w", err)
+		}
+		if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+			e.StartTime = t
+		}
+		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+			e.EndTime = t
+		}
+		entries = append(entries, e)
+	}
+	if entries == nil {
+		entries = []models.HistoryEntry{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 // emitHistoryEvent emits a history event

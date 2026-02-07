@@ -5,6 +5,7 @@ import {
   Component,
   OnInit,
   OnDestroy,
+  inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { BehaviorSubject, combineLatest, Subscription } from "rxjs";
@@ -33,6 +34,11 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RemotesComponent implements OnInit, OnDestroy {
+  readonly appService = inject(AppService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly errorService = inject(ErrorService);
+  private readonly confirmationService = inject(ConfirmationService);
+
   Date = Date;
 
   private subscriptions = new Subscription();
@@ -49,13 +55,6 @@ export class RemotesComponent implements OnInit, OnDestroy {
   // Modal state management
   showAddRemoteModal = false;
   addRemoteData: RemoteFormData = { name: "", type: "drive" };
-
-  constructor(
-    public readonly appService: AppService,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly errorService: ErrorService,
-    private readonly confirmationService: ConfirmationService
-  ) {}
 
   ngOnInit(): void {
     this.subscriptions.add(

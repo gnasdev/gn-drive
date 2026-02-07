@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'neo-button',
   standalone: true,
@@ -30,6 +31,7 @@ export class NeoButtonComponent {
   @Input() type: 'button' | 'submit' = 'button';
   @Input() fullWidth = false;
 
+  // eslint-disable-next-line @angular-eslint/no-output-on-prefix
   @Output() onClick = new EventEmitter<MouseEvent>();
 
   get buttonClasses(): string {

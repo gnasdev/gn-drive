@@ -4,21 +4,18 @@ import (
 	"context"
 	"desktop/backend/models"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func newTestHistoryService(t *testing.T) *HistoryService {
 	t.Helper()
-	tmpDir := t.TempDir()
-	h := &HistoryService{
-		entries:  []models.HistoryEntry{},
-		filePath: filepath.Join(tmpDir, "history.json"),
+	// Clean DB table for test isolation
+	db, _ := GetSharedDB()
+	db.Exec("DELETE FROM history")
+	return &HistoryService{
+		initialized: true,
 	}
-	h.initialized = true
-	return h
 }
 
 func TestHistoryService_AddEntry(t *testing.T) {
@@ -182,19 +179,12 @@ func TestHistoryService_GetStats(t *testing.T) {
 }
 
 func TestHistoryService_Persistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "history.json")
 	ctx := context.Background()
 
-	// Create and populate first instance
-	h1 := &HistoryService{
-		entries:     []models.HistoryEntry{},
-		filePath:    filePath,
-		initialized: true,
-	}
-
+	// Create first service instance and add an entry
+	h1 := &HistoryService{initialized: true}
 	entry := models.HistoryEntry{
-		Id:          "persist-1",
+		Id:          "persist-hist-1",
 		ProfileName: "test",
 		Action:      "push",
 		Status:      "completed",
@@ -206,21 +196,22 @@ func TestHistoryService_Persistence(t *testing.T) {
 		t.Fatalf("AddEntry failed: %v", err)
 	}
 
-	// Create second instance and verify persistence
-	h2 := &HistoryService{
-		entries:     []models.HistoryEntry{},
-		filePath:    filePath,
-		initialized: true,
-	}
-	if err := h2.loadFromFile(); err != nil {
-		t.Fatalf("loadFromFile failed: %v", err)
+	// Create second service instance and query DB
+	h2 := &HistoryService{initialized: true}
+	entries, err := h2.GetHistory(ctx, 100, 0)
+	if err != nil {
+		t.Fatalf("GetHistory failed: %v", err)
 	}
 
-	if len(h2.entries) != 1 {
-		t.Fatalf("expected 1 persisted entry, got %d", len(h2.entries))
+	found := false
+	for _, e := range entries {
+		if e.Id == "persist-hist-1" {
+			found = true
+			break
+		}
 	}
-	if h2.entries[0].Id != "persist-1" {
-		t.Errorf("expected entry id 'persist-1', got %q", h2.entries[0].Id)
+	if !found {
+		t.Error("expected to find 'persist-hist-1' in DB after persistence")
 	}
 }
 
@@ -266,17 +257,3 @@ func TestHistoryService_Pagination(t *testing.T) {
 	}
 }
 
-func TestHistoryService_LoadNonExistentFile(t *testing.T) {
-	h := &HistoryService{
-		entries:  []models.HistoryEntry{},
-		filePath: filepath.Join(os.TempDir(), "nonexistent-ns-drive-test-history.json"),
-	}
-
-	err := h.loadFromFile()
-	if err != nil {
-		t.Errorf("loadFromFile should not error for non-existent file, got: %v", err)
-	}
-	if len(h.entries) != 0 {
-		t.Errorf("expected 0 entries, got %d", len(h.entries))
-	}
-}

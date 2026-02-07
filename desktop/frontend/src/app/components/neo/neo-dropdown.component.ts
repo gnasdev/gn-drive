@@ -1,14 +1,4 @@
-import {
-  Component,
-  Input,
-  Output,
-  EventEmitter,
-  forwardRef,
-  ElementRef,
-  HostListener,
-  ContentChild,
-  TemplateRef,
-} from '@angular/core';
+import { Component, Input, Output, EventEmitter, forwardRef, ElementRef, HostListener, ContentChild, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -20,6 +10,7 @@ export interface DropdownOption {
   data?: unknown;
 }
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'neo-dropdown',
   standalone: true,
@@ -34,6 +25,7 @@ export interface DropdownOption {
   template: `
     <div class="relative" [class.w-full]="fullWidth">
       @if (label) {
+        <!-- eslint-disable-next-line @angular-eslint/template/label-has-associated-control -->
         <label class="block font-bold text-sm text-sys-fg mb-1">{{ label }}</label>
       }
 
@@ -87,29 +79,29 @@ export interface DropdownOption {
   `,
 })
 export class NeoDropdownComponent implements ControlValueAccessor {
+  private readonly elementRef = inject(ElementRef);
+
   @Input() options: DropdownOption[] = [];
   @Input() label?: string;
   @Input() placeholder = 'Select...';
   @Input() disabled = false;
   @Input() fullWidth = false;
 
+  // eslint-disable-next-line @angular-eslint/no-output-on-prefix
   @Output() onSelect = new EventEmitter<DropdownOption>();
 
   @ContentChild('optionTemplate') optionTemplate?: TemplateRef<unknown>;
 
   isOpen = false;
   value = '';
-  onChange: (value: string) => void = () => {};
-  onTouched: () => void = () => {};
-
-  constructor(private elementRef: ElementRef) {}
+  onChange: (value: string) => void = () => { /* noop */ };
+  onTouched: () => void = () => { /* noop */ };
 
   get selectedOption(): DropdownOption | undefined {
     return this.options.find((o) => o.value === this.value);
   }
 
-  get triggerClasses(): string {
-    return `
+  readonly triggerClasses = `
       w-full px-4 py-2
       bg-sys-bg
       border-2 border-sys-border
@@ -120,7 +112,6 @@ export class NeoDropdownComponent implements ControlValueAccessor {
       hover:bg-sys-accent/10
       text-sys-fg
     `;
-  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {

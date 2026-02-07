@@ -6,6 +6,7 @@ import {
   ElementRef,
   EventEmitter,
   HostListener,
+  inject,
   Input,
   Output,
 } from "@angular/core";
@@ -15,14 +16,16 @@ import { ButtonModule } from "primeng/button";
 import { ListFiles } from "../../../../wailsjs/desktop/backend/services/operationservice.js";
 import * as models from "../../../../wailsjs/desktop/backend/models/models.js";
 
+/* eslint-disable @angular-eslint/directive-selector */
 @Directive({
   selector: "[clickOutside]",
   standalone: true,
 })
+/* eslint-enable @angular-eslint/directive-selector */
 export class ClickOutsideDirective {
-  @Output() clickOutside = new EventEmitter<void>();
+  private readonly elementRef = inject(ElementRef);
 
-  constructor(private elementRef: ElementRef) {}
+  @Output() clickOutside = new EventEmitter<void>();
 
   @HostListener("document:click", ["$event.target"])
   onClick(target: EventTarget | null): void {
@@ -55,10 +58,10 @@ export class PathBrowserComponent {
   filterPrefix = "";
   errorMessage = "";
 
+  private readonly cdr = inject(ChangeDetectorRef);
+
   private lastLoadedKey = "";
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor(private readonly cdr: ChangeDetectorRef) {}
 
   get filteredEntries(): models.FileEntry[] {
     let result = this.entries;

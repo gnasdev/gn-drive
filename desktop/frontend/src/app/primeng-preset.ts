@@ -155,6 +155,6 @@ const NsDrivePreset = definePreset(Aura, {
       },
     },
   },
-} as any);
+} as Parameters<typeof definePreset>[1]);
 
 export default NsDrivePreset;

@@ -4,6 +4,7 @@ import {
     ChangeDetectorRef,
     Component,
     HostListener,
+    inject,
     OnDestroy,
     OnInit,
 } from "@angular/core";
@@ -68,6 +69,9 @@ interface SidebarItem {
     `,
 })
 export class SidebarComponent implements OnInit, OnDestroy {
+    readonly navigationService = inject(NavigationService);
+    private readonly cdr = inject(ChangeDetectorRef);
+
     collapsed = false;
     private subscription?: Subscription;
 
@@ -77,10 +81,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
         { page: "settings", label: "Settings", icon: "pi pi-cog" },
     ];
 
-    constructor(
-        public readonly navigationService: NavigationService,
-        private readonly cdr: ChangeDetectorRef,
-    ) {
+    constructor() {
         this.checkWidth(window.innerWidth);
     }
 

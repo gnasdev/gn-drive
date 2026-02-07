@@ -1,10 +1,12 @@
 import {
+  ChangeDetectorRef,
   Component,
   Input,
   Output,
   EventEmitter,
   inject,
   OnInit,
+  OnDestroy,
   forwardRef,
   ElementRef,
   HostListener,
@@ -12,7 +14,6 @@ import {
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { AppService } from '../../app.service';
-import { NeoButtonComponent } from '../neo/neo-button.component';
 
 export interface RemoteInfo {
   name: string;
@@ -22,7 +23,7 @@ export interface RemoteInfo {
 @Component({
   selector: 'app-remote-dropdown',
   standalone: true,
-  imports: [CommonModule, NeoButtonComponent],
+  imports: [CommonModule],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -33,6 +34,7 @@ export interface RemoteInfo {
   template: `
     <div class="relative">
       @if (label) {
+        <!-- eslint-disable-next-line @angular-eslint/template/label-has-associated-control -->
         <label class="block text-sm font-bold mb-1">{{ label }}</label>
       }
 
@@ -61,8 +63,13 @@ export interface RemoteInfo {
             <div
               class="flex items-center justify-between px-3 py-2 hover:bg-sys-accent/30 cursor-pointer group"
               [class.bg-sys-accent]="remote.name === value"
+              tabindex="0"
+              role="option"
+              [attr.aria-selected]="remote.name === value"
+              (click)="selectRemote(remote)"
+              (keydown.enter)="selectRemote(remote)"
             >
-              <div class="flex items-center gap-2 flex-1" (click)="selectRemote(remote)">
+              <div class="flex items-center gap-2 flex-1">
                 <i [class]="getRemoteIcon(remote.type) + ' text-lg text-sys-fg'"></i>
                 <span class="truncate text-sys-fg">{{ remote.name }}</span>
               </div>
@@ -98,7 +105,10 @@ export interface RemoteInfo {
           <!-- Add Remote -->
           <div
             class="flex items-center gap-2 px-3 py-2 border-t-2 border-sys-border hover:bg-sys-accent-success/30 cursor-pointer text-sys-fg"
+            tabindex="0"
+            role="button"
             (click)="onAddRemote()"
+            (keydown.enter)="onAddRemote()"
           >
             <i class="pi pi-plus-circle text-lg"></i>
             <span class="font-medium">Add Remote</span>
@@ -108,7 +118,7 @@ export interface RemoteInfo {
     </div>
   `,
 })
-export class RemoteDropdownComponent implements OnInit, ControlValueAccessor {
+export class RemoteDropdownComponent implements OnInit, OnDestroy, ControlValueAccessor {
   @Input() label?: string;
   @Input() placeholder = 'Select remote...';
   @Input() disabled = false;
@@ -119,12 +129,14 @@ export class RemoteDropdownComponent implements OnInit, ControlValueAccessor {
 
   private readonly appService = inject(AppService);
   private readonly elementRef = inject(ElementRef);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private subscription?: ReturnType<typeof this.appService.remotes$.subscribe>;
 
   remotes: RemoteInfo[] = [];
   isOpen = false;
   value = '';
-  onChange: (value: string) => void = () => {};
-  onTouched: () => void = () => {};
+  onChange: (value: string) => void = () => { /* noop */ };
+  onTouched: () => void = () => { /* noop */ };
 
   get selectedRemote(): RemoteInfo | undefined {
     return this.remotes.find((r) => r.name === this.value);
@@ -133,9 +145,14 @@ export class RemoteDropdownComponent implements OnInit, ControlValueAccessor {
   ngOnInit(): void {
     this.loadRemotes();
     // Subscribe to remote changes
-    this.appService.remotes$.subscribe((remotes) => {
+    this.subscription = this.appService.remotes$.subscribe((remotes) => {
       this.remotes = remotes.map((r) => ({ name: r.name, type: r.type }));
+      this.cdr.detectChanges();
     });
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
   }
 
   private async loadRemotes(): Promise<void> {

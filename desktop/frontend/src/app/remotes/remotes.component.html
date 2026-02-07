@@ -99,6 +99,7 @@
   [draggable]="false"
   [style]="{ width: '24rem' }"
   [closable]="true"
+  [contentStyle]="{ overflow: 'visible' }"
   (onHide)="closeAddRemoteModal()"
 >
   <form (ngSubmit)="saveRemote()" class="space-y-4">
@@ -136,6 +137,7 @@
         optionValue="value"
         placeholder="Select a remote type"
         styleClass="w-full"
+        appendTo="body"
       ></p-select>
     </div>
     <div class="flex justify-end space-x-3 pt-4">

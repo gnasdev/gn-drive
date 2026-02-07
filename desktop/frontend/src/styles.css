@@ -4,45 +4,46 @@
 
 /* ========================================
    System Colors - CSS Custom Properties
+   Yellow-Black-White NeoBrutalism Theme
    ======================================== */
 :root {
-  /* Background colors */
+  /* Background colors - White theme */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F3F4F6;
-  --color-bg-tertiary: #E5E7EB;
-  --color-bg-inverse: #111827;
+  --color-bg-secondary: #F5F5F5;
+  --color-bg-tertiary: #E5E5E5;
+  --color-bg-inverse: #000000;
 
-  /* Foreground/Text colors */
-  --color-fg-primary: #111827;
-  --color-fg-secondary: #374151;
-  --color-fg-tertiary: #6B7280;
-  --color-fg-inverse: #F9FAFB;
-  --color-fg-muted: #4B5563;
+  /* Foreground/Text colors - Black */
+  --color-fg-primary: #000000;
+  --color-fg-secondary: #1A1A1A;
+  --color-fg-tertiary: #404040;
+  --color-fg-inverse: #FFFFFF;
+  --color-fg-muted: #525252;
 
-  /* Border colors */
+  /* Border colors - Black */
   --color-border-default: #000000;
-  --color-border-subtle: #E5E7EB;
-  --color-border-muted: #D1D5DB;
+  --color-border-subtle: #D4D4D4;
+  --color-border-muted: #A3A3A3;
 
-  /* Accent colors (NeoBrutalism palette) */
-  --color-accent-primary: #FEF08A;     /* Yellow - primary actions */
-  --color-accent-secondary: #BFDBFE;   /* Blue */
-  --color-accent-success: #BBF7D0;     /* Green */
-  --color-accent-warning: #FED7AA;     /* Orange */
-  --color-accent-danger: #FECACA;      /* Red */
-  --color-accent-info: #FBCFE8;        /* Pink */
+  /* Accent colors (Yellow-Black NeoBrutalism) */
+  --color-accent-primary: #FEF08A;     /* Yellow - primary */
+  --color-accent-secondary: #FACC15;   /* Darker yellow */
+  --color-accent-success: #86EFAC;     /* Green */
+  --color-accent-warning: #FDBA74;     /* Orange */
+  --color-accent-danger: #FCA5A5;      /* Red */
+  --color-accent-info: #93C5FD;        /* Blue */
 
-  /* Shadow */
-  --color-shadow: rgba(0, 0, 0, 1);
+  /* Shadow - Black for neo effect */
+  --color-shadow: #000000;
 
   /* Status colors (for badges, indicators) */
-  --color-status-success: #22C55E;
+  --color-status-success: #16A34A;
   --color-status-success-bg: #DCFCE7;
-  --color-status-warning: #F59E0B;
-  --color-status-warning-bg: #FEF3C7;
-  --color-status-error: #EF4444;
+  --color-status-warning: #CA8A04;
+  --color-status-warning-bg: #FEF9C3;
+  --color-status-error: #DC2626;
   --color-status-error-bg: #FEE2E2;
-  --color-status-info: #3B82F6;
+  --color-status-info: #2563EB;
   --color-status-info-bg: #DBEAFE;
 }
 
@@ -69,33 +70,46 @@
 *:focus,
 *:focus-visible {
   box-sizing: border-box;
-  outline: none;
+  outline: none !important;
 }
 html,
 body {
   height: 100%;
   margin: 0;
   font-family: "Roboto", "Helvetica Neue", sans-serif;
-  background: #111827;
-  color: #f9fafb;
+  background: var(--color-bg-primary);
+  color: var(--color-fg-primary);
 }
 
-/* Custom scrollbar styling */
+/* Custom scrollbar styling - overlay style */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-muted) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--color-border-muted);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--color-accent-primary);
+}
+
+/* Make scrollbar overlay (not take space) */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto {
+  overflow: overlay;
 }
 
 /* Hide scrollbar utility class */
@@ -111,10 +125,10 @@ body {
 .console-output {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.875rem;
-  background: #111827;
-  color: #4ade80;
+  background: var(--color-bg-inverse);
+  color: var(--color-fg-inverse);
   padding: 1rem;
-  border-radius: 0.5rem;
+  border-radius: 0;
   overflow: auto;
   max-height: 24rem;
 }

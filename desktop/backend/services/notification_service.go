@@ -2,10 +2,8 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/emersion/go-autostart"
@@ -25,7 +23,6 @@ type AppSettings struct {
 type NotificationService struct {
 	app      *application.App
 	settings AppSettings
-	filePath string
 	mutex    sync.RWMutex
 }
 
@@ -53,20 +50,6 @@ func (n *NotificationService) ServiceName() string {
 // ServiceStartup is called when the service starts
 func (n *NotificationService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("NotificationService starting up...")
-
-	// Determine settings file path
-	shared := GetSharedConfig()
-	if shared != nil {
-		n.filePath = filepath.Join(shared.ConfigDir, "settings.json")
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "."
-		}
-		n.filePath = filepath.Join(homeDir, ".config", "ns-drive", "settings.json")
-	}
-
-	// Load persisted settings
 	n.loadSettings()
 	return nil
 }
@@ -99,7 +82,7 @@ func (n *NotificationService) SetEnabled(ctx context.Context, enabled bool) {
 	n.mutex.Lock()
 	n.settings.NotificationsEnabled = enabled
 	n.mutex.Unlock()
-	n.saveSettings()
+	n.saveSetting("notifications_enabled", boolToStr(enabled))
 }
 
 // IsEnabled returns whether notifications are enabled
@@ -114,7 +97,7 @@ func (n *NotificationService) SetDebugMode(ctx context.Context, enabled bool) {
 	n.mutex.Lock()
 	n.settings.DebugMode = enabled
 	n.mutex.Unlock()
-	n.saveSettings()
+	n.saveSetting("debug_mode", boolToStr(enabled))
 }
 
 // IsDebugMode returns whether debug mode is enabled
@@ -129,7 +112,7 @@ func (n *NotificationService) SetMinimizeToTray(ctx context.Context, enabled boo
 	n.mutex.Lock()
 	n.settings.MinimizeToTray = enabled
 	n.mutex.Unlock()
-	n.saveSettings()
+	n.saveSetting("minimize_to_tray", boolToStr(enabled))
 }
 
 // IsMinimizeToTray returns whether minimize to tray is enabled
@@ -176,7 +159,7 @@ func (n *NotificationService) SetStartAtLogin(ctx context.Context, enabled bool)
 	n.mutex.Lock()
 	n.settings.StartAtLogin = enabled
 	n.mutex.Unlock()
-	n.saveSettings()
+	n.saveSetting("start_at_login", boolToStr(enabled))
 
 	return nil
 }
@@ -189,36 +172,48 @@ func (n *NotificationService) IsStartAtLogin(ctx context.Context) bool {
 }
 
 func (n *NotificationService) loadSettings() {
-	data, err := os.ReadFile(n.filePath)
+	db, err := GetSharedDB()
 	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Printf("Warning: Could not load settings: %v", err)
-		}
+		log.Printf("Warning: Could not get database for settings: %v", err)
 		return
 	}
-	if len(data) == 0 {
+
+	rows, err := db.Query("SELECT key, value FROM settings")
+	if err != nil {
+		log.Printf("Warning: Could not load settings: %v", err)
 		return
 	}
+	defer rows.Close()
+
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
-	if err := json.Unmarshal(data, &n.settings); err != nil {
-		log.Printf("Warning: Could not parse settings: %v", err)
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			continue
+		}
+		switch key {
+		case "notifications_enabled":
+			n.settings.NotificationsEnabled = value == "true"
+		case "debug_mode":
+			n.settings.DebugMode = value == "true"
+		case "minimize_to_tray":
+			n.settings.MinimizeToTray = value == "true"
+		case "start_at_login":
+			n.settings.StartAtLogin = value == "true"
+		}
 	}
 }
 
-func (n *NotificationService) saveSettings() {
-	n.mutex.RLock()
-	data, err := json.MarshalIndent(n.settings, "", "  ")
-	n.mutex.RUnlock()
+func (n *NotificationService) saveSetting(key, value string) {
+	db, err := GetSharedDB()
 	if err != nil {
-		log.Printf("Warning: Could not marshal settings: %v", err)
+		log.Printf("Warning: Could not get database for saving setting: %v", err)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(n.filePath), 0755); err != nil {
-		log.Printf("Warning: Could not create settings directory: %v", err)
-		return
-	}
-	if err := os.WriteFile(n.filePath, data, 0644); err != nil {
-		log.Printf("Warning: Could not save settings: %v", err)
+
+	if _, err := db.Exec("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", key, value); err != nil {
+		log.Printf("Warning: Could not save setting %s: %v", key, err)
 	}
 }

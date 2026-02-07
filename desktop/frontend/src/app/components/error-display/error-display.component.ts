@@ -1,10 +1,4 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-} from "@angular/core";
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subscription } from "rxjs";
 import {
@@ -118,15 +112,13 @@ import { ButtonModule } from "primeng/button";
   `,
 })
 export class ErrorDisplayComponent implements OnInit, OnDestroy {
+  private errorService = inject(ErrorService);
+  private cdr = inject(ChangeDetectorRef);
+
   activeErrors: ErrorNotification[] = [];
   dialogVisible = false;
   private subscription?: Subscription;
   private previousErrorCount = 0;
-
-  constructor(
-    private errorService: ErrorService,
-    private cdr: ChangeDetectorRef
-  ) {}
 
   ngOnInit(): void {
     this.subscription = this.errorService.errors$.subscribe((errors) => {
