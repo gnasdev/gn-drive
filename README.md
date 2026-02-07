@@ -23,9 +23,10 @@ A modern desktop application for cloud storage synchronization powered by rclone
 ## 🛠️ Technology Stack
 
 - **Backend**: Go 1.25 with Wails v3 (alpha.57)
-- **Frontend**: Angular 21.1 with Tailwind CSS
+- **Frontend**: Angular 21.1 with Tailwind CSS + PrimeNG 21
+- **Database**: SQLite (via modernc.org/sqlite)
 - **Cloud Sync**: rclone v1.73.0 integration
-- **Package Manager**: npm
+- **Package Manager**: Bun
 - **Build Tool**: Taskfile (task runner)
 
 ## 📋 Prerequisites
@@ -34,7 +35,7 @@ Before building or running NS-Drive, ensure you have the following installed:
 
 - **Go**: v1.25 or later
 - **Node.js**: v18 or later (v24+ recommended)
-- **npm**: Package manager (comes with Node.js)
+- **Bun**: JavaScript package manager and runtime
 - **Taskfile**: Task runner for build automation
 - **Wails v3**: Desktop app framework
 
@@ -46,6 +47,9 @@ Before building or running NS-Drive, ensure you have the following installed:
 
 # Install Node.js
 # Visit: https://nodejs.org/
+
+# Install Bun
+# Visit: https://bun.sh/
 
 # Install Taskfile
 # Visit: https://taskfile.dev/installation/
@@ -151,8 +155,8 @@ If `task` commands don't work, you can run manually:
 ```bash
 # Terminal 1: Frontend
 cd desktop/frontend
-npm install --legacy-peer-deps
-npm start -- --port 9245
+bun install
+bun start --port 9245
 
 # Terminal 2: Backend (after frontend is ready)
 cd desktop
@@ -176,7 +180,7 @@ wails3 dev -config ./build/config.yml -port 9245
    cd desktop && go mod tidy
 
    # Install frontend dependencies
-   cd frontend && npm install --legacy-peer-deps
+   cd frontend && bun install
    cd ../..
    ```
 
@@ -238,18 +242,23 @@ wails3 dev -config ./build/config.yml -port 9245
 
 ## 🔧 Available Commands
 
-| Command                      | Description                                           | Status     |
-| ---------------------------- | ----------------------------------------------------- | ---------- |
-| `task build`                 | Build the application for current platform            | ✅ Working |
-| `task build:macos`           | Build signed macOS .app bundle                        | ✅ Working |
-| `task build:macos:bundle`    | Create macOS .app bundle (without signing)            | ✅ Working |
-| `task build:macos:sign`      | Sign existing macOS .app bundle                       | ✅ Working |
-| `task dev:fe`                | Start frontend development server                     | ✅ Working |
-| `task dev:be`                | Start Wails dev server (requires frontend dev server) | ✅ Working |
-| `task lint:fe`               | Run ESLint on frontend code                           | ✅ Working |
-| `task lint:be`               | Run golangci-lint on backend code                     | ✅ Working |
-| `task lint`                  | Run linting on both frontend and backend              | ✅ Working |
-| `task clean`                 | Clean all build artifacts                             | ✅ Working |
+| Command                      | Description                                           |
+| ---------------------------- | ----------------------------------------------------- |
+| `task build`                 | Build the application for current platform            |
+| `task build:dev`             | Build with debug info for development                 |
+| `task build:macos`           | Build signed macOS .app bundle                        |
+| `task build:macos:bundle`    | Create macOS .app bundle (without signing)            |
+| `task build:macos:sign`      | Sign existing macOS .app bundle                       |
+| `task dev:fe`                | Start frontend development server                     |
+| `task dev:be`                | Start Wails dev server (requires frontend dev server) |
+| `task test`                  | Run all tests (backend + frontend)                    |
+| `task test:be`               | Run Go backend tests                                  |
+| `task test:fe`               | Run Angular frontend tests (headless Chrome)          |
+| `task test:be:coverage`      | Run backend tests with coverage report                |
+| `task lint`                  | Run linting on both frontend and backend              |
+| `task lint:fe`               | Run ESLint on frontend code                           |
+| `task lint:be`               | Run golangci-lint on backend code                     |
+| `task clean`                 | Clean all build artifacts                             |
 
 ## 🌐 Supported Cloud Providers
 
@@ -263,26 +272,6 @@ wails3 dev -config ./build/config.yml -port 9245
 
 For detailed setup instructions for each provider, refer to the [rclone documentation](https://rclone.org/docs/).
 
-## 📱 Screenshots
-
-### Dashboard
-
-![Homepage](./screenshots/s1.png)
-
-_Multi-tab operation dashboard with real-time monitoring_
-
-### Profile Management
-
-![Profile Manager Page](./screenshots/s2.png)
-
-_Create and configure sync profiles with advanced settings_
-
-### Remote Configuration
-
-![Remote Manager Page](./screenshots/s3.png)
-
-_Manage cloud storage connections and authentication_
-
 ## 🏗️ Project Structure
 
 ```
@@ -291,48 +280,62 @@ ns-drive/
 │   ├── backend/            # Go backend code
 │   │   ├── app.go         # Legacy App service
 │   │   ├── commands.go    # rclone command building
-│   │   ├── services/      # Domain services (12 services)
-│   │   │   ├── sync_service.go      # Sync operations
-│   │   │   ├── config_service.go    # Profile management
-│   │   │   ├── remote_service.go    # Remote management
-│   │   │   ├── tab_service.go       # Tab lifecycle
-│   │   │   ├── scheduler_service.go # Cron scheduling
-│   │   │   ├── history_service.go   # Operation history
-│   │   │   ├── board_service.go     # Workflow boards
-│   │   │   ├── operation_service.go # File operations
-│   │   │   ├── crypt_service.go     # Encryption
-│   │   │   ├── tray_service.go      # System tray
-│   │   │   ├── notification_service.go # Notifications
-│   │   │   ├── log_service.go       # Reliable logging
-│   │   │   ├── export_service.go    # Config export
-│   │   │   └── import_service.go    # Config import
-│   │   ├── models/        # Data structures
-│   │   ├── rclone/        # rclone operations
-│   │   ├── events/        # Event system
-│   │   ├── errors/        # Error handling
-│   │   ├── config/        # Configuration
+│   │   ├── services/      # Domain services (16 services)
+│   │   │   ├── db.go                  # SQLite database layer & migrations
+│   │   │   ├── shared_config.go       # Shared configuration across services
+│   │   │   ├── sync_service.go        # Sync operations (pull/push/bi/resync)
+│   │   │   ├── config_service.go      # Profile management
+│   │   │   ├── remote_service.go      # Remote management
+│   │   │   ├── tab_service.go         # Tab lifecycle
+│   │   │   ├── flow_service.go        # Flow/operation persistence
+│   │   │   ├── scheduler_service.go   # Cron scheduling
+│   │   │   ├── history_service.go     # Operation history
+│   │   │   ├── board_service.go       # Workflow boards (DAG execution)
+│   │   │   ├── operation_service.go   # File operations
+│   │   │   ├── crypt_service.go       # Encrypted remotes
+│   │   │   ├── tray_service.go        # System tray
+│   │   │   ├── notification_service.go # Desktop notifications
+│   │   │   ├── log_service.go         # Reliable log delivery
+│   │   │   ├── log_buffer.go          # Log buffering
+│   │   │   ├── export_service.go      # Config export
+│   │   │   └── import_service.go      # Config import
+│   │   ├── models/        # Data structures (profile, flow, board, etc.)
+│   │   ├── rclone/        # rclone operations (sync, bisync, operations)
+│   │   ├── dto/           # Data transfer objects (sync status, commands)
+│   │   ├── events/        # Event bus system
+│   │   ├── errors/        # Error handling & logging
+│   │   ├── config/        # Configuration loading
 │   │   ├── validation/    # Input validation
-│   │   ├── dto/           # Data transfer objects
 │   │   └── utils/         # Utility functions
 │   ├── frontend/          # Angular frontend
-│   │   ├── src/app/       # Application components
-│   │   │   ├── board/     # Visual workflow editor
+│   │   ├── src/app/       # Application source
+│   │   │   ├── board/     # Visual workflow editor (drag-drop canvas)
 │   │   │   ├── remotes/   # Remote management UI
 │   │   │   ├── settings/  # App settings
 │   │   │   ├── components/# Shared components
-│   │   │   └── services/  # Frontend services
-│   │   ├── bindings/      # Wails generated bindings
+│   │   │   │   ├── flows/            # Flow builder UI
+│   │   │   │   ├── operations-tree/  # Operations tree view
+│   │   │   │   ├── sync-status/      # Real-time sync progress
+│   │   │   │   ├── path-browser/     # Remote path navigation
+│   │   │   │   ├── neo/              # NeoBrutalism UI components
+│   │   │   │   ├── sidebar/          # Left navigation
+│   │   │   │   ├── topbar/           # Header navigation
+│   │   │   │   ├── toast/            # Toast notifications
+│   │   │   │   ├── confirm-dialog/   # Confirmation modals
+│   │   │   │   ├── dialogs/          # Various dialogs
+│   │   │   │   ├── error-display/    # Error messages
+│   │   │   │   └── remote-dropdown/  # Remote selector
+│   │   │   ├── services/  # Frontend services (flows, logging, errors)
+│   │   │   └── models/    # TypeScript interfaces
+│   │   ├── bindings/      # Wails generated TypeScript bindings
 │   │   └── dist/          # Built frontend assets
-│   ├── build/             # Build configuration
+│   ├── build/             # Build configuration (config.yml, appicon.png)
 │   ├── go.mod             # Go module definition
-│   └── main.go            # Application entry point
+│   └── main.go            # Application entry point (service registration)
 ├── scripts/               # Build and utility scripts
-│   └── build-macos.sh    # macOS production build script
-├── docs/                  # Documentation
+├── docs/                  # Documentation (architecture, API, events, dev guide)
 ├── screenshots/           # Application screenshots
 ├── Taskfile.yml          # Build tasks
-├── ns-drive              # Built binary (after build)
-├── ns-drive.app          # macOS app bundle (after build)
 └── README.md             # This file
 ```
 
@@ -371,12 +374,10 @@ wails3 version
 |------|----------|-------------|
 | `desktop/build/config.yml` | Project | Wails dev mode configuration |
 | `desktop/go.mod` | Project | Go module dependencies |
-| `desktop/frontend/package.json` | Project | npm dependencies |
-| `~/.config/ns-drive/profiles.json` | User home | Sync profiles configuration |
+| `desktop/frontend/package.json` | Project | Frontend dependencies |
+| `~/.config/ns-drive/ns-drive.db` | User home | SQLite database (profiles, flows, operations, history) |
 | `~/.config/ns-drive/rclone.conf` | User home | Rclone remotes configuration |
-| `~/.config/ns-drive/schedules.json` | User home | Scheduled sync tasks |
 | `~/.config/ns-drive/boards.json` | User home | Workflow board definitions |
-| `~/.config/ns-drive/history.json` | User home | Sync operation history |
 | `~/.config/ns-drive/app_settings.json` | User home | App settings (notifications, tray) |
 
 ### Generating Bindings
@@ -388,7 +389,7 @@ cd desktop
 wails3 generate bindings
 ```
 
-Bindings are generated to `desktop/frontend/bindings/` (symlinked as `wailsjs/` for compatibility).
+Bindings are generated to `desktop/frontend/bindings/` (aliased as `wailsjs/` in tsconfig for import compatibility).
 
 ### Linting
 
@@ -421,7 +422,7 @@ task lint:be
 
    ```bash
    # Solution: Build frontend first
-   cd desktop/frontend && npm run build
+   cd desktop/frontend && bun run build
    task build
    ```
 
@@ -450,8 +451,8 @@ task lint:be
 5. **Frontend dependencies errors**
 
    ```bash
-   # Solution: Install with legacy peer deps flag
-   cd desktop/frontend && npm install --legacy-peer-deps
+   # Solution: Reinstall with bun
+   cd desktop/frontend && bun install
    ```
 
 6. **Linker warnings about macOS version**
@@ -490,7 +491,7 @@ curl http://localhost:9245
 cd desktop && go mod verify
 
 # Clean and rebuild
-cd desktop/frontend && rm -rf node_modules dist && npm install --legacy-peer-deps
+cd desktop/frontend && rm -rf node_modules dist && bun install
 cd desktop && go clean -cache
 
 # View backend logs in real-time
