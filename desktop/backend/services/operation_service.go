@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	beConfig "desktop/backend/config"
+	"desktop/backend/dto"
 	"desktop/backend/events"
 	"desktop/backend/models"
 	"desktop/backend/rclone"
@@ -236,12 +237,10 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 		return
 	}
 
-	outLog := make(chan string, 100)
-	stopSyncStatus := utils.StartSyncStatusReporting(ctx, nil, task.Id, task.Operation, task.TabId)
+	outStatus := make(chan *dto.SyncStatusDTO, 100)
 
 	utils.AddCmd(task.Id, func() {
-		stopSyncStatus()
-		close(outLog)
+		close(outStatus)
 		task.Cancel()
 	})
 
@@ -249,13 +248,28 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 		utils.AddTabMapping(task.Id, task.TabId)
 	}
 
-	// Emit progress logs
+	// Consume structured SyncStatusDTO and dispatch events
 	go func() {
-		for logEntry := range outLog {
+		for status := range outStatus {
+			// Enrich DTO with task identity
+			status.Id = &task.Id
+			status.TabId = &task.TabId
+			status.Action = task.Operation
+
+			// Extract LogMessages for text-based event consumers
+			for _, logMsg := range status.LogMessages {
+				if o.eventBus != nil {
+					event := events.NewOperationEvent(events.OperationProgress, task.TabId, task.Operation, "running", logMsg)
+					if emitErr := o.eventBus.EmitOperationEvent(event); emitErr != nil {
+						log.Printf("Failed to emit operation progress event: %v", emitErr)
+					}
+				}
+			}
+
+			// Emit structured SyncStatusDTO for frontend
 			if o.eventBus != nil {
-				event := events.NewOperationEvent(events.OperationProgress, task.TabId, task.Operation, "running", logEntry)
-				if emitErr := o.eventBus.EmitOperationEvent(event); emitErr != nil {
-					log.Printf("Failed to emit operation progress event: %v", emitErr)
+				if emitErr := o.eventBus.Emit(status); emitErr != nil {
+					log.Printf("Failed to emit operation status: %v", emitErr)
 				}
 			}
 		}
@@ -275,16 +289,14 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 
 	switch operation {
 	case "copy":
-		err = rclone.Copy(ctx, config, task.Profile, outLog)
+		err = rclone.Copy(ctx, config, task.Profile, outStatus)
 	case "move":
-		err = rclone.Move(ctx, config, task.Profile, outLog)
+		err = rclone.Move(ctx, config, task.Profile, outStatus)
 	case "check":
-		err = rclone.Check(ctx, config, task.Profile, outLog)
+		err = rclone.Check(ctx, config, task.Profile, outStatus)
 	default:
 		err = fmt.Errorf("unknown operation: %s", operation)
 	}
-
-	stopSyncStatus()
 	if task.TabId != "" {
 		utils.RemoveTabMapping(task.Id)
 	}

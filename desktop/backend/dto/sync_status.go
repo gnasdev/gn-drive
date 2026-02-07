@@ -25,7 +25,20 @@ type SyncStatusDTO struct {
 	Renames         int64     `json:"renames"`
 	Timestamp       time.Time `json:"timestamp"`
 	ElapsedTime     string    `json:"elapsed_time"`
-	Action          string    `json:"action"` // "pull", "push", "bi", "bi-resync"
+	Action          string             `json:"action"`                      // "pull", "push", "bi", "bi-resync"
+	LogMessages     []string           `json:"log_messages,omitempty"`      // Captured rclone log messages since last emission
+	Transfers       []FileTransferInfo `json:"transfers,omitempty"`         // Per-file transfer info
+}
+
+// FileTransferInfo represents a single file's transfer status
+type FileTransferInfo struct {
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	Bytes    int64   `json:"bytes"`
+	Progress float64 `json:"progress"`            // 0-100
+	Status   string  `json:"status"`              // "transferring", "completed", "failed", "checking"
+	Speed    float64 `json:"speed,omitempty"`     // bytes per second
+	Error    string  `json:"error,omitempty"`
 }
 
 // ToJSON converts SyncStatusDTO to JSON bytes

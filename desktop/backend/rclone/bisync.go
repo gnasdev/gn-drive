@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"desktop/backend/config"
+	"desktop/backend/dto"
 	"desktop/backend/models"
 	"desktop/backend/utils"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 	"github.com/rclone/rclone/fs/filter"
 )
 
-func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outLog chan string) error {
+func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outStatus chan *dto.SyncStatusDTO) error {
 	var err error
 
 	// Initialize the config
@@ -194,7 +195,7 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
+	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(bisync.Bisync(ctx, dstFs, srcFs, opt), "Sync failed", nil, nil)
 	})
 }

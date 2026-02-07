@@ -5,19 +5,18 @@ import { debounceTime } from 'rxjs/operators';
 import * as models from '../../../wailsjs/desktop/backend/models/models.js';
 import {
   AddBoard,
-  ClearExecutionLogs,
   DeleteBoard,
   ExecuteBoard,
   GetBoardExecutionStatus,
   GetBoards,
-  GetExecutionLogs,
   StopBoardExecution,
 } from '../../../wailsjs/desktop/backend/services/boardservice.js';
 import {
   GetFlows,
   SaveFlows,
 } from '../../../wailsjs/desktop/backend/services/flowservice.js';
-import { isBoardEvent, isSyncEvent, parseEvent, type BoardEvent, type SyncEvent } from '../models/events.js';
+import { isBoardEvent, isSyncEvent, isSyncStatusDTO, parseEvent, type BoardEvent, type SyncEvent } from '../models/events.js';
+import { type SyncStatus, type SyncStatusEvent } from '../models/sync-status.interface.js';
 import { ErrorService } from './error.service.js';
 import {
   createEmptyFlow,
@@ -26,7 +25,6 @@ import {
   Flow,
   FlowsState,
   generateId,
-  MAX_LOG_LINES,
   Operation,
   type SyncAction,
   type SyncConfig,
@@ -52,7 +50,6 @@ export class FlowsService implements OnDestroy {
   private tempBoardId: string | null = null;
 
   private eventCleanup: (() => void) | undefined;
-  private logPollingInterval: ReturnType<typeof setInterval> | null = null;
   private autoSaveSubscription: Subscription | null = null;
   private autoSaveTrigger$ = new Subject<void>();
 
@@ -64,7 +61,9 @@ export class FlowsService implements OnDestroy {
     this.eventCleanup = Events.On('tofe', (event) => {
       const rawData = event.data;
       const parsedEvent = parseEvent(rawData);
-      if (parsedEvent && isSyncEvent(parsedEvent)) {
+      if (parsedEvent && isSyncStatusDTO(parsedEvent)) {
+        this.ngZone.run(() => this.handleSyncStatusEvent(parsedEvent as unknown as SyncStatusEvent));
+      } else if (parsedEvent && isSyncEvent(parsedEvent)) {
         this.ngZone.run(() => this.handleSyncLogEvent(parsedEvent));
       }
       if (parsedEvent && isBoardEvent(parsedEvent)) {
@@ -80,7 +79,6 @@ export class FlowsService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.eventCleanup?.();
-    this.stopLogPolling();
     this.autoSaveSubscription?.unsubscribe();
   }
 
@@ -388,10 +386,10 @@ export class FlowsService implements OnDestroy {
     this.executingOperationIndex = 0;
     this.updateFlow(flowId, { status: 'running' });
 
-    // Clear all operation logs and set to pending
+    // Clear sync status and set to pending
     const clearedOps: Operation[] = flow.operations.map((op, idx) => ({
       ...op,
-      logs: [] as string[],
+      syncStatus: undefined,
       status: (idx === 0 ? 'running' : 'pending') as Operation['status'],
     }));
     this.updateFlowOperations(flowId, clearedOps);
@@ -447,7 +445,6 @@ export class FlowsService implements OnDestroy {
     } finally {
       this.executingFlowId = null;
       this.executingOperationIndex = -1;
-      this.stopLogPolling();
     }
   }
 
@@ -484,7 +481,6 @@ export class FlowsService implements OnDestroy {
       this.updateFlow(flowId, { status: 'cancelled' });
     }
 
-    this.stopLogPolling();
     this.executingFlowId = null;
     this.executingOperationIndex = -1;
     await this.cleanupTempBoard();
@@ -521,9 +517,6 @@ export class FlowsService implements OnDestroy {
       await AddBoard(board);
       console.log(`[FlowsService] Board added successfully`);
 
-      await ClearExecutionLogs();
-      this.startLogPolling(flowId, operation.id);
-
       console.log(`[FlowsService] Executing board ${board.id}...`);
       await ExecuteBoard(board.id);
       console.log(`[FlowsService] ExecuteBoard returned, waiting for completion...`);
@@ -536,9 +529,6 @@ export class FlowsService implements OnDestroy {
       console.error(`[FlowsService] executeSingleOperation error:`, err);
       throw err;
     } finally {
-      // Final flush: collect any remaining logs before stopping
-      await this.flushRemainingLogs(flowId, operation.id);
-      this.stopLogPolling();
       // Clean up this operation's temp board immediately
       await this.cleanupTempBoard();
     }
@@ -790,86 +780,12 @@ export class FlowsService implements OnDestroy {
     }
   }
 
-  private startLogPolling(flowId: string, operationId: string): void {
-    if (this.logPollingInterval) return;
-
-    this.logPollingInterval = setInterval(async () => {
-      try {
-        const logs = await GetExecutionLogs();
-        if (logs && logs.length > 0) {
-          this.ngZone.run(() => {
-            const flow = this.getFlow(flowId);
-            const operation = flow?.operations.find((op) => op.id === operationId);
-            if (operation) {
-              let newLogs = [...operation.logs, ...logs];
-              if (newLogs.length > MAX_LOG_LINES) {
-                newLogs = newLogs.slice(-MAX_LOG_LINES);
-              }
-              // Immutable update: create new operation and flow references
-              this.updateFlowOperations(flowId,
-                flow!.operations.map((op) =>
-                  op.id === operationId ? { ...op, logs: newLogs } : op
-                )
-              );
-            }
-          });
-        }
-      } catch (err) {
-        console.error('[FlowsService] Error polling logs:', err);
-      }
-    }, 500);
-  }
-
-  private async flushRemainingLogs(flowId: string, operationId: string): Promise<void> {
-    try {
-      const logs = await GetExecutionLogs();
-      if (logs && logs.length > 0) {
-        const flow = this.getFlow(flowId);
-        const operation = flow?.operations.find((op) => op.id === operationId);
-        if (operation) {
-          let newLogs = [...operation.logs, ...logs];
-          if (newLogs.length > MAX_LOG_LINES) {
-            newLogs = newLogs.slice(-MAX_LOG_LINES);
-          }
-          this.updateFlowOperations(flowId,
-            flow!.operations.map((op) =>
-              op.id === operationId ? { ...op, logs: newLogs } : op
-            )
-          );
-        }
-      }
-    } catch {
-      // Ignore errors during final flush
-    }
-  }
-
-  private stopLogPolling(): void {
-    if (this.logPollingInterval) {
-      clearInterval(this.logPollingInterval);
-      this.logPollingInterval = null;
-    }
-  }
-
   private handleSyncLogEvent(event: SyncEvent): void {
     if (!this.executingFlowId) return;
 
     const flow = this.getFlow(this.executingFlowId);
     const operation = flow?.operations[this.executingOperationIndex];
     if (!operation) return;
-
-    // Append log message with immutable update
-    const message = event.message || '';
-    if (message) {
-      let newLogs = [...operation.logs, message];
-      if (newLogs.length > MAX_LOG_LINES) {
-        newLogs = newLogs.slice(-MAX_LOG_LINES);
-      }
-      this.updateFlowOperations(this.executingFlowId,
-        flow!.operations.map((op, idx) =>
-          idx === this.executingOperationIndex ? { ...op, logs: newLogs } : op
-        )
-      );
-    }
 
     // Check for completion events
     if (event.type === 'sync:completed') {
@@ -879,6 +795,47 @@ export class FlowsService implements OnDestroy {
     } else if (event.type === 'sync:cancelled') {
       this.updateOperation(this.executingFlowId, operation.id, { status: 'cancelled' });
     }
+  }
+
+  private handleSyncStatusEvent(event: SyncStatusEvent): void {
+    if (!this.executingFlowId) return;
+
+    const flow = this.getFlow(this.executingFlowId);
+    const operation = flow?.operations[this.executingOperationIndex];
+    if (!operation) return;
+
+    // Build SyncStatus from event
+    const syncStatus: SyncStatus = {
+      command: event.command || 'sync_status',
+      pid: event.pid,
+      tab_id: event.tab_id,
+      status: (['running', 'completed', 'error', 'stopped'].includes(event.status || '') ? event.status : 'running') as SyncStatus['status'],
+      progress: event.progress || 0,
+      speed: event.speed || '0 B/s',
+      eta: event.eta || '--',
+      files_transferred: event.files_transferred || 0,
+      total_files: event.total_files || 0,
+      bytes_transferred: event.bytes_transferred || 0,
+      total_bytes: event.total_bytes || 0,
+      current_file: event.current_file || '',
+      errors: event.errors || 0,
+      checks: event.checks || 0,
+      deletes: event.deletes || 0,
+      renames: event.renames || 0,
+      timestamp: event.timestamp || new Date().toISOString(),
+      elapsed_time: event.elapsed_time || '0s',
+      action: (['pull', 'push', 'bi', 'bi-resync'].includes(event.action || '') ? event.action : 'push') as SyncStatus['action'],
+      transfers: event.transfers,
+    };
+
+    // Immutable update: set syncStatus
+    this.updateFlowOperations(this.executingFlowId,
+      flow!.operations.map((op, idx) =>
+        idx === this.executingOperationIndex
+          ? { ...op, syncStatus }
+          : op
+      )
+    );
   }
 
   // ============ Persistence (SQLite via FlowService) ============
@@ -910,7 +867,6 @@ export class FlowsService implements OnDestroy {
         targetPath: bo.target_path || '/',
         syncConfig: this.profileToSyncConfig(bo.sync_config || new models.Profile(), bo.action),
         status: 'idle' as const,
-        logs: [] as string[],
         isExpanded: bo.is_expanded || false,
       })),
     };

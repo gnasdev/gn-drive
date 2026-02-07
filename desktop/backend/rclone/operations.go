@@ -2,6 +2,7 @@ package rclone
 
 import (
 	"context"
+	"desktop/backend/dto"
 	"fmt"
 
 	beConfig "desktop/backend/config"
@@ -15,7 +16,7 @@ import (
 )
 
 // Copy performs a one-way copy from source to destination (no deleting destination files).
-func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, outLog chan string) error {
+func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
 	fsConfig.Checkers = profile.Parallel
@@ -41,13 +42,13 @@ func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, o
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
+	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.CopyDir(ctx, dstFs, srcFs, false), "Copy failed", nil, nil)
 	})
 }
 
 // Move performs a copy then deletes files from the source.
-func Move(ctx context.Context, config beConfig.Config, profile models.Profile, outLog chan string) error {
+func Move(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
 	fsConfig.Checkers = profile.Parallel
@@ -73,13 +74,13 @@ func Move(ctx context.Context, config beConfig.Config, profile models.Profile, o
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
+	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.MoveDir(ctx, dstFs, srcFs, false, false), "Move failed", nil, nil)
 	})
 }
 
 // Check compares source and destination and reports differences.
-func Check(ctx context.Context, config beConfig.Config, profile models.Profile, outLog chan string) error {
+func Check(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Checkers = profile.Parallel
 
@@ -104,7 +105,7 @@ func Check(ctx context.Context, config beConfig.Config, profile models.Profile, 
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, false, false, outLog, func() error {
+	return utils.RunRcloneWithRetryAndStats(ctx, false, false, outStatus, func() error {
 		return utils.HandleError(operations.Check(ctx, &operations.CheckOpt{
 			Fsrc: srcFs,
 			Fdst: dstFs,

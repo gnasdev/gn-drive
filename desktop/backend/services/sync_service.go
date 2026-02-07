@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	beConfig "desktop/backend/config"
+	"desktop/backend/dto"
 	"desktop/backend/events"
 	"desktop/backend/models"
 	"desktop/backend/rclone"
@@ -317,26 +318,22 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		return
 	}
 
-	// Create output log channel for progress reporting
-	outLog := make(chan string, 100)
-	var outLogClosed bool
-	var outLogMutex sync.Mutex
-	closeOutLog := func() {
-		outLogMutex.Lock()
-		defer outLogMutex.Unlock()
-		if !outLogClosed {
-			outLogClosed = true
-			close(outLog)
+	// Create structured status channel
+	outStatus := make(chan *dto.SyncStatusDTO, 100)
+	var outStatusClosed bool
+	var outStatusMutex sync.Mutex
+	closeOutStatus := func() {
+		outStatusMutex.Lock()
+		defer outStatusMutex.Unlock()
+		if !outStatusClosed {
+			outStatusClosed = true
+			close(outStatus)
 		}
 	}
 
-	// Start sync status reporting
-	stopSyncStatus := utils.StartSyncStatusReporting(ctx, nil, task.Id, string(task.Action), task.TabId)
-
 	// Register cancel function in the global command store
 	utils.AddCmd(task.Id, func() {
-		stopSyncStatus()
-		closeOutLog()
+		closeOutStatus()
 		task.Cancel()
 	})
 
@@ -344,26 +341,30 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		utils.AddTabMapping(task.Id, task.TabId)
 	}
 
-	// Goroutine to read output logs and emit progress events
+	// Goroutine to consume structured SyncStatusDTO and dispatch events + logs
 	go func() {
 		isBoardTask := strings.HasPrefix(task.TabId, "board-")
-		for logEntry := range outLog {
-			// Always log to backend console for visibility
-			log.Printf("[sync:%s:%s] %s", string(task.Action), task.TabId, logEntry)
+		for status := range outStatus {
+			// Enrich DTO with task identity (library layer doesn't set these)
+			status.Id = &task.Id
+			status.TabId = &task.TabId
+			status.Action = string(task.Action)
 
-			// For board tasks, also append to the board log buffer for polling
-			if isBoardTask {
-				AppendBoardLog(logEntry)
+			// Extract LogMessages for text-based consumers
+			for _, logMsg := range status.LogMessages {
+				log.Printf("[sync:%s:%s] %s", string(task.Action), task.TabId, logMsg)
+				if isBoardTask {
+					AppendBoardLog(logMsg)
+				}
+				if s.logService != nil {
+					s.logService.LogSync(task.TabId, string(task.Action), status.Status, logMsg)
+				}
 			}
 
-			// Use LogService for reliable log delivery with sequence numbers
-			if s.logService != nil {
-				s.logService.LogSync(task.TabId, string(task.Action), "running", logEntry)
-			} else if s.eventBus != nil {
-				// Fallback to direct event emission if LogService not available
-				event := events.NewSyncEvent(events.SyncProgress, task.TabId, string(task.Action), "running", logEntry)
-				if emitErr := s.eventBus.EmitSyncEvent(event); emitErr != nil {
-					log.Printf("Failed to emit progress event: %v", emitErr)
+			// Emit structured SyncStatusDTO for frontend
+			if s.eventBus != nil {
+				if emitErr := s.eventBus.Emit(status); emitErr != nil {
+					log.Printf("Failed to emit sync status: %v", emitErr)
 				}
 			}
 		}
@@ -377,22 +378,19 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	config := s.envConfig
 	switch task.Action {
 	case ActionPull:
-		err = rclone.Sync(ctx, config, "pull", task.Profile, outLog)
+		err = rclone.Sync(ctx, config, "pull", task.Profile, outStatus)
 	case ActionPush:
-		err = rclone.Sync(ctx, config, "push", task.Profile, outLog)
+		err = rclone.Sync(ctx, config, "push", task.Profile, outStatus)
 	case ActionBi:
-		err = rclone.BiSync(ctx, config, task.Profile, false, outLog)
+		err = rclone.BiSync(ctx, config, task.Profile, false, outStatus)
 	case ActionBiResync:
-		err = rclone.BiSync(ctx, config, task.Profile, true, outLog)
+		err = rclone.BiSync(ctx, config, task.Profile, true, outStatus)
 	default:
 		err = fmt.Errorf("unknown sync action: %s", task.Action)
 	}
 
-	// Close the outLog channel to unblock the log reader goroutine
-	closeOutLog()
-
-	// Clean up
-	stopSyncStatus()
+	// Close the outStatus channel to unblock the reader goroutine
+	closeOutStatus()
 
 	if task.TabId != "" {
 		utils.RemoveTabMapping(task.Id)

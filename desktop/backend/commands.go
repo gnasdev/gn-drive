@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	fsConfig "github.com/rclone/rclone/fs/config"
@@ -59,14 +60,20 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 		return 0
 	}
 
-	outLog := make(chan string, 100)
-
-	// Start sync status reporting
-	stopSyncStatus := utils.StartSyncStatusReporting(ctx, a.oc, id, task, tabId)
+	outStatus := make(chan *dto.SyncStatusDTO, 100)
+	var outStatusClosed bool
+	var outStatusMutex sync.Mutex
+	closeOutStatus := func() {
+		outStatusMutex.Lock()
+		defer outStatusMutex.Unlock()
+		if !outStatusClosed {
+			outStatusClosed = true
+			close(outStatus)
+		}
+	}
 
 	utils.AddCmd(id, func() {
-		stopSyncStatus()
-		close(outLog)
+		closeOutStatus()
 		cancel()
 	})
 
@@ -75,36 +82,50 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	}
 
 	go func() {
-		for {
-			logEntry, ok := <-outLog
-			if !ok { // channel is closed
-				break
-			}
-			if config.DebugMode {
-				fmt.Println("--------------------")
-				fmt.Println(logEntry)
-			}
-			var j []byte
+		for status := range outStatus {
+			// Enrich DTO with task identity
+			status.Id = &id
 			if tabId != "" {
-				j, _ = utils.NewCommandOutputDTOWithTab(id, logEntry, tabId).ToJSON()
-			} else {
-				j, _ = utils.NewCommandOutputDTO(id, logEntry).ToJSON()
+				status.TabId = &tabId
 			}
-			a.oc <- j
+			status.Action = task
+
+			// Extract LogMessages for backward-compatible text output
+			for _, logMsg := range status.LogMessages {
+				if config.DebugMode {
+					fmt.Println("--------------------")
+					fmt.Println(logMsg)
+				}
+				var j []byte
+				if tabId != "" {
+					j, _ = utils.NewCommandOutputDTOWithTab(id, logMsg, tabId).ToJSON()
+				} else {
+					j, _ = utils.NewCommandOutputDTO(id, logMsg).ToJSON()
+				}
+				a.oc <- j
+			}
+
+			// Also send structured SyncStatusDTO
+			if j, err := status.ToJSON(); err == nil {
+				a.oc <- j
+			}
 		}
 	}()
 
 	go func() {
 		switch task {
 		case "pull":
-			err = rclone.Sync(ctx, config, "pull", profile, outLog)
+			err = rclone.Sync(ctx, config, "pull", profile, outStatus)
 		case "push":
-			err = rclone.Sync(ctx, config, "push", profile, outLog)
+			err = rclone.Sync(ctx, config, "push", profile, outStatus)
 		case "bi":
-			err = rclone.BiSync(ctx, config, profile, false, outLog)
+			err = rclone.BiSync(ctx, config, profile, false, outStatus)
 		case "bi-resync":
-			err = rclone.BiSync(ctx, config, profile, true, outLog)
+			err = rclone.BiSync(ctx, config, profile, true, outStatus)
 		}
+
+		// Close the outStatus channel to unblock the reader goroutine
+		closeOutStatus()
 
 		if err != nil {
 			var j []byte

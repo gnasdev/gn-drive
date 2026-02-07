@@ -187,6 +187,12 @@ export function isLegacyCommandDTO(event: unknown): event is CommandDTO {
     return typeof e["command"] === "string" && !("type" in e);
 }
 
+export function isSyncStatusDTO(event: unknown): boolean {
+    if (typeof event !== "object" || event === null) return false;
+    const e = event as Record<string, unknown>;
+    return e["command"] === "sync_status";
+}
+
 // Parse event from raw data (can be JSON string or already parsed object)
 export function parseEvent(rawData: unknown): AppEvent | null {
     try {

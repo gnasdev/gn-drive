@@ -1,3 +1,13 @@
+export interface FileTransferInfo {
+  name: string;
+  size: number;
+  bytes: number;
+  progress: number; // 0-100
+  status: 'transferring' | 'completed' | 'failed' | 'checking';
+  speed?: number; // bytes per second
+  error?: string;
+}
+
 export interface SyncStatus {
   command: string;
   pid?: number;
@@ -18,6 +28,7 @@ export interface SyncStatus {
   timestamp: string;
   elapsed_time: string;
   action: "pull" | "push" | "bi" | "bi-resync";
+  transfers?: FileTransferInfo[];
 }
 
 export interface SyncStatusEvent {
@@ -40,6 +51,7 @@ export interface SyncStatusEvent {
   timestamp?: string;
   elapsed_time?: string;
   action?: string;
+  transfers?: FileTransferInfo[];
 }
 
 export const DEFAULT_SYNC_STATUS: SyncStatus = {

@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Flow, Operation, DragData } from '../../models/flow.model';
+import { SyncStatus } from '../../models/sync-status.interface';
 import { NeoButtonComponent } from '../neo/neo-button.component';
 import { FlowOperationItemComponent } from './operation-item.component';
 import { DropZoneComponent } from './drop-zone.component';
@@ -103,11 +104,10 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
         </div>
       </div>
 
-      <!-- Flow Logs Panel (single logs for entire flow) -->
-      @if (flow.status === 'running' || hasLogs) {
+      <!-- Flow Status Panel -->
+      @if (flow.status === 'running' || activeOperationSyncStatus) {
         <app-operation-logs-panel
-          [logs]="aggregatedLogs"
-          [isLoading]="flow.status === 'running' && aggregatedLogs.length === 0"
+          [syncStatus]="activeOperationSyncStatus"
         ></app-operation-logs-panel>
       }
 
@@ -134,7 +134,6 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
             [totalInFlow]="flow.operations.length"
             [isDragging]="isDragging && isSourceFlow && dragStartIndex === i"
             [willBeDragged]="isSourceFlow && dragStartIndex === i"
-            [showLogs]="false"
             (operationChange)="onOperationChange(i, $event)"
             (remove)="removeOperation.emit(operation.id)"
             (toggleExpanded)="toggleOperationExpanded.emit(operation.id)"
@@ -218,20 +217,10 @@ export class FlowCardComponent {
     return this.flow.operations.every((op) => op.sourceRemote && op.targetRemote);
   }
 
-  get hasLogs(): boolean {
-    return this.flow.operations.some((op) => op.logs.length > 0);
-  }
-
-  get aggregatedLogs(): string[] {
-    // Aggregate logs from all operations in sequence
-    const logs: string[] = [];
-    for (const op of this.flow.operations) {
-      if (op.logs.length > 0) {
-        logs.push(`--- ${op.sourceRemote} → ${op.targetRemote} ---`);
-        logs.push(...op.logs);
-      }
-    }
-    return logs;
+  get activeOperationSyncStatus(): SyncStatus | null {
+    if (this.flow.status !== 'running') return null;
+    const runningOp = this.flow.operations.find(op => op.status === 'running');
+    return runningOp?.syncStatus || null;
   }
 
   startEdit(): void {

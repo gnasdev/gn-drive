@@ -1,3 +1,5 @@
+import { SyncStatus } from './sync-status.interface';
+
 /**
  * Flow-based Operations Model
  *
@@ -83,7 +85,7 @@ export interface Operation {
 
   // Runtime state (not persisted)
   status: OperationStatus;
-  logs: string[];
+  syncStatus?: SyncStatus;
 
   // UI state
   isExpanded: boolean;
@@ -164,22 +166,7 @@ export function createEmptyOperation(): Operation {
       action: 'push',
     },
     status: 'idle',
-    logs: [],
     isExpanded: false,
   };
 }
 
-/**
- * Maximum log lines per operation
- */
-export const MAX_LOG_LINES = 500;
-
-/**
- * Append log to operation, maintaining max buffer size
- */
-export function appendOperationLog(operation: Operation, log: string): void {
-  operation.logs.push(log);
-  if (operation.logs.length > MAX_LOG_LINES) {
-    operation.logs = operation.logs.slice(-MAX_LOG_LINES);
-  }
-}

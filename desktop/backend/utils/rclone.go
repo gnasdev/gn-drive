@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"desktop/backend/dto"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -37,7 +38,7 @@ func resolveError(ctx context.Context, err error) error {
 	return err
 }
 
-func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool, outLog chan string, cb func() error) error {
+func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool, outStatus chan *dto.SyncStatusDTO, cb func() error) error {
 	var cmdErr error
 
 	fsConfig := fs.GetConfig(ctx)
@@ -48,11 +49,7 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 		showStats = true
 	}
 
-	if fsConfig.Progress {
-		stopStats = startProgress(ctx, outLog)
-	} else if showStats {
-		stopStats = startStats(ctx, outLog)
-	}
+	stopStats = startProgress(ctx, outStatus)
 
 	cmd.SigInfoHandler()
 
@@ -98,7 +95,7 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 	}
 
 	stopStats()
-	if showStats && (stats.Errored() || statsInterval > 0) {
+	if showStats && stats.Errored() {
 		stats.Log()
 	}
 

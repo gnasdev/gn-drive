@@ -2,6 +2,7 @@ package rclone
 
 import (
 	"context"
+	"desktop/backend/dto"
 	"fmt"
 
 	beConfig "desktop/backend/config"
@@ -27,7 +28,7 @@ import (
 	_ "github.com/rclone/rclone/backend/yandex"
 )
 
-func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outLog chan string) error {
+func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	// Initialize the config
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
@@ -88,7 +89,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outLog, func() error {
+	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.Sync(ctx, dstFs, srcFs, false), "Sync failed", nil, nil)
 	})
 }

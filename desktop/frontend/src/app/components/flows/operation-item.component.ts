@@ -6,7 +6,6 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
 import { RemoteDropdownComponent, RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
 import { PathBrowserComponent } from '../path-browser/path-browser.component';
 import { OperationSettingsPanelComponent } from '../operations-tree/operation-settings-panel.component';
-import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-panel.component';
 
 @Component({
   selector: 'app-flow-operation-item',
@@ -18,7 +17,6 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
     RemoteDropdownComponent,
     PathBrowserComponent,
     OperationSettingsPanelComponent,
-    OperationLogsPanelComponent,
   ],
   template: `
     <div
@@ -140,13 +138,6 @@ import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-p
           (configChange)="onConfigChange($event)"
         ></app-operation-settings-panel>
 
-        <!-- Logs Panel (When executing or has logs, and showLogs is true) -->
-        @if (showLogs && (isExecuting || operation.logs.length > 0)) {
-          <app-operation-logs-panel
-            [logs]="operation.logs"
-            [isLoading]="isExecuting && operation.logs.length === 0"
-          ></app-operation-logs-panel>
-        }
       }
     </div>
   `,
@@ -157,7 +148,6 @@ export class FlowOperationItemComponent {
   @Input() totalInFlow!: number;
   @Input() isDragging = false;
   @Input() willBeDragged = false;
-  @Input() showLogs = true;
 
   @Output() operationChange = new EventEmitter<Operation>();
   @Output() remove = new EventEmitter<void>();
