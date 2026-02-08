@@ -7,16 +7,16 @@ import (
 	"sync"
 
 	"github.com/emersion/go-autostart"
-	"github.com/gen2brain/beeep"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // AppSettings holds persisted application settings
 type AppSettings struct {
-	NotificationsEnabled bool `json:"notifications_enabled"`
-	DebugMode            bool `json:"debug_mode"`
-	MinimizeToTray       bool `json:"minimize_to_tray"`
-	StartAtLogin         bool `json:"start_at_login"`
+	NotificationsEnabled    bool `json:"notifications_enabled"`
+	DebugMode               bool `json:"debug_mode"`
+	MinimizeToTray          bool `json:"minimize_to_tray"`
+	StartAtLogin            bool `json:"start_at_login"`
+	MinimizeToTrayOnStartup bool `json:"minimize_to_tray_on_startup"`
 }
 
 // NotificationService handles desktop notifications and app settings persistence
@@ -50,7 +50,7 @@ func (n *NotificationService) ServiceName() string {
 // ServiceStartup is called when the service starts
 func (n *NotificationService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("NotificationService starting up...")
-	n.loadSettings()
+	n.LoadSettings()
 	return nil
 }
 
@@ -70,7 +70,7 @@ func (n *NotificationService) SendNotification(ctx context.Context, title, body 
 		return nil
 	}
 
-	if err := beeep.Notify(title, body, ""); err != nil {
+	if err := sendPlatformNotification(title, body); err != nil {
 		log.Printf("Failed to send notification: %v", err)
 		return err
 	}
@@ -171,7 +171,23 @@ func (n *NotificationService) IsStartAtLogin(ctx context.Context) bool {
 	return n.settings.StartAtLogin
 }
 
-func (n *NotificationService) loadSettings() {
+// SetMinimizeToTrayOnStartup enables or disables minimizing to tray on startup
+func (n *NotificationService) SetMinimizeToTrayOnStartup(ctx context.Context, enabled bool) {
+	n.mutex.Lock()
+	n.settings.MinimizeToTrayOnStartup = enabled
+	n.mutex.Unlock()
+	n.saveSetting("minimize_to_tray_on_startup", boolToStr(enabled))
+}
+
+// IsMinimizeToTrayOnStartup returns whether minimize to tray on startup is enabled
+func (n *NotificationService) IsMinimizeToTrayOnStartup(ctx context.Context) bool {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	return n.settings.MinimizeToTrayOnStartup
+}
+
+// LoadSettings loads settings from the database. Exported for early loading in main.go.
+func (n *NotificationService) LoadSettings() {
 	db, err := GetSharedDB()
 	if err != nil {
 		log.Printf("Warning: Could not get database for settings: %v", err)
@@ -202,6 +218,8 @@ func (n *NotificationService) loadSettings() {
 			n.settings.MinimizeToTray = value == "true"
 		case "start_at_login":
 			n.settings.StartAtLogin = value == "true"
+		case "minimize_to_tray_on_startup":
+			n.settings.MinimizeToTrayOnStartup = value == "true"
 		}
 	}
 }

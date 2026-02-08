@@ -34,12 +34,12 @@ export interface RemoteInfo {
 
 // Constants for remote type options
 export const REMOTE_TYPE_OPTIONS: RemoteTypeOption[] = [
-    { value: "drive", label: "Google Drive", icon: "cloud" },
-    { value: "dropbox", label: "Dropbox", icon: "cloud_queue" },
-    { value: "onedrive", label: "OneDrive", icon: "cloud_circle" },
-    { value: "yandex", label: "Yandex Disk", icon: "cloud_sync" },
-    { value: "gphotos", label: "Google Photos", icon: "photo_library" },
-    { value: "iclouddrive", label: "iCloud Drive", icon: "cloud_upload" },
+    { value: "drive", label: "Google Drive", icon: "googledrive" },
+    { value: "dropbox", label: "Dropbox", icon: "dropbox" },
+    { value: "onedrive", label: "OneDrive", icon: "microsoftonedrive" },
+    { value: "yandex", label: "Yandex Disk", icon: "yandex" },
+    { value: "gphotos", label: "Google Photos", icon: "googlephotos" },
+    { value: "iclouddrive", label: "iCloud Drive", icon: "icloud" },
 ];
 
 // Type guards

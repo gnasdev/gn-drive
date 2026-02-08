@@ -11,14 +11,16 @@ import (
 
 // TrayService manages the system tray
 type TrayService struct {
-	app          *application.App
-	tray         *application.SystemTray
-	menu         *application.Menu
-	boardService *BoardService
-	window       application.Window
-	mutex        sync.RWMutex
-	initialized  bool
-	iconData     []byte
+	app            *application.App
+	tray           *application.SystemTray
+	menu           *application.Menu
+	boardService   *BoardService
+	flowService    *FlowService
+	window         application.Window
+	mutex          sync.RWMutex
+	initialized    bool
+	iconData       []byte
+	onShowCallback func() // called when restoring from tray to show in Dock
 }
 
 // Singleton instance
@@ -54,9 +56,19 @@ func (t *TrayService) SetBoardService(boardService *BoardService) {
 	t.boardService = boardService
 }
 
+// SetFlowService sets the flow service reference
+func (t *TrayService) SetFlowService(flowService *FlowService) {
+	t.flowService = flowService
+}
+
 // SetWindow sets the main window reference
 func (t *TrayService) SetWindow(window application.Window) {
 	t.window = window
+}
+
+// SetOnShowCallback sets a callback invoked when the app is restored from tray
+func (t *TrayService) SetOnShowCallback(cb func()) {
+	t.onShowCallback = cb
 }
 
 // Initialize creates and shows the system tray
@@ -115,19 +127,19 @@ func (t *TrayService) RefreshMenu() {
 func (t *TrayService) buildMenu() {
 	menu := application.NewMenu()
 
-	// Add boards section
-	if t.boardService != nil {
-		boards, err := t.boardService.GetBoards(context.Background())
-		if err == nil && len(boards) > 0 {
-			for _, board := range boards {
-				boardId := board.Id
-				boardName := board.Name
-				if boardName == "" {
-					boardName = "(Unnamed)"
+	// Add flows section
+	if t.flowService != nil {
+		flows, err := t.flowService.GetFlows(context.Background())
+		if err == nil && len(flows) > 0 {
+			for _, flow := range flows {
+				flowId := flow.Id
+				flowName := flow.Name
+				if flowName == "" {
+					flowName = "(Unnamed Flow)"
 				}
 
-				menu.Add(boardName).OnClick(func(ctx *application.Context) {
-					t.executeBoard(boardId)
+				menu.Add(flowName).OnClick(func(ctx *application.Context) {
+					t.executeFlow(flowId)
 				})
 			}
 
@@ -150,26 +162,20 @@ func (t *TrayService) buildMenu() {
 	t.menu = menu
 }
 
-// executeBoard starts execution of a board
-func (t *TrayService) executeBoard(boardId string) {
-	if t.boardService == nil {
-		log.Printf("TrayService: Board service not available")
-		return
+// executeFlow emits an event for the frontend to execute a flow
+func (t *TrayService) executeFlow(flowId string) {
+	log.Printf("TrayService: Requesting flow execution %s", flowId)
+	if t.app != nil {
+		t.app.Event.Emit("tray:execute_flow", flowId)
 	}
-
-	log.Printf("TrayService: Executing board %s", boardId)
-
-	go func() {
-		_, err := t.boardService.ExecuteBoard(context.Background(), boardId)
-		if err != nil {
-			log.Printf("TrayService: Failed to execute board %s: %v", boardId, err)
-		}
-	}()
 }
 
 // showWindow shows and focuses the main window
 func (t *TrayService) showWindow() {
 	if t.window != nil {
+		if t.onShowCallback != nil {
+			t.onShowCallback()
+		}
 		t.window.Show()
 		t.window.Focus()
 	}

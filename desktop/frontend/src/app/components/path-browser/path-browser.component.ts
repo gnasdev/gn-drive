@@ -60,6 +60,7 @@ export class PathBrowserComponent {
   lastSegmentIsFile = false;
 
   private readonly cdr = inject(ChangeDetectorRef);
+  private browseGeneration = 0;
 
   get segments(): PathSegment[] {
     if (!this.path) return [];
@@ -84,6 +85,9 @@ export class PathBrowserComponent {
       return;
     }
 
+    // Cancel any in-progress browse by incrementing generation
+    const generation = ++this.browseGeneration;
+
     this.activeSegmentIndex = index;
     this.dropdownLoading = true;
     this.dropdownEntries = [];
@@ -95,6 +99,9 @@ export class PathBrowserComponent {
         ? `${this.remoteName}:${segmentPath}`
         : segmentPath || "/";
       const entries = await ListFiles(remotePath, false);
+
+      // Discard stale result if a newer browse was started
+      if (this.browseGeneration !== generation) return;
 
       let filtered = entries || [];
       if (this.filterMode === "folder") {
@@ -108,15 +115,20 @@ export class PathBrowserComponent {
         return a.name.localeCompare(b.name);
       });
     } catch (err) {
+      // Discard stale error if a newer browse was started
+      if (this.browseGeneration !== generation) return;
       this.dropdownEntries = [];
       console.error("Failed to load entries:", err);
     } finally {
-      this.dropdownLoading = false;
-      this.cdr.detectChanges();
+      // Only update loading state if this is still the active browse
+      if (this.browseGeneration === generation) {
+        this.dropdownLoading = false;
+        this.cdr.detectChanges();
+      }
     }
   }
 
-  onEntrySelect(entry: { name: string; is_dir: boolean }): void {
+  async onEntrySelect(entry: { name: string; is_dir: boolean }): Promise<void> {
     if (this.activeSegmentIndex === null) return;
 
     const basePath =
@@ -129,6 +141,15 @@ export class PathBrowserComponent {
     this.activeSegmentIndex = null;
     this.pathChange.emit(this.path);
     this.cdr.detectChanges();
+
+    // Auto-navigate deeper: if selected entry is a directory,
+    // open the dropdown for the new last segment
+    if (entry.is_dir) {
+      const lastIndex = this.segments.length - 1;
+      if (lastIndex >= 0) {
+        await this.onSegmentClick(lastIndex);
+      }
+    }
   }
 
   closeDropdown(): void {

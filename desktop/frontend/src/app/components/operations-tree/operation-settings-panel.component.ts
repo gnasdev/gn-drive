@@ -6,6 +6,12 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
 import { NeoInputComponent } from '../neo/neo-input.component';
 import { NeoToggleComponent } from '../neo/neo-toggle.component';
 import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.component';
+import { PathBrowserComponent } from '../path-browser/path-browser.component';
+
+interface PathEntry {
+  value: string;
+  mode: 'browser' | 'custom';
+}
 
 @Component({
   selector: 'app-operation-settings-panel',
@@ -17,6 +23,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
     NeoInputComponent,
     NeoToggleComponent,
     NeoDropdownComponent,
+    PathBrowserComponent,
   ],
   template: `
     <div class="border-t-2 border-sys-border bg-sys-bg p-4 space-y-4" [class.opacity-50]="disabled" [class.pointer-events-none]="disabled">
@@ -66,7 +73,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
             [disabled]="disabled"
           ></neo-input>
         </div>
-        <details class="mt-2">
+        <details class="mt-2" open>
           <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Performance</summary>
           <div class="grid grid-cols-2 gap-3 mt-2">
             <neo-input
@@ -166,31 +173,85 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
         <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
           <i class="pi pi-filter"></i> Filtering
         </h3>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="block">
+        <div class="space-y-3">
+          <!-- Include Paths -->
+          <div>
             <span class="block text-sm font-medium mb-1">Include Paths</span>
-            <textarea
-              class="w-full px-3 py-2 border-2 border-sys-border shadow-neo-sm font-mono text-sm resize-none"
-              rows="3"
-              placeholder="/path/to/include&#10;/another/path"
-              [ngModel]="includedPathsText"
-              (ngModelChange)="updateIncludedPaths($event)"
-              [disabled]="disabled"
-            ></textarea>
-          </label>
-          <label class="block">
+            @for (entry of includedPathEntries; track $index; let i = $index) {
+              <div class="flex items-center gap-2 mb-1">
+                <button type="button" (click)="togglePathMode(includedPathEntries, i)"
+                  class="text-xs px-2 py-1 border-2 border-sys-border shrink-0 hover:bg-sys-accent/20"
+                  [disabled]="disabled">
+                  {{ entry.mode === 'browser' ? 'Browse' : 'Custom' }}
+                </button>
+                @if (entry.mode === 'browser') {
+                  <app-path-browser
+                    [remoteName]="sourceRemote"
+                    [path]="entry.value"
+                    (pathChange)="onPathEntryChange(includedPathEntries, i, $event); syncIncludedPaths()"
+                    placeholder="Select path"
+                    filterMode="both"
+                    [disabled]="disabled"
+                    class="flex-1 min-w-0"
+                  ></app-path-browser>
+                } @else {
+                  <input type="text" [(ngModel)]="entry.value"
+                    (ngModelChange)="syncIncludedPaths()"
+                    class="flex-1 min-w-0 px-3 py-1 border-2 border-sys-border shadow-neo-sm font-mono text-sm"
+                    placeholder="/path or *.ext"
+                    [disabled]="disabled" />
+                }
+                <button type="button" (click)="removePathEntry(includedPathEntries, i); syncIncludedPaths()"
+                  class="text-sys-status-error shrink-0 px-1 hover:opacity-70" [disabled]="disabled">
+                  <i class="pi pi-times text-xs"></i>
+                </button>
+              </div>
+            }
+            <button type="button" (click)="addPathEntry(includedPathEntries)"
+              class="text-xs text-sys-fg-muted hover:text-sys-fg mt-1" [disabled]="disabled">
+              <i class="pi pi-plus mr-1"></i> Add path
+            </button>
+          </div>
+          <!-- Exclude Paths -->
+          <div>
             <span class="block text-sm font-medium mb-1">Exclude Paths</span>
-            <textarea
-              class="w-full px-3 py-2 border-2 border-sys-border shadow-neo-sm font-mono text-sm resize-none"
-              rows="3"
-              placeholder="*.tmp&#10;node_modules/"
-              [ngModel]="excludedPathsText"
-              (ngModelChange)="updateExcludedPaths($event)"
-              [disabled]="disabled"
-            ></textarea>
-          </label>
+            @for (entry of excludedPathEntries; track $index; let i = $index) {
+              <div class="flex items-center gap-2 mb-1">
+                <button type="button" (click)="togglePathMode(excludedPathEntries, i)"
+                  class="text-xs px-2 py-1 border-2 border-sys-border shrink-0 hover:bg-sys-accent/20"
+                  [disabled]="disabled">
+                  {{ entry.mode === 'browser' ? 'Browse' : 'Custom' }}
+                </button>
+                @if (entry.mode === 'browser') {
+                  <app-path-browser
+                    [remoteName]="sourceRemote"
+                    [path]="entry.value"
+                    (pathChange)="onPathEntryChange(excludedPathEntries, i, $event); syncExcludedPaths()"
+                    placeholder="Select path"
+                    filterMode="both"
+                    [disabled]="disabled"
+                    class="flex-1 min-w-0"
+                  ></app-path-browser>
+                } @else {
+                  <input type="text" [(ngModel)]="entry.value"
+                    (ngModelChange)="syncExcludedPaths()"
+                    class="flex-1 min-w-0 px-3 py-1 border-2 border-sys-border shadow-neo-sm font-mono text-sm"
+                    placeholder="*.tmp or node_modules/"
+                    [disabled]="disabled" />
+                }
+                <button type="button" (click)="removePathEntry(excludedPathEntries, i); syncExcludedPaths()"
+                  class="text-sys-status-error shrink-0 px-1 hover:opacity-70" [disabled]="disabled">
+                  <i class="pi pi-times text-xs"></i>
+                </button>
+              </div>
+            }
+            <button type="button" (click)="addPathEntry(excludedPathEntries)"
+              class="text-xs text-sys-fg-muted hover:text-sys-fg mt-1" [disabled]="disabled">
+              <i class="pi pi-plus mr-1"></i> Add path
+            </button>
+          </div>
         </div>
-        <details class="mt-2">
+        <details class="mt-2" open>
           <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Filtering</summary>
           <div class="grid grid-cols-2 gap-3 mt-2">
             <!-- Min Size: number + unit -->
@@ -311,7 +372,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
       </div>
 
       <!-- Safety -->
-      <details>
+      <details open>
         <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
           <i class="pi pi-shield"></i> Safety
         </summary>
@@ -370,7 +431,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
       </details>
 
       <!-- Comparison -->
-      <details>
+      <details open>
         <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
           <i class="pi pi-check-circle"></i> Comparison
         </summary>
@@ -398,7 +459,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
 
       <!-- Sync-specific (push/pull) -->
       @if (config.action === 'push' || config.action === 'pull') {
-        <details>
+        <details open>
           <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
             <i class="pi pi-sync"></i> Sync Options
           </summary>
@@ -429,7 +490,7 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
             (ngModelChange)="onConfigChange()"
             [disabled]="disabled"
           ></neo-dropdown>
-          <details class="mt-2">
+          <details class="mt-2" open>
             <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Bisync</summary>
             <div class="grid grid-cols-2 gap-3 mt-2">
               <neo-dropdown
@@ -515,6 +576,8 @@ import { NeoDropdownComponent, DropdownOption } from '../neo/neo-dropdown.compon
 })
 export class OperationSettingsPanelComponent implements OnInit {
   @Input() config: SyncConfig = { action: 'push' };
+  @Input() sourceRemote = '';
+  @Input() targetRemote = '';
   @Input() scheduleEnabled = false;
   @Input() cronExpr = '';
   @Input() disabled = false;
@@ -576,6 +639,10 @@ export class OperationSettingsPanelComponent implements OnInit {
     { value: 'y', label: 'Year' },
   ];
 
+  // Path entry arrays for per-row filtering UI
+  includedPathEntries: PathEntry[] = [];
+  excludedPathEntries: PathEntry[] = [];
+
   // Size/age split fields
   minSizeNum = '';
   minSizeUnit = 'M';
@@ -588,23 +655,47 @@ export class OperationSettingsPanelComponent implements OnInit {
 
   ngOnInit(): void {
     this.initSizeAgeFields();
+    this.initPathEntries();
   }
 
-  get includedPathsText(): string {
-    return this.config.includedPaths?.join('\n') || '';
+  private initPathEntries(): void {
+    this.includedPathEntries = (this.config.includedPaths || []).map((p) => ({
+      value: p,
+      mode: 'custom' as const,
+    }));
+    this.excludedPathEntries = (this.config.excludedPaths || []).map((p) => ({
+      value: p,
+      mode: 'custom' as const,
+    }));
   }
 
-  get excludedPathsText(): string {
-    return this.config.excludedPaths?.join('\n') || '';
+  addPathEntry(entries: PathEntry[]): void {
+    entries.push({ value: '', mode: 'custom' });
   }
 
-  updateIncludedPaths(text: string): void {
-    this.config.includedPaths = text.split('\n').filter((p) => p.trim());
+  removePathEntry(entries: PathEntry[], index: number): void {
+    entries.splice(index, 1);
+  }
+
+  togglePathMode(entries: PathEntry[], index: number): void {
+    entries[index].mode = entries[index].mode === 'browser' ? 'custom' : 'browser';
+  }
+
+  onPathEntryChange(entries: PathEntry[], index: number, value: string): void {
+    entries[index].value = value;
+  }
+
+  syncIncludedPaths(): void {
+    this.config.includedPaths = this.includedPathEntries
+      .map((e) => e.value)
+      .filter((v) => v.trim());
     this.onConfigChange();
   }
 
-  updateExcludedPaths(text: string): void {
-    this.config.excludedPaths = text.split('\n').filter((p) => p.trim());
+  syncExcludedPaths(): void {
+    this.config.excludedPaths = this.excludedPathEntries
+      .map((e) => e.value)
+      .filter((v) => v.trim());
     this.onConfigChange();
   }
 

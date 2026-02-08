@@ -207,6 +207,15 @@ export class RemotesComponent implements OnInit, OnDestroy {
     return option?.icon ?? "cloud";
   }
 
+  onIconError(event: Event): void {
+    const img = event.target as HTMLElement;
+    img.style.display = 'none';
+    const fallback = img.nextElementSibling as HTMLElement | null;
+    if (fallback) {
+      fallback.style.display = 'block';
+    }
+  }
+
   getRemoteTypeLabel(type: string): string {
     const option = this.remoteTypeOptions.find((opt) => opt.value === type);
     return option?.label ?? type;

@@ -233,7 +233,16 @@ func (s *FlowService) SaveFlows(ctx context.Context, flows []models.Flow) error 
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Refresh tray menu to reflect flow changes
+	if ts := GetTrayService(); ts != nil {
+		go ts.RefreshMenu()
+	}
+
+	return nil
 }
 
 // OnRemoteDeleted cleans up operations referencing a deleted remote

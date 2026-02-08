@@ -50,6 +50,7 @@ export class FlowsService implements OnDestroy {
   private tempBoardId: string | null = null;
 
   private eventCleanup: (() => void) | undefined;
+  private trayEventCleanup: (() => void) | undefined;
   private autoSaveSubscription: Subscription | null = null;
   private autoSaveTrigger$ = new Subject<void>();
 
@@ -71,6 +72,14 @@ export class FlowsService implements OnDestroy {
       }
     });
 
+    // Listen for tray-initiated flow execution
+    this.trayEventCleanup = Events.On('tray:execute_flow', (event) => {
+      const flowId = event.data as string;
+      if (flowId) {
+        this.ngZone.run(() => this.executeFlow(flowId));
+      }
+    });
+
     // Auto-save on changes (debounced)
     this.autoSaveSubscription = this.autoSaveTrigger$.pipe(debounceTime(500)).subscribe(() => {
       this.persistFlows();
@@ -79,6 +88,7 @@ export class FlowsService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.eventCleanup?.();
+    this.trayEventCleanup?.();
     this.autoSaveSubscription?.unsubscribe();
   }
 

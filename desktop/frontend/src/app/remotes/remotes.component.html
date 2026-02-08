@@ -29,8 +29,15 @@
           @for (remote of appService.remotes$ | async; track remote) {
           <p-card [attr.aria-label]="'Remote: ' + remote.name" styleClass="group hover:bg-gray-700 transition-colors duration-200">
             <div class="flex items-center">
-              <div class="flex-shrink-0 mr-4">
-                <i class="pi pi-cloud text-3xl text-gray-400" aria-hidden="true"></i>
+              <div class="shrink-0 mr-4 w-8 h-8 flex items-center justify-center">
+                <img
+                  [src]="'https://cdn.simpleicons.org/' + getRemoteIcon(remote.type) + '/9ca3af'"
+                  alt=""
+                  aria-hidden="true"
+                  class="w-8 h-8"
+                  (error)="onIconError($event)"
+                />
+                <i class="pi pi-cloud text-3xl text-gray-400" style="display:none" aria-hidden="true"></i>
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-medium text-gray-100 truncate">

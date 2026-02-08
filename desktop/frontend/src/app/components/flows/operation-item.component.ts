@@ -132,6 +132,8 @@ import { OperationSettingsPanelComponent } from '../operations-tree/operation-se
         <!-- Settings Panel -->
         <app-operation-settings-panel
           [config]="operation.syncConfig"
+          [sourceRemote]="operation.sourceRemote"
+          [targetRemote]="operation.targetRemote"
           [scheduleEnabled]="false"
           [cronExpr]="''"
           [disabled]="isExecuting"

@@ -30,6 +30,7 @@ import {
   GetSettings,
   SetEnabled,
   SetMinimizeToTray,
+  SetMinimizeToTrayOnStartup,
   SetStartAtLogin,
 } from '../../../../wailsjs/desktop/backend/services/notificationservice';
 import { NeoButtonComponent } from '../neo/neo-button.component';
@@ -55,9 +56,7 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
       [visible]="visible"
       (visibleChange)="visibleChange.emit($event)"
       title="Settings v1.0.0"
-      width="80vw"
       maxWidth="80vw"
-      height="80vh"
       maxHeight="80vh"
       [headerYellow]="true"
     >
@@ -117,6 +116,16 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
                 (ngModelChange)="saveMinimizeToTraySetting()"
               ></neo-toggle>
             </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium">Minimize to Tray on Startup</p>
+                <p class="text-xs text-sys-fg-muted">Start minimized to system tray</p>
+              </div>
+              <neo-toggle
+                [(ngModel)]="minimizeToTrayOnStartup"
+                (ngModelChange)="saveMinimizeToTrayOnStartupSetting()"
+              ></neo-toggle>
+            </div>
           </div>
         </neo-card>
 
@@ -138,23 +147,6 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
           </div>
         </neo-card>
 
-        <!-- Paths -->
-        <neo-card>
-          <div class="flex items-center gap-2 mb-3">
-            <i class="pi pi-folder-open"></i>
-            <h2 class="font-bold">Configuration Paths</h2>
-          </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-sys-fg-muted">Boards</span>
-              <code class="text-xs bg-sys-accent/30 px-1">~/.config/ns-drive/boards.json</code>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-sys-fg-muted">Rclone</span>
-              <code class="text-xs bg-sys-accent/30 px-1">~/.config/ns-drive/rclone.conf</code>
-            </div>
-          </div>
-        </neo-card>
 
       </div>
     </neo-dialog>
@@ -308,6 +300,7 @@ export class SettingsDialogComponent implements OnInit {
   // Settings state
   startAtLogin = false;
   minimizeToTray = false;
+  minimizeToTrayOnStartup = false;
   notificationsEnabled = true;
 
   // Export dialog
@@ -343,6 +336,7 @@ export class SettingsDialogComponent implements OnInit {
       const settings = await GetSettings();
       this.startAtLogin = settings.start_at_login;
       this.minimizeToTray = settings.minimize_to_tray;
+      this.minimizeToTrayOnStartup = settings.minimize_to_tray_on_startup;
       this.notificationsEnabled = settings.notifications_enabled;
       this.cdr.markForCheck();
     } catch (err) {
@@ -361,6 +355,14 @@ export class SettingsDialogComponent implements OnInit {
   async saveMinimizeToTraySetting(): Promise<void> {
     try {
       await SetMinimizeToTray(this.minimizeToTray);
+    } catch (err) {
+      console.error('Failed to save setting:', err);
+    }
+  }
+
+  async saveMinimizeToTrayOnStartupSetting(): Promise<void> {
+    try {
+      await SetMinimizeToTrayOnStartup(this.minimizeToTrayOnStartup);
     } catch (err) {
       console.error('Failed to save setting:', err);
     }

@@ -105,6 +105,7 @@ func main() {
 	// Wire up tray service dependencies
 	trayService.SetApp(app)
 	trayService.SetBoardService(boardService)
+	trayService.SetFlowService(flowService)
 
 	// Compute shared config once to avoid duplicate file I/O across services
 	homeDir, err := os.UserHomeDir()
@@ -126,11 +127,14 @@ func main() {
 	}
 	defer services.CloseDatabase()
 
+	// Load settings early so they're available before app.Run() calls ServiceStartup()
+	notificationService.LoadSettings()
+
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ns-drive",
-		Width:  1000,
-		Height: 1200,
+		Width:  800,
+		Height: 1000,
 	})
 
 	// Set window reference on shared EventBus for window-specific events
@@ -148,14 +152,24 @@ func main() {
 			// Cancel the close event and hide window instead
 			event.Cancel()
 			window.Hide()
+			be.HideFromDock()
+		} else {
+			// Quit the entire application (including backend)
+			app.Quit()
 		}
-		// If not minimize to tray, let the window close normally which will quit the app
 	})
 
 	// Initialize system tray
 	trayService.SetWindow(window)
+	trayService.SetOnShowCallback(be.ShowInDock)
 	if err := trayService.Initialize(); err != nil {
 		log.Printf("Warning: Failed to initialize system tray: %v", err)
+	}
+
+	// Minimize to tray on startup if setting is enabled
+	if notificationService.IsMinimizeToTrayOnStartup(nil) {
+		window.Hide()
+		be.HideFromDock()
 	}
 
 	// Run the application
