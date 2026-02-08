@@ -82,6 +82,8 @@ export class BoardComponent implements OnInit, OnDestroy {
     editingEdgeTargetLabel = "";
     editingEdgeSourceProvider = "";
     editingEdgeTargetProvider = "";
+    editingEdgeSourceType = "";
+    editingEdgeTargetType = "";
 
     // Execution
     isExecuting = false;
@@ -390,6 +392,8 @@ export class BoardComponent implements OnInit, OnDestroy {
             this.editingEdgeTargetProvider = this.getNodeProvider(
                 edge.target_id,
             );
+            this.editingEdgeSourceType = this.getNodeType(edge.source_id);
+            this.editingEdgeTargetType = this.getNodeType(edge.target_id);
             this.showEdgeDialog = true;
         }
     }
@@ -418,6 +422,16 @@ export class BoardComponent implements OnInit, OnDestroy {
         );
         if (!remote) return "";
         return this.getProviderLabel(remote.type);
+    }
+
+    getNodeType(nodeId: string): string {
+        const node = this.activeBoard?.nodes?.find((n) => n.id === nodeId);
+        if (!node) return "";
+        if (node.remote_name === "local") return "local";
+        const remote = this.appService.remotes$.value?.find(
+            (r) => r.name === node.remote_name,
+        );
+        return remote?.type || "";
     }
 
     getProviderLabel(type: string): string {

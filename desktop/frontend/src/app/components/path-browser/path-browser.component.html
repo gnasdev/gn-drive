@@ -47,9 +47,17 @@
         <i class="pi pi-spin pi-spinner text-sys-fg-muted mr-2"></i>
         <span class="text-xs text-sys-fg-muted">Loading...</span>
       </div>
-    } @else if (dropdownEntries.length === 0) {
-      <div class="p-3 text-xs text-sys-fg-muted text-center">Empty</div>
     } @else {
+      @if (filterMode !== 'file') {
+        <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+        <div
+          class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-sys-accent/20 text-sm"
+          (click)="onSelectCurrentFolder()"
+        >
+          <i class="pi pi-folder text-sys-accent"></i>
+          <span class="truncate text-sys-fg">.</span>
+        </div>
+      }
       @for (entry of dropdownEntries; track entry.name) {
         <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
         <div

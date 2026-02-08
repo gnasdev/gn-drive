@@ -110,19 +110,43 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <span class="text-xs text-gray-500 mb-1 block">{{ isBidirectional() ? 'Side A' : 'Source' }}</span>
-          <div class="p-2 bg-gray-800 rounded text-sm">
+          <div class="p-2 bg-gray-800 rounded text-sm flex items-center gap-2">
+            @if (getProviderIcon(sourceType); as icon) {
+              <img
+                [src]="'https://cdn.simpleicons.org/' + icon + '/9ca3af'"
+                alt=""
+                aria-hidden="true"
+                class="w-5 h-5"
+                (error)="onIconError($event)"
+              />
+              <i class="pi pi-cloud text-lg text-gray-400" style="display:none" aria-hidden="true"></i>
+            } @else {
+              <i class="pi pi-cloud text-lg text-gray-400" aria-hidden="true"></i>
+            }
             <span class="text-gray-300">{{ sourceLabel }}</span>
             @if (sourceProvider) {
-              <span class="text-xs text-gray-500 ml-2">({{ sourceProvider }})</span>
+              <span class="text-xs text-gray-500">({{ sourceProvider }})</span>
             }
           </div>
         </div>
         <div>
           <span class="text-xs text-gray-500 mb-1 block">{{ isBidirectional() ? 'Side B' : 'Target' }}</span>
-          <div class="p-2 bg-gray-800 rounded text-sm">
+          <div class="p-2 bg-gray-800 rounded text-sm flex items-center gap-2">
+            @if (getProviderIcon(targetType); as icon) {
+              <img
+                [src]="'https://cdn.simpleicons.org/' + icon + '/9ca3af'"
+                alt=""
+                aria-hidden="true"
+                class="w-5 h-5"
+                (error)="onIconError($event)"
+              />
+              <i class="pi pi-cloud text-lg text-gray-400" style="display:none" aria-hidden="true"></i>
+            } @else {
+              <i class="pi pi-cloud text-lg text-gray-400" aria-hidden="true"></i>
+            }
             <span class="text-gray-300">{{ targetLabel }}</span>
             @if (targetProvider) {
-              <span class="text-xs text-gray-500 ml-2">({{ targetProvider }})</span>
+              <span class="text-xs text-gray-500">({{ targetProvider }})</span>
             }
           </div>
         </div>

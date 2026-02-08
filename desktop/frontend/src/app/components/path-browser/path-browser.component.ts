@@ -128,6 +128,19 @@ export class PathBrowserComponent {
     }
   }
 
+  onSelectCurrentFolder(): void {
+    if (this.activeSegmentIndex === null) return;
+
+    this.path =
+      this.activeSegmentIndex === -1
+        ? ""
+        : this.segments[this.activeSegmentIndex].fullPath;
+    this.lastSegmentIsFile = false;
+    this.activeSegmentIndex = null;
+    this.pathChange.emit(this.path);
+    this.cdr.detectChanges();
+  }
+
   async onEntrySelect(entry: { name: string; is_dir: boolean }): Promise<void> {
     if (this.activeSegmentIndex === null) return;
 

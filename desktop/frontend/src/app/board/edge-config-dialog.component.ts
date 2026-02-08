@@ -15,6 +15,7 @@ import { InputText } from "primeng/inputtext";
 import { Select } from "primeng/select";
 import { ToggleSwitch } from "primeng/toggleswitch";
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
+import { REMOTE_TYPE_OPTIONS } from "../remotes/remotes.types.js";
 
 @Component({
     selector: "app-edge-config-dialog",
@@ -40,6 +41,8 @@ export class EdgeConfigDialogComponent {
     @Input() targetLabel = "";
     @Input() sourceProvider = "";
     @Input() targetProvider = "";
+    @Input() sourceType = "";
+    @Input() targetType = "";
 
     @Output() visibleChange = new EventEmitter<boolean>();
     @Output() edgeSaved = new EventEmitter<models.BoardEdge>();
@@ -88,5 +91,19 @@ export class EdgeConfigDialogComponent {
 
     isBidirectional(): boolean {
         return this.edge?.action === "bi" || this.edge?.action === "bi-resync";
+    }
+
+    getProviderIcon(type: string): string {
+        const option = REMOTE_TYPE_OPTIONS.find((opt) => opt.value === type);
+        return option?.icon ?? "";
+    }
+
+    onIconError(event: Event): void {
+        const img = event.target as HTMLElement;
+        img.style.display = "none";
+        const fallback = img.nextElementSibling as HTMLElement | null;
+        if (fallback) {
+            fallback.style.display = "inline";
+        }
     }
 }

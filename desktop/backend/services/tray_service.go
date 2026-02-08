@@ -125,8 +125,25 @@ func (t *TrayService) RefreshMenu() {
 
 // buildMenu creates the menu structure (must be called with mutex held)
 func (t *TrayService) buildMenu() {
-	menu := application.NewMenu()
+	if t.menu == nil {
+		// First call (during Initialize): create a new menu and set it on the tray.
+		// The tray's Run() will cache the native menu pointer from this object.
+		t.menu = application.NewMenu()
+		t.populateMenu(t.menu)
+		t.tray.SetMenu(t.menu)
+	} else {
+		// Subsequent calls: clear and repopulate the same Menu object,
+		// then call Update() so the native menu is rebuilt in-place.
+		// This works around a Wails v3 issue where SetMenu() on macOS
+		// stores the Go reference but never refreshes the cached native nsMenu pointer.
+		t.menu.Clear()
+		t.populateMenu(t.menu)
+		t.menu.Update()
+	}
+}
 
+// populateMenu adds flow items and standard items to the given menu
+func (t *TrayService) populateMenu(menu *application.Menu) {
 	// Add flows section
 	if t.flowService != nil {
 		flows, err := t.flowService.GetFlows(context.Background())
@@ -157,9 +174,6 @@ func (t *TrayService) buildMenu() {
 	menu.Add("Quit").OnClick(func(ctx *application.Context) {
 		t.quit()
 	})
-
-	t.tray.SetMenu(menu)
-	t.menu = menu
 }
 
 // executeFlow emits an event for the frontend to execute a flow
