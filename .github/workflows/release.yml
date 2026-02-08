@@ -12,6 +12,7 @@ permissions:
 
 env:
   APP_NAME: ns-drive
+  WAILS_VERSION: v3.0.0-alpha.57
 
 jobs:
   build:
@@ -47,13 +48,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+          cache-dependency-path: desktop/go.sum
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install Wails v3 CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
-
+      # Linux deps must be installed BEFORE wails3 CLI (CGO needs gtk/webkit headers)
       - name: Install Linux dependencies
         if: matrix.goos == 'linux'
         run: |
@@ -63,6 +63,9 @@ jobs:
             libwebkit2gtk-4.1-dev \
             build-essential \
             pkg-config
+
+      - name: Install Wails v3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Install frontend dependencies
         working-directory: desktop/frontend
@@ -90,8 +93,6 @@ jobs:
         working-directory: desktop
         shell: bash
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "1"
         run: |
           EXT=""
