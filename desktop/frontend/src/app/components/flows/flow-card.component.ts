@@ -218,9 +218,18 @@ export class FlowCardComponent {
   }
 
   get activeOperationSyncStatus(): SyncStatus | null {
-    if (this.flow.status !== 'running') return null;
+    // Prefer running operation's status
     const runningOp = this.flow.operations.find(op => op.status === 'running');
-    return runningOp?.syncStatus || null;
+    if (runningOp?.syncStatus) return runningOp.syncStatus;
+
+    // Otherwise show the last operation that has syncStatus data (completed/failed)
+    for (let i = this.flow.operations.length - 1; i >= 0; i--) {
+      if (this.flow.operations[i].syncStatus) {
+        return this.flow.operations[i].syncStatus!;
+      }
+    }
+
+    return null;
   }
 
   startEdit(): void {

@@ -790,21 +790,10 @@ export class FlowsService implements OnDestroy {
     }
   }
 
-  private handleSyncLogEvent(event: SyncEvent): void {
-    if (!this.executingFlowId) return;
-
-    const flow = this.getFlow(this.executingFlowId);
-    const operation = flow?.operations[this.executingOperationIndex];
-    if (!operation) return;
-
-    // Check for completion events
-    if (event.type === 'sync:completed') {
-      this.updateOperation(this.executingFlowId, operation.id, { status: 'completed' });
-    } else if (event.type === 'sync:failed') {
-      this.updateOperation(this.executingFlowId, operation.id, { status: 'failed' });
-    } else if (event.type === 'sync:cancelled') {
-      this.updateOperation(this.executingFlowId, operation.id, { status: 'cancelled' });
-    }
+  private handleSyncLogEvent(_event: SyncEvent): void {
+    // Operation status is managed by executeFlow via board completion events.
+    // No need to duplicate status updates here — doing so would prematurely
+    // change the operation status and cause the UI to lose the syncStatus display.
   }
 
   private handleSyncStatusEvent(event: SyncStatusEvent): void {
