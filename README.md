@@ -408,7 +408,19 @@ task lint:be
 
 ### Common Issues & Solutions
 
-1. **`go.mod file not found` error when running `task dev:be`**
+1. **macOS: "Apple could not verify app is free of malware"**
+
+   > **⚠️ Important for macOS users:** Since NS-Drive is not signed with an Apple Developer ID certificate, macOS Gatekeeper will block the app on first launch.
+
+   **Fix:** Remove the quarantine attribute after downloading:
+
+   ```bash
+   xattr -cr /Applications/ns-drive.app
+   ```
+
+   Or right-click the app → "Open" → click "Open" in the dialog to bypass Gatekeeper for this app.
+
+2. **`go.mod file not found` error when running `task dev:be`**
 
    ```bash
    # Solution: Run go mod tidy from desktop directory first
@@ -418,7 +430,7 @@ task lint:be
    task dev:be
    ```
 
-2. **Build fails with "no matching files found"**
+3. **Build fails with "no matching files found"**
 
    ```bash
    # Solution: Build frontend first
@@ -426,7 +438,7 @@ task lint:be
    task build
    ```
 
-3. **Dev server fails to connect to frontend**
+4. **Dev server fails to connect to frontend**
 
    ```bash
    # Solution: Ensure frontend is running on correct port
@@ -438,7 +450,7 @@ task lint:be
    task dev:be
    ```
 
-4. **Wails3 command not found**
+5. **Wails3 command not found**
 
    ```bash
    # Solution: Install Wails v3 and update PATH
@@ -448,14 +460,14 @@ task lint:be
    export PATH="$PATH:$(go env GOPATH)/bin"
    ```
 
-5. **Frontend dependencies errors**
+6. **Frontend dependencies errors**
 
    ```bash
    # Solution: Reinstall with bun
    cd desktop/frontend && bun install
    ```
 
-6. **Linker warnings about macOS version**
+7. **Linker warnings about macOS version**
 
    ```
    ld: warning: object file was built for newer 'macOS' version (26.0) than being linked (11.0)
@@ -463,7 +475,7 @@ task lint:be
 
    These warnings are harmless and don't affect functionality. They occur due to CGO compilation targeting older macOS versions.
 
-7. **Port 9245 already in use**
+8. **Port 9245 already in use**
 
    ```bash
    # Find and kill process using the port
@@ -475,7 +487,7 @@ task lint:be
    WAILS_VITE_PORT=9246 task dev:be
    ```
 
-8. **Changes not reflecting in app**
+9. **Changes not reflecting in app**
 
    - Frontend changes: Should auto-reload. If not, refresh the app window
    - Backend changes: Wails watches `*.go` files and auto-rebuilds
