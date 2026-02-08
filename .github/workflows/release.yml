@@ -73,7 +73,11 @@ jobs:
 
       - name: Generate bindings
         working-directory: desktop
-        run: wails3 generate bindings -ts
+        shell: bash
+        run: |
+          wails3 generate bindings -ts
+          # Recreate wailsjs symlink (gitignored, needed for frontend imports)
+          ln -sf bindings frontend/wailsjs
 
       - name: Build frontend
         working-directory: desktop/frontend
