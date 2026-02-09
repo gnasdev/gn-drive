@@ -28,7 +28,7 @@ interface ExportOptions {
   include_remotes: boolean;
   include_settings: boolean;
   exclude_tokens: boolean;
-  encrypt_password?: string;
+  encrypt_password: string;
 }
 
 interface ImportOptions {
@@ -48,9 +48,9 @@ interface ImportPreviewSection {
 interface ImportPreview {
   valid: boolean;
   encrypted: boolean;
-  manifest?: { export_date: string; board_count: number; remote_count: number };
-  boards?: ImportPreviewSection;
-  remotes?: ImportPreviewSection;
+  manifest?: { export_date: string; board_count: number; remote_count: number } | null;
+  boards?: ImportPreviewSection | null;
+  remotes?: ImportPreviewSection | null;
   warnings: string[];
   errors: string[];
 }
@@ -556,6 +556,7 @@ export class SettingsDialogComponent implements OnInit {
     include_remotes: true,
     include_settings: false,
     exclude_tokens: false,
+    encrypt_password: '',
   };
   exportPreview: { board_count: number; remote_count: number } | null = null;
   exportEncrypt = false;
@@ -863,11 +864,11 @@ export class SettingsDialogComponent implements OnInit {
 
     try {
       const preview = await ValidateImportFileWithPassword(this.importFilePath, this.importPassword);
-      if (preview.valid) {
+      if (preview && preview.valid) {
         this.importPreview = preview;
         this.importNeedsPassword = false;
       } else {
-        this.importPasswordError = preview.errors?.[0] || 'Wrong password or corrupted file';
+        this.importPasswordError = preview?.errors?.[0] || 'Wrong password or corrupted file';
       }
     } catch (err) {
       this.importPasswordError = this.extractErrorMessage(err);
