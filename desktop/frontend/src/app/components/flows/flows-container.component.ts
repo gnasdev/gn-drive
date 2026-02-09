@@ -237,12 +237,15 @@ export class FlowsContainerComponent implements OnInit, OnDestroy {
     this.isRemovingRemote = true;
     try {
       await this.appService.deleteRemote(this.remoteToRemove.name);
+      // Reload flows to pick up backend changes (OnRemoteDeleted clears references)
+      await this.flowsService.loadFlows();
       this.showRemoveConfirmDialog = false;
       this.remoteToRemove = null;
     } catch (err) {
       console.error('Failed to remove remote:', err);
     } finally {
       this.isRemovingRemote = false;
+      this.cdr.detectChanges();
     }
   }
 }

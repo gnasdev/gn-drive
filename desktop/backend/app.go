@@ -58,11 +58,10 @@ func GetEmbeddedEnvConfigStr() string {
 	return envConfigStr
 }
 
-// ServiceStartup is called when the service starts
+// ServiceStartup is called when the service starts (Phase 1).
+// Sets up working dir, env config, and event channel.
+// Rclone config loading is deferred to CompleteInitialization (Phase 2).
 func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
-	// Note: In Wails v3, we don't have direct access to the application instance from ServiceOptions
-	// We'll need to handle events differently or get the app reference another way
-
 	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
 		a.errorHandler.HandleError(err, "startup", "working_directory")
 		utils.LogErrorAndExit(err)
@@ -83,23 +82,34 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	}
 	a.ConfigInfo.WorkingDir = wd
 
-	// Load profiles
-	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
-	if err != nil {
-		a.errorHandler.HandleError(err, "startup", "load_profiles")
-		a.ConfigInfo.Profiles = []models.Profile{}
-	}
-
 	// Setup event channel for sending messages to the frontend
 	a.oc = make(chan []byte, 100) // buffered channel to prevent blocking
 	go func() {
 		for data := range a.oc {
-			// Use Wails v3 events API
 			if a.app != nil {
 				a.app.Event.Emit("tofe", string(data))
 			}
 		}
 	}()
+
+	return nil
+}
+
+// CompleteInitialization performs Phase 2 init: loads profiles, rclone config, and caches remotes.
+// Called by AuthService after unlock (or immediately if no auth).
+func (a *App) CompleteInitialization(ctx context.Context) error {
+	a.initMutex.Lock()
+	defer a.initMutex.Unlock()
+
+	if a.initialized {
+		return nil
+	}
+
+	// Load profiles
+	if err := a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig); err != nil {
+		a.errorHandler.HandleError(err, "startup", "load_profiles")
+		a.ConfigInfo.Profiles = []models.Profile{}
+	}
 
 	// Load Rclone config
 	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
@@ -111,57 +121,18 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	a.cachedRemotes = fsConfig.GetRemotes()
 
 	a.initialized = true
+	log.Printf("App: Initialization completed (rclone config loaded)")
 	return nil
 }
 
 // initializeConfig initializes the configuration if it hasn't been done yet
 func (a *App) initializeConfig() {
-	a.initMutex.Lock()
-	defer a.initMutex.Unlock()
-
-	// Check if already initialized (double-check pattern)
 	if a.initialized {
 		return
 	}
-
-	ctx := context.Background()
-
-	if err := utils.CdToNormalizeWorkingDir(ctx); err != nil {
-		a.errorHandler.HandleError(err, "init_config", "working_directory")
-		return
+	if err := a.CompleteInitialization(context.Background()); err != nil {
+		log.Printf("Warning: Failed to complete initialization: %v", err)
 	}
-
-	// Migrate config files from old location to new home directory location
-	if err := utils.MigrateConfigFiles(); err != nil {
-		log.Printf("Warning: Failed to migrate config files during initialization: %v", err)
-	}
-
-	a.ConfigInfo.EnvConfig = utils.LoadEnvConfigFromEnvStr(envConfigStr)
-
-	// Load working directory
-	wd, err := os.Getwd()
-	if err != nil {
-		a.errorHandler.HandleError(err, "init_config", "get_working_directory")
-		return
-	}
-	a.ConfigInfo.WorkingDir = wd
-
-	// Load profiles
-	err = a.ConfigInfo.ReadFromFile(a.ConfigInfo.EnvConfig)
-	if err != nil {
-		a.errorHandler.HandleError(err, "init_config", "load_profiles")
-		a.ConfigInfo.Profiles = []models.Profile{}
-	}
-
-	// Load Rclone config
-	if err := fsConfig.SetConfigPath(a.ConfigInfo.EnvConfig.RcloneFilePath); err != nil {
-		// Log error but don't fail initialization
-		fmt.Printf("Warning: failed to set rclone config path: %v\n", err)
-	}
-	configfile.Install()
-
-	// Mark as initialized
-	a.initialized = true
 }
 
 // invalidateRemotesCache refreshes the cached remotes list from rclone config

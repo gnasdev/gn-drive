@@ -20,12 +20,40 @@ import {
   ImportFromFile,
   SelectImportFile,
   ValidateImportFile,
+  ValidateImportFileWithPassword,
 } from '../../../../wailsjs/desktop/backend/services/importservice';
-import type {
-  ExportOptions,
-  ImportOptions,
-  ImportPreview,
-} from '../../../../wailsjs/desktop/backend/services/models';
+// Inline types matching Go structs (not generated as model classes)
+interface ExportOptions {
+  include_boards: boolean;
+  include_remotes: boolean;
+  include_settings: boolean;
+  exclude_tokens: boolean;
+  encrypt_password?: string;
+}
+
+interface ImportOptions {
+  overwrite_boards: boolean;
+  overwrite_remotes: boolean;
+  merge_mode: boolean;
+  password?: string;
+}
+
+interface ImportPreviewSection {
+  to_add: string[];
+  to_update: string[];
+  to_skip: string[];
+  total: number;
+}
+
+interface ImportPreview {
+  valid: boolean;
+  encrypted: boolean;
+  manifest?: { export_date: string; board_count: number; remote_count: number };
+  boards?: ImportPreviewSection;
+  remotes?: ImportPreviewSection;
+  warnings: string[];
+  errors: string[];
+}
 import {
   GetSettings,
   SetEnabled,
@@ -33,9 +61,11 @@ import {
   SetMinimizeToTrayOnStartup,
   SetStartAtLogin,
 } from '../../../../wailsjs/desktop/backend/services/notificationservice';
+import { AuthService } from '../../services/auth.service';
 import { NeoButtonComponent } from '../neo/neo-button.component';
 import { NeoCardComponent } from '../neo/neo-card.component';
 import { NeoDialogComponent } from '../neo/neo-dialog.component';
+import { NeoInputComponent } from '../neo/neo-input.component';
 import { NeoToggleComponent } from '../neo/neo-toggle.component';
 
 @Component({
@@ -48,6 +78,7 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
     NeoDialogComponent,
     NeoButtonComponent,
     NeoCardComponent,
+    NeoInputComponent,
     NeoToggleComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +92,42 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
       [headerYellow]="true"
     >
       <div class="space-y-4 h-full overflow-auto hide-scrollbar">
+        <!-- Security -->
+        <neo-card>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-shield"></i>
+            <h2 class="font-bold">Security</h2>
+          </div>
+          <div class="space-y-3">
+            @if (authEnabled) {
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium">Password Protection</p>
+                  <p class="text-xs text-sys-fg-muted">Your data is encrypted</p>
+                </div>
+                <div class="flex gap-2">
+                  <neo-button variant="secondary" size="sm" (onClick)="showChangePasswordDialog = true">
+                    Change
+                  </neo-button>
+                  <neo-button variant="danger" size="sm" (onClick)="showRemovePasswordDialog = true">
+                    Remove
+                  </neo-button>
+                </div>
+              </div>
+            } @else {
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium">Password Protection</p>
+                  <p class="text-xs text-sys-fg-muted">Encrypt your data with a password</p>
+                </div>
+                <neo-button variant="secondary" size="sm" (onClick)="showSetPasswordDialog = true">
+                  Set Password
+                </neo-button>
+              </div>
+            }
+          </div>
+        </neo-card>
+
         <!-- Backup & Restore -->
         <neo-card>
           <div class="flex items-center gap-2 mb-3">
@@ -151,6 +218,118 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
       </div>
     </neo-dialog>
 
+    <!-- Set Password Sub-Dialog -->
+    <neo-dialog
+      [(visible)]="showSetPasswordDialog"
+      title="Set Password"
+      maxWidth="400px"
+    >
+      <form (ngSubmit)="doSetPassword()" class="space-y-4">
+        @if (securityError) {
+          <div class="p-3 bg-sys-accent-danger/20 border-2 border-sys-border text-sm">
+            {{ securityError }}
+          </div>
+        }
+        <neo-input
+          label="Password"
+          type="password"
+          placeholder="Choose a password"
+          [(ngModel)]="newPassword"
+          [error]="newPasswordError"
+          name="newPassword"
+        ></neo-input>
+        <neo-input
+          label="Confirm Password"
+          type="password"
+          placeholder="Confirm password"
+          [(ngModel)]="confirmNewPassword"
+          [error]="confirmNewPasswordError"
+          name="confirmNewPassword"
+        ></neo-input>
+        <div class="flex justify-end gap-2 pt-2">
+          <neo-button variant="secondary" (onClick)="closeSecurityDialogs()">Cancel</neo-button>
+          <neo-button type="submit" [loading]="isSecurityLoading" [disabled]="!newPassword || !confirmNewPassword">
+            Set Password
+          </neo-button>
+        </div>
+      </form>
+    </neo-dialog>
+
+    <!-- Change Password Sub-Dialog -->
+    <neo-dialog
+      [(visible)]="showChangePasswordDialog"
+      title="Change Password"
+      maxWidth="400px"
+    >
+      <form (ngSubmit)="doChangePassword()" class="space-y-4">
+        @if (securityError) {
+          <div class="p-3 bg-sys-accent-danger/20 border-2 border-sys-border text-sm">
+            {{ securityError }}
+          </div>
+        }
+        <neo-input
+          label="Current Password"
+          type="password"
+          placeholder="Enter current password"
+          [(ngModel)]="currentPassword"
+          name="currentPassword"
+        ></neo-input>
+        <neo-input
+          label="New Password"
+          type="password"
+          placeholder="Choose new password"
+          [(ngModel)]="newPassword"
+          [error]="newPasswordError"
+          name="newPassword"
+        ></neo-input>
+        <neo-input
+          label="Confirm New Password"
+          type="password"
+          placeholder="Confirm new password"
+          [(ngModel)]="confirmNewPassword"
+          [error]="confirmNewPasswordError"
+          name="confirmNewPassword"
+        ></neo-input>
+        <div class="flex justify-end gap-2 pt-2">
+          <neo-button variant="secondary" (onClick)="closeSecurityDialogs()">Cancel</neo-button>
+          <neo-button type="submit" [loading]="isSecurityLoading" [disabled]="!currentPassword || !newPassword || !confirmNewPassword">
+            Change Password
+          </neo-button>
+        </div>
+      </form>
+    </neo-dialog>
+
+    <!-- Remove Password Sub-Dialog -->
+    <neo-dialog
+      [(visible)]="showRemovePasswordDialog"
+      title="Remove Password"
+      maxWidth="400px"
+    >
+      <form (ngSubmit)="doRemovePassword()" class="space-y-4">
+        @if (securityError) {
+          <div class="p-3 bg-sys-accent-danger/20 border-2 border-sys-border text-sm">
+            {{ securityError }}
+          </div>
+        }
+        <p class="text-sm text-sys-fg-muted">
+          This will decrypt all data and remove password protection. Enter your current password to confirm.
+        </p>
+        <neo-input
+          label="Current Password"
+          type="password"
+          placeholder="Enter current password"
+          [(ngModel)]="currentPassword"
+          name="currentPassword"
+        ></neo-input>
+        <div class="flex justify-end gap-2 pt-2">
+          <neo-button variant="secondary" (onClick)="closeSecurityDialogs()">Cancel</neo-button>
+          <neo-button variant="danger" type="submit" [loading]="isSecurityLoading" [disabled]="!currentPassword">
+            Remove Password
+          </neo-button>
+        </div>
+      </form>
+    </neo-dialog>
+
     <!-- Export Sub-Dialog -->
     <neo-dialog
       [(visible)]="showExportDialog"
@@ -186,12 +365,38 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
           </label>
         }
 
+        <!-- Encrypt export -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" [(ngModel)]="exportEncrypt"
+                 class="w-4 h-4 border-2 border-sys-border" />
+          <span class="text-sm">Encrypt backup file</span>
+        </label>
+
+        @if (exportEncrypt) {
+          <neo-input
+            label="Export Password"
+            type="password"
+            placeholder="Password for encryption"
+            [(ngModel)]="exportPassword"
+            [error]="exportPasswordError"
+            name="exportPassword"
+          ></neo-input>
+          <neo-input
+            label="Confirm Password"
+            type="password"
+            placeholder="Confirm password"
+            [(ngModel)]="exportPasswordConfirm"
+            [error]="exportPasswordConfirmError"
+            name="exportPasswordConfirm"
+          ></neo-input>
+        }
+
         <div class="flex justify-end gap-2 pt-2">
           <neo-button variant="secondary" (onClick)="showExportDialog = false">
             Cancel
           </neo-button>
           <neo-button
-            [disabled]="!exportOptions.include_boards && !exportOptions.include_remotes"
+            [disabled]="(!exportOptions.include_boards && !exportOptions.include_remotes) || (exportEncrypt && (!exportPassword || !exportPasswordConfirm))"
             [loading]="isExporting"
             (onClick)="doExport()"
           >
@@ -207,14 +412,40 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
       title="Import Configuration"
       maxWidth="450px"
     >
-      @if (!importPreview) {
+      @if (!importPreview && !importNeedsPassword) {
         <div class="text-center py-4">
           <p class="text-sm text-sys-fg-muted mb-4">Select a backup file (.nsd)</p>
           <neo-button [loading]="isLoadingPreview" (onClick)="selectImportFile()">
             <i class="pi pi-folder-open mr-1"></i> Select File
           </neo-button>
         </div>
-      } @else {
+      } @else if (importNeedsPassword) {
+        <!-- Encrypted file needs password -->
+        <div class="space-y-4">
+          <div class="p-3 bg-sys-accent-secondary/20 border-2 border-sys-border text-sm">
+            <i class="pi pi-lock mr-1"></i>
+            This backup file is encrypted. Enter the password to continue.
+          </div>
+          @if (importPasswordError) {
+            <div class="p-3 bg-sys-accent-danger/20 border-2 border-sys-border text-sm">
+              {{ importPasswordError }}
+            </div>
+          }
+          <neo-input
+            label="Password"
+            type="password"
+            placeholder="Enter backup password"
+            [(ngModel)]="importPassword"
+            name="importPassword"
+          ></neo-input>
+          <div class="flex justify-end gap-2 pt-2">
+            <neo-button variant="secondary" (onClick)="cancelImport()">Cancel</neo-button>
+            <neo-button [loading]="isLoadingPreview" [disabled]="!importPassword" (onClick)="unlockImportFile()">
+              Unlock
+            </neo-button>
+          </div>
+        </div>
+      } @else if (importPreview) {
         <div class="space-y-4">
           <div class="p-3 bg-sys-accent-secondary/20 border-2 border-sys-border text-sm">
             <div class="flex justify-between">
@@ -296,12 +527,26 @@ export class SettingsDialogComponent implements OnInit {
 
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly messageService = inject(MessageService);
+  private readonly authService = inject(AuthService);
 
   // Settings state
   startAtLogin = false;
   minimizeToTray = false;
   minimizeToTrayOnStartup = false;
   notificationsEnabled = true;
+
+  // Security state
+  authEnabled = false;
+  showSetPasswordDialog = false;
+  showChangePasswordDialog = false;
+  showRemovePasswordDialog = false;
+  isSecurityLoading = false;
+  securityError = '';
+  currentPassword = '';
+  newPassword = '';
+  confirmNewPassword = '';
+  newPasswordError = '';
+  confirmNewPasswordError = '';
 
   // Export dialog
   showExportDialog = false;
@@ -313,6 +558,11 @@ export class SettingsDialogComponent implements OnInit {
     exclude_tokens: false,
   };
   exportPreview: { board_count: number; remote_count: number } | null = null;
+  exportEncrypt = false;
+  exportPassword = '';
+  exportPasswordConfirm = '';
+  exportPasswordError = '';
+  exportPasswordConfirmError = '';
 
   // Import dialog
   showImportDialog = false;
@@ -321,6 +571,9 @@ export class SettingsDialogComponent implements OnInit {
   importFilePath = '';
   importFileName = '';
   importPreview: ImportPreview | null = null;
+  importNeedsPassword = false;
+  importPassword = '';
+  importPasswordError = '';
   importOptions: ImportOptions = {
     overwrite_boards: false,
     overwrite_remotes: false,
@@ -329,6 +582,7 @@ export class SettingsDialogComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadSettings();
+    this.authEnabled = this.authService.authEnabled$.value;
   }
 
   private async loadSettings(): Promise<void> {
@@ -343,6 +597,120 @@ export class SettingsDialogComponent implements OnInit {
       console.error('Failed to load settings:', err);
     }
   }
+
+  // --- Security methods ---
+
+  closeSecurityDialogs(): void {
+    this.showSetPasswordDialog = false;
+    this.showChangePasswordDialog = false;
+    this.showRemovePasswordDialog = false;
+    this.resetSecurityFields();
+    this.cdr.markForCheck();
+  }
+
+  private resetSecurityFields(): void {
+    this.currentPassword = '';
+    this.newPassword = '';
+    this.confirmNewPassword = '';
+    this.securityError = '';
+    this.newPasswordError = '';
+    this.confirmNewPasswordError = '';
+  }
+
+  async doSetPassword(): Promise<void> {
+    this.newPasswordError = '';
+    this.confirmNewPasswordError = '';
+    this.securityError = '';
+
+    if (this.newPassword.length < 4) {
+      this.newPasswordError = 'Password must be at least 4 characters';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (this.newPassword !== this.confirmNewPassword) {
+      this.confirmNewPasswordError = 'Passwords do not match';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.isSecurityLoading = true;
+    this.cdr.markForCheck();
+
+    try {
+      await this.authService.setupPassword(this.newPassword);
+      this.authEnabled = true;
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Password Set',
+        detail: 'Your data is now encrypted',
+      });
+      this.closeSecurityDialogs();
+    } catch (err) {
+      this.securityError = this.extractErrorMessage(err);
+    } finally {
+      this.isSecurityLoading = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async doChangePassword(): Promise<void> {
+    this.newPasswordError = '';
+    this.confirmNewPasswordError = '';
+    this.securityError = '';
+
+    if (this.newPassword.length < 4) {
+      this.newPasswordError = 'Password must be at least 4 characters';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (this.newPassword !== this.confirmNewPassword) {
+      this.confirmNewPasswordError = 'Passwords do not match';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.isSecurityLoading = true;
+    this.cdr.markForCheck();
+
+    try {
+      await this.authService.changePassword(this.currentPassword, this.newPassword);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Password Changed',
+        detail: 'Your password has been updated',
+      });
+      this.closeSecurityDialogs();
+    } catch (err) {
+      this.securityError = this.extractErrorMessage(err);
+    } finally {
+      this.isSecurityLoading = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async doRemovePassword(): Promise<void> {
+    this.securityError = '';
+    this.isSecurityLoading = true;
+    this.cdr.markForCheck();
+
+    try {
+      await this.authService.removePassword(this.currentPassword);
+      this.authEnabled = false;
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Password Removed',
+        detail: 'Password protection has been disabled',
+      });
+      this.closeSecurityDialogs();
+    } catch (err) {
+      this.securityError = this.extractErrorMessage(err);
+    } finally {
+      this.isSecurityLoading = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  // --- Settings methods ---
 
   async saveStartAtLoginSetting(): Promise<void> {
     try {
@@ -376,6 +744,8 @@ export class SettingsDialogComponent implements OnInit {
     }
   }
 
+  // --- Export/Import methods ---
+
   async openExportDialog(): Promise<void> {
     try {
       this.exportPreview = await GetExportPreview(this.exportOptions);
@@ -387,6 +757,22 @@ export class SettingsDialogComponent implements OnInit {
   }
 
   async doExport(): Promise<void> {
+    this.exportPasswordError = '';
+    this.exportPasswordConfirmError = '';
+
+    if (this.exportEncrypt) {
+      if (this.exportPassword.length < 4) {
+        this.exportPasswordError = 'Password must be at least 4 characters';
+        this.cdr.markForCheck();
+        return;
+      }
+      if (this.exportPassword !== this.exportPasswordConfirm) {
+        this.exportPasswordConfirmError = 'Passwords do not match';
+        this.cdr.markForCheck();
+        return;
+      }
+    }
+
     this.isExporting = true;
     this.cdr.markForCheck();
 
@@ -398,18 +784,25 @@ export class SettingsDialogComponent implements OnInit {
         return;
       }
 
-      await ExportToFile(filePath, this.exportOptions);
+      const options = {
+        ...this.exportOptions,
+        encrypt_password: this.exportEncrypt ? this.exportPassword : '',
+      };
+      await ExportToFile(filePath, options);
       this.messageService.add({
         severity: 'success',
         summary: 'Export Complete',
         detail: 'Configuration exported successfully',
       });
       this.showExportDialog = false;
+      this.exportEncrypt = false;
+      this.exportPassword = '';
+      this.exportPasswordConfirm = '';
     } catch (err) {
       this.messageService.add({
         severity: 'error',
         summary: 'Export Failed',
-        detail: String(err),
+        detail: this.extractErrorMessage(err),
       });
     } finally {
       this.isExporting = false;
@@ -421,6 +814,9 @@ export class SettingsDialogComponent implements OnInit {
     this.importPreview = null;
     this.importFilePath = '';
     this.importFileName = '';
+    this.importNeedsPassword = false;
+    this.importPassword = '';
+    this.importPasswordError = '';
     this.showImportDialog = true;
     this.cdr.markForCheck();
   }
@@ -439,13 +835,42 @@ export class SettingsDialogComponent implements OnInit {
 
       this.importFilePath = filePath;
       this.importFileName = filePath.split('/').pop() || filePath;
-      this.importPreview = await ValidateImportFile(filePath);
+      const preview = await ValidateImportFile(filePath) as ImportPreview & { encrypted?: boolean };
+
+      if (preview.encrypted && !preview.valid) {
+        this.importNeedsPassword = true;
+      } else {
+        this.importPreview = preview;
+      }
     } catch (err) {
       this.messageService.add({
         severity: 'error',
         summary: 'Invalid File',
-        detail: String(err),
+        detail: this.extractErrorMessage(err),
       });
+    } finally {
+      this.isLoadingPreview = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async unlockImportFile(): Promise<void> {
+    if (!this.importPassword || !this.importFilePath) return;
+
+    this.isLoadingPreview = true;
+    this.importPasswordError = '';
+    this.cdr.markForCheck();
+
+    try {
+      const preview = await ValidateImportFileWithPassword(this.importFilePath, this.importPassword);
+      if (preview.valid) {
+        this.importPreview = preview;
+        this.importNeedsPassword = false;
+      } else {
+        this.importPasswordError = preview.errors?.[0] || 'Wrong password or corrupted file';
+      }
+    } catch (err) {
+      this.importPasswordError = this.extractErrorMessage(err);
     } finally {
       this.isLoadingPreview = false;
       this.cdr.markForCheck();
@@ -454,6 +879,9 @@ export class SettingsDialogComponent implements OnInit {
 
   cancelImport(): void {
     this.importPreview = null;
+    this.importNeedsPassword = false;
+    this.importPassword = '';
+    this.importPasswordError = '';
     this.showImportDialog = false;
     this.cdr.markForCheck();
   }
@@ -465,22 +893,40 @@ export class SettingsDialogComponent implements OnInit {
     this.cdr.markForCheck();
 
     try {
-      await ImportFromFile(this.importFilePath, this.importOptions);
+      const options = {
+        ...this.importOptions,
+        password: this.importPassword,
+      };
+      await ImportFromFile(this.importFilePath, options);
       this.messageService.add({
         severity: 'success',
         summary: 'Import Complete',
         detail: 'Configuration imported successfully',
       });
       this.showImportDialog = false;
+      this.importPassword = '';
     } catch (err) {
       this.messageService.add({
         severity: 'error',
         summary: 'Import Failed',
-        detail: String(err),
+        detail: this.extractErrorMessage(err),
       });
     } finally {
       this.isImporting = false;
       this.cdr.markForCheck();
     }
+  }
+
+  private extractErrorMessage(err: unknown): string {
+    if (!err) return 'An unknown error occurred';
+    const raw = String(err);
+    try {
+      const jsonStr = raw.replace(/^Error:\s*/, '');
+      const parsed = JSON.parse(jsonStr);
+      if (parsed?.message) return parsed.message;
+    } catch {
+      if (raw.startsWith('Error: ')) return raw.slice(7);
+    }
+    return raw;
   }
 }

@@ -59,14 +59,14 @@ func (s *SchedulerService) ServiceName() string {
 
 // ServiceStartup is called when the service starts.
 // Initialization runs in a goroutine to avoid blocking app startup.
+// If DB is not available (auth enabled), the goroutine fails silently
+// and ensureInitialized() retries on first access after unlock.
 func (s *SchedulerService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("SchedulerService starting up (async)...")
 	go func() {
 		if err := s.initialize(); err != nil {
-			log.Printf("SchedulerService init error: %v", err)
-			return
+			log.Printf("SchedulerService init deferred (DB not ready): %v", err)
 		}
-		s.cron.Start()
 	}()
 	return nil
 }
@@ -89,7 +89,9 @@ func (s *SchedulerService) ServiceShutdown(ctx context.Context) error {
 	return nil
 }
 
-// initialize loads existing schedules from SQLite and registers cron jobs
+// initialize loads existing schedules from SQLite and registers cron jobs.
+// Returns error if DB is not available (e.g. auth enabled, files encrypted).
+// In that case, initialized stays false so ensureInitialized() retries later.
 func (s *SchedulerService) initialize() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -100,11 +102,10 @@ func (s *SchedulerService) initialize() error {
 
 	schedules, err := s.loadSchedulesFromDB()
 	if err != nil {
-		log.Printf("Warning: Could not load schedules: %v", err)
-		s.schedules = []models.ScheduleEntry{}
-	} else {
-		s.schedules = schedules
+		// Don't set initialized - ensureInitialized() will retry on next access
+		return fmt.Errorf("could not load schedules: %w", err)
 	}
+	s.schedules = schedules
 
 	// Register enabled schedules with cron
 	for i := range s.schedules {
@@ -114,6 +115,9 @@ func (s *SchedulerService) initialize() error {
 			}
 		}
 	}
+
+	// Start cron scheduler (safe to call multiple times)
+	s.cron.Start()
 
 	s.initialized = true
 	log.Printf("SchedulerService initialized with %d schedules", len(s.schedules))

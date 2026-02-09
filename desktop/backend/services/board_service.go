@@ -138,7 +138,9 @@ func (b *BoardService) ensureInitialized() error {
 	return b.initialize()
 }
 
-// initialize loads existing boards from SQLite
+// initialize loads existing boards from SQLite.
+// Returns error if DB is not available (e.g. auth enabled, files encrypted).
+// In that case, initialized stays false so ensureInitialized() retries later.
 func (b *BoardService) initialize() error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -149,11 +151,10 @@ func (b *BoardService) initialize() error {
 
 	boards, err := b.loadBoardsFromDB()
 	if err != nil {
-		log.Printf("Warning: Could not load boards: %v", err)
-		b.boards = []models.Board{}
-	} else {
-		b.boards = boards
+		// Don't set initialized - ensureInitialized() will retry on next access
+		return fmt.Errorf("could not load boards: %w", err)
 	}
+	b.boards = boards
 
 	// Auto-migrate from profiles if no boards exist
 	if len(b.boards) == 0 {

@@ -26,19 +26,21 @@ type ImportService struct {
 
 // ImportOptions configures how to import
 type ImportOptions struct {
-	OverwriteBoards  bool `json:"overwrite_boards"`  // Overwrite existing boards with same name
-	OverwriteRemotes bool `json:"overwrite_remotes"` // Overwrite existing remotes with same name
-	MergeMode        bool `json:"merge_mode"`        // Add new items only, skip existing
+	OverwriteBoards  bool   `json:"overwrite_boards"`  // Overwrite existing boards with same name
+	OverwriteRemotes bool   `json:"overwrite_remotes"` // Overwrite existing remotes with same name
+	MergeMode        bool   `json:"merge_mode"`        // Add new items only, skip existing
+	Password         string `json:"password"`           // Password for encrypted backups
 }
 
 // ImportPreview shows what will happen during import
 type ImportPreview struct {
-	Valid    bool                  `json:"valid"`
-	Manifest *ExportManifest       `json:"manifest,omitempty"`
-	Boards   *ImportPreviewSection `json:"boards,omitempty"`
-	Remotes  *ImportPreviewSection `json:"remotes,omitempty"`
-	Warnings []string              `json:"warnings"`
-	Errors   []string              `json:"errors"`
+	Valid     bool                  `json:"valid"`
+	Encrypted bool                 `json:"encrypted"` // File is encrypted, needs password
+	Manifest  *ExportManifest      `json:"manifest,omitempty"`
+	Boards    *ImportPreviewSection `json:"boards,omitempty"`
+	Remotes   *ImportPreviewSection `json:"remotes,omitempty"`
+	Warnings  []string             `json:"warnings"`
+	Errors    []string             `json:"errors"`
 }
 
 // ImportPreviewSection shows changes for a specific section
@@ -99,24 +101,46 @@ func (i *ImportService) ServiceShutdown(ctx context.Context) error {
 	return nil
 }
 
-// ValidateImportFile validates an import file and returns a preview
+// ValidateImportFile validates an import file and returns a preview.
+// If file is encrypted, returns preview with Encrypted=true. Use ValidateImportFileWithPassword.
 func (i *ImportService) ValidateImportFile(ctx context.Context, filePath string) (*ImportPreview, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	return i.ValidateImportBytes(ctx, data)
+	return i.validateImportData(ctx, data, "")
 }
 
-// ValidateImportBytes validates import data and returns a preview
-func (i *ImportService) ValidateImportBytes(ctx context.Context, data []byte) (*ImportPreview, error) {
+// ValidateImportFileWithPassword validates an encrypted import file with a password
+func (i *ImportService) ValidateImportFileWithPassword(ctx context.Context, filePath string, password string) (*ImportPreview, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	return i.validateImportData(ctx, data, password)
+}
+
+// validateImportData validates import data and returns a preview
+func (i *ImportService) validateImportData(ctx context.Context, data []byte, password string) (*ImportPreview, error) {
 	preview := &ImportPreview{
 		Valid:    false,
 		Warnings: []string{},
 		Errors:   []string{},
 	}
 
-	parsed, err := i.parseExportData(data)
+	// Check if file is encrypted first
+	encrypted, err := isExportEncrypted(data)
+	if err != nil {
+		preview.Errors = append(preview.Errors, fmt.Sprintf("Invalid file format: %v", err))
+		return preview, nil
+	}
+
+	if encrypted && password == "" {
+		preview.Encrypted = true
+		return preview, nil
+	}
+
+	parsed, err := i.parseExportData(data, password)
 	if err != nil {
 		preview.Errors = append(preview.Errors, fmt.Sprintf("Invalid file format: %v", err))
 		return preview, nil
@@ -124,6 +148,7 @@ func (i *ImportService) ValidateImportBytes(ctx context.Context, data []byte) (*
 
 	preview.Manifest = parsed.manifest
 	preview.Valid = true
+	preview.Encrypted = encrypted
 
 	// Check if tokens were excluded
 	if parsed.flags&FlagExcludeTokens != 0 {
@@ -163,7 +188,7 @@ func (i *ImportService) ImportFromBytes(ctx context.Context, data []byte, option
 		Errors:   []string{},
 	}
 
-	parsed, err := i.parseExportData(data)
+	parsed, err := i.parseExportData(data, options.Password)
 	if err != nil {
 		return nil, fmt.Errorf("invalid file format: %w", err)
 	}
@@ -249,8 +274,24 @@ func (i *ImportService) PreviewWithDialog(ctx context.Context) (*ImportPreview, 
 	return preview, filePath, err
 }
 
-// parseExportData parses binary export data
-func (i *ImportService) parseExportData(data []byte) (*parsedExport, error) {
+// isExportEncrypted checks if the export file header has the encrypted flag
+func isExportEncrypted(data []byte) (bool, error) {
+	if len(data) < 32 {
+		return false, fmt.Errorf("file too small")
+	}
+
+	// Skip magic (7) + version (1) = 8 bytes
+	if string(data[:7]) != MagicBytes {
+		return false, fmt.Errorf("invalid file format (bad magic bytes)")
+	}
+
+	// Read flags at offset 8
+	flags := binary.LittleEndian.Uint32(data[8:12])
+	return flags&FlagEncrypted != 0, nil
+}
+
+// parseExportData parses binary export data, decrypting if needed
+func (i *ImportService) parseExportData(data []byte, password string) (*parsedExport, error) {
 	if len(data) < 32 {
 		return nil, fmt.Errorf("file too small")
 	}
@@ -287,10 +328,22 @@ func (i *ImportService) parseExportData(data []byte) (*parsedExport, error) {
 		return nil, fmt.Errorf("failed to read checksum: %w", err)
 	}
 
-	// Skip reserved bytes
+	// Read reserved bytes (contains encryption salt if encrypted)
 	reserved := make([]byte, 16)
 	if _, err := reader.Read(reserved); err != nil {
 		return nil, fmt.Errorf("failed to read reserved bytes: %w", err)
+	}
+
+	// Derive decryption key if file is encrypted
+	isEncrypted := flags&FlagEncrypted != 0
+	var decKey []byte
+	if isEncrypted {
+		if password == "" {
+			return nil, fmt.Errorf("file is encrypted but no password provided")
+		}
+		// Salt is stored in reserved bytes (16 bytes)
+		decKey = DeriveExportKeyWithSalt(password, reserved)
+		defer zeroBytes(decKey)
 	}
 
 	// Read sections
@@ -326,16 +379,26 @@ func (i *ImportService) parseExportData(data []byte) (*parsedExport, error) {
 
 		allSectionData.Write(sectionData)
 
+		// Decrypt if needed
+		processedData := sectionData
+		if isEncrypted {
+			var err error
+			processedData, err = DecryptData(sectionData, decKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decrypt section (wrong password?): %w", err)
+			}
+		}
+
 		// Decompress if needed
 		var jsonData []byte
 		if flags&FlagCompressed != 0 {
 			var err error
-			jsonData, err = decompressData(sectionData)
+			jsonData, err = decompressData(processedData)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decompress section: %w", err)
 			}
 		} else {
-			jsonData = sectionData
+			jsonData = processedData
 		}
 
 		// Parse section based on type

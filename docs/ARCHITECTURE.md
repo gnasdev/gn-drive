@@ -323,6 +323,47 @@ ListCryptRemotes(ctx context.Context) ([]string, error)
 
 ---
 
+### Security Services
+
+#### AuthService (`desktop/backend/services/auth_service.go`)
+
+**Responsibilities:**
+- Master password protection with Argon2id KDF
+- AES-256-GCM file encryption for sensitive data (rclone.conf, ns-drive.db)
+- App lock/unlock lifecycle management
+- Rate limiting with exponential backoff
+- Crash recovery for interrupted encrypt/decrypt operations
+- 2-phase app initialization (deferred DB/rclone init until after unlock)
+
+**Key Methods:**
+```go
+IsAuthEnabled(ctx context.Context) bool
+IsUnlocked(ctx context.Context) bool
+SetupPassword(ctx context.Context, password string) error
+Unlock(ctx context.Context, password string) error
+Lock(ctx context.Context) error
+ChangePassword(ctx context.Context, oldPassword, newPassword string) error
+RemovePassword(ctx context.Context, password string) error
+GetLockoutStatus(ctx context.Context) LockoutStatus
+GetPreUnlockSettings() PreUnlockSettings
+SyncAppSettings(settings AppSettings)
+```
+
+**Encrypted Files (when locked):**
+- `rclone.conf` → `rclone.conf.enc`
+- `ns-drive.db` → `ns-drive.db.enc`
+
+**Always Unencrypted:**
+- `auth.json` — stores password hash, rate limit state, and pre-unlock app settings
+
+**Events Emitted:**
+- `auth:unlocked` — App unlocked (password verified or no auth)
+- `auth:locked` — App locked (user action or shutdown)
+
+> See [SECURITY.md](SECURITY.md) for detailed encryption design, rate limiting rules, and crash recovery behavior.
+
+---
+
 ### System Integration Services
 
 #### TrayService (`desktop/backend/services/tray_service.go`)
@@ -534,6 +575,7 @@ Format: `domain:action`
 
 | Category | Events |
 |----------|--------|
+| Auth | `auth:unlocked`, `auth:locked` |
 | Sync | `sync:started`, `sync:progress`, `sync:completed`, `sync:failed`, `sync:cancelled` |
 | Config | `config:updated`, `profile:added`, `profile:updated`, `profile:deleted` |
 | Remote | `remote:added`, `remote:updated`, `remote:deleted`, `remote:tested` |
@@ -587,6 +629,7 @@ Events.On("board:execution_status", (event) => {
 | Service | Purpose |
 |---------|---------|
 | `app.service.ts` | Backend communication |
+| `auth.service.ts` | Auth state management (lock/unlock) |
 | `tab.service.ts` | Tab state management |
 | `log-consumer.service.ts` | Log event consumption |
 | `theme.service.ts` | Dark/light theme |
@@ -599,7 +642,9 @@ Events.On("board:execution_status", (event) => {
 | File | Purpose |
 |------|---------|
 | `~/.config/ns-drive/profiles.json` | Sync profiles |
-| `~/.config/ns-drive/rclone.conf` | Rclone remotes |
+| `~/.config/ns-drive/rclone.conf` | Rclone remotes (encrypted when locked) |
+| `~/.config/ns-drive/ns-drive.db` | SQLite database (encrypted when locked) |
+| `~/.config/ns-drive/auth.json` | Auth metadata and pre-unlock settings |
 | `~/.config/ns-drive/schedules.json` | Scheduled tasks |
 | `~/.config/ns-drive/boards.json` | Workflow boards |
 | `~/.config/ns-drive/history.json` | Operation history |

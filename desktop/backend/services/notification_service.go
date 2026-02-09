@@ -47,10 +47,12 @@ func (n *NotificationService) ServiceName() string {
 	return "NotificationService"
 }
 
-// ServiceStartup is called when the service starts
+// ServiceStartup is called when the service starts.
+// Note: LoadSettings() is NOT called here because when auth is enabled,
+// the DB is encrypted and not available yet. AuthService.initializeApp()
+// will call LoadSettings() after decryption.
 func (n *NotificationService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("NotificationService starting up...")
-	n.LoadSettings()
 	return nil
 }
 
@@ -224,6 +226,14 @@ func (n *NotificationService) LoadSettings() {
 	}
 }
 
+// authSettingsSyncer is set by AuthService to sync settings to auth.json
+var authSettingsSyncer func(AppSettings)
+
+// SetAuthSettingsSyncer sets the callback for syncing settings to auth.json
+func SetAuthSettingsSyncer(syncer func(AppSettings)) {
+	authSettingsSyncer = syncer
+}
+
 func (n *NotificationService) saveSetting(key, value string) {
 	db, err := GetSharedDB()
 	if err != nil {
@@ -233,5 +243,13 @@ func (n *NotificationService) saveSetting(key, value string) {
 
 	if _, err := db.Exec("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", key, value); err != nil {
 		log.Printf("Warning: Could not save setting %s: %v", key, err)
+	}
+
+	// Sync tray/startup settings to auth.json (needed before unlock on next start)
+	if authSettingsSyncer != nil {
+		n.mutex.RLock()
+		settings := n.settings
+		n.mutex.RUnlock()
+		authSettingsSyncer(settings)
 	}
 }

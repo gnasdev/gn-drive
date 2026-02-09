@@ -46,10 +46,11 @@ type ExportService struct {
 
 // ExportOptions configures what to export
 type ExportOptions struct {
-	IncludeBoards   bool `json:"include_boards"`
-	IncludeRemotes  bool `json:"include_remotes"`
-	IncludeSettings bool `json:"include_settings"`
-	ExcludeTokens   bool `json:"exclude_tokens"` // Export remotes without sensitive tokens
+	IncludeBoards   bool   `json:"include_boards"`
+	IncludeRemotes  bool   `json:"include_remotes"`
+	IncludeSettings bool   `json:"include_settings"`
+	ExcludeTokens   bool   `json:"exclude_tokens"`    // Export remotes without sensitive tokens
+	EncryptPassword string `json:"encrypt_password"`   // If set, encrypt the export file
 }
 
 // ExportManifest contains metadata about the export
@@ -144,6 +145,15 @@ func (e *ExportService) ExportToBytes(ctx context.Context, options ExportOptions
 		flags |= FlagExcludeTokens
 	}
 
+	// Derive encryption key if password provided
+	var encKey []byte
+	var encSalt []byte
+	if options.EncryptPassword != "" {
+		flags |= FlagEncrypted
+		encKey, encSalt = DeriveExportKey(options.EncryptPassword)
+		defer zeroBytes(encKey)
+	}
+
 	// Collect data sections
 	var sections []struct {
 		sectionType uint8
@@ -162,14 +172,20 @@ func (e *ExportService) ExportToBytes(ctx context.Context, options ExportOptions
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal boards: %w", err)
 				}
-				compressed, err := compressData(boardsJSON)
+				sectionData, err := compressData(boardsJSON)
 				if err != nil {
 					return nil, fmt.Errorf("failed to compress boards: %w", err)
+				}
+				if encKey != nil {
+					sectionData, err = EncryptData(sectionData, encKey)
+					if err != nil {
+						return nil, fmt.Errorf("failed to encrypt boards: %w", err)
+					}
 				}
 				sections = append(sections, struct {
 					sectionType uint8
 					data        []byte
-				}{SectionBoards, compressed})
+				}{SectionBoards, sectionData})
 			}
 		}
 	}
@@ -182,14 +198,20 @@ func (e *ExportService) ExportToBytes(ctx context.Context, options ExportOptions
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal remotes: %w", err)
 			}
-			compressed, err := compressData(remotesJSON)
+			sectionData, err := compressData(remotesJSON)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compress remotes: %w", err)
+			}
+			if encKey != nil {
+				sectionData, err = EncryptData(sectionData, encKey)
+				if err != nil {
+					return nil, fmt.Errorf("failed to encrypt remotes: %w", err)
+				}
 			}
 			sections = append(sections, struct {
 				sectionType uint8
 				data        []byte
-			}{SectionRemotes, compressed})
+			}{SectionRemotes, sectionData})
 		}
 	}
 
@@ -213,14 +235,20 @@ func (e *ExportService) ExportToBytes(ctx context.Context, options ExportOptions
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	manifestCompressed, err := compressData(manifestJSON)
+	manifestData, err := compressData(manifestJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress manifest: %w", err)
+	}
+	if encKey != nil {
+		manifestData, err = EncryptData(manifestData, encKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt manifest: %w", err)
+		}
 	}
 	sections = append(sections, struct {
 		sectionType uint8
 		data        []byte
-	}{SectionManifest, manifestCompressed})
+	}{SectionManifest, manifestData})
 
 	// Calculate checksum of all section data
 	var allData bytes.Buffer
@@ -242,8 +270,11 @@ func (e *ExportService) ExportToBytes(ctx context.Context, options ExportOptions
 	if err := binary.Write(&buf, binary.LittleEndian, checksum); err != nil {
 		return nil, fmt.Errorf("failed to write checksum: %w", err)
 	}
-	// Reserved (16 bytes)
+	// Reserved (16 bytes) - stores encryption salt if encrypted
 	reserved := make([]byte, 16)
+	if encSalt != nil && len(encSalt) >= 16 {
+		copy(reserved, encSalt[:16])
+	}
 	buf.Write(reserved)
 
 	// Write sections

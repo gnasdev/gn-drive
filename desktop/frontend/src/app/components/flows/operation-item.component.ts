@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Operation, SyncConfig } from '../../models/flow.model';
@@ -145,6 +145,8 @@ import { OperationSettingsPanelComponent } from '../operations-tree/operation-se
   `,
 })
 export class FlowOperationItemComponent {
+  private readonly cdr = inject(ChangeDetectorRef);
+
   @Input() operation!: Operation;
   @Input() index!: number;
   @Input() totalInFlow!: number;
@@ -165,12 +167,15 @@ export class FlowOperationItemComponent {
   }
 
   onOperationChange(): void {
-    this.operationChange.emit(this.operation);
+    // Emit a copy to avoid shared mutation with parent state
+    this.operationChange.emit({ ...this.operation });
+    this.cdr.detectChanges();
   }
 
   onConfigChange(config: SyncConfig): void {
-    this.operation.syncConfig = config;
-    this.operationChange.emit(this.operation);
+    // Emit a new operation with updated config (don't mutate @Input)
+    this.operationChange.emit({ ...this.operation, syncConfig: config });
+    this.cdr.detectChanges();
   }
 
   onDragStart(event: DragEvent): void {

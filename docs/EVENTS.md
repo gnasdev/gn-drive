@@ -12,6 +12,22 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 
 ## Event Types
 
+### Auth Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `auth:unlocked` | App unlocked (password verified or no auth) | - |
+| `auth:locked` | App locked (user action or shutdown) | - |
+
+Auth events are emitted directly via `application.WailsEvent` (not through the EventBus `tofe` channel). Frontend listens with:
+
+```typescript
+Events.On("auth:unlocked", () => { /* initialize app */ });
+Events.On("auth:locked", () => { /* show lock screen */ });
+```
+
+---
+
 ### Sync Events
 
 | Event Type | Description | Fields |

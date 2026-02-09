@@ -50,10 +50,13 @@ func (c *ConfigService) ServiceName() string {
 	return "ConfigService"
 }
 
-// ServiceStartup is called when the service starts
+// ServiceStartup is called when the service starts.
+// NOTE: Don't call initializeConfig() here. When auth is enabled, the DB
+// is encrypted and not available yet. Lazy initialization via GetConfigInfo/
+// GetProfiles will handle loading on first access after unlock.
 func (c *ConfigService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("ConfigService starting up...")
-	return c.initializeConfig(ctx)
+	return nil
 }
 
 // ServiceShutdown is called when the service shuts down

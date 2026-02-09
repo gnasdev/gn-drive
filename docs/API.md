@@ -5,6 +5,7 @@ This document describes the Go backend services API exposed to the frontend via 
 ## Table of Contents
 
 - [App Service (Legacy)](#app-service-legacy)
+- [AuthService](#authservice)
 - [SyncService](#syncservice)
 - [ConfigService](#configservice)
 - [RemoteService](#remoteservice)
@@ -106,6 +107,99 @@ Delete a remote and associated profiles.
 #### `StopAddingRemote() AppError | null`
 
 Cancel an in-progress OAuth flow.
+
+---
+
+## AuthService
+
+Service for master password protection and file encryption.
+
+> See [SECURITY.md](SECURITY.md) for detailed encryption design, rate limiting rules, and crash recovery.
+
+### Methods
+
+#### `IsAuthEnabled(ctx Context) bool`
+
+Check if password protection is configured (auth.json exists and enabled).
+
+---
+
+#### `IsUnlocked(ctx Context) bool`
+
+Check if the app is currently unlocked.
+
+---
+
+#### `SetupPassword(ctx Context, password string) error`
+
+Enable password protection for the first time. Derives encryption key with Argon2id, writes auth.json, and stores key in memory. Files are encrypted on next Lock or Shutdown.
+
+**Validation:** Password must be at least 4 characters.
+
+---
+
+#### `Unlock(ctx Context, password string) error`
+
+Verify password, decrypt .enc files, initialize database and rclone config. Subject to rate limiting.
+
+**Events:** Emits `auth:unlocked` on success.
+
+---
+
+#### `Lock(ctx Context) error`
+
+Close database, encrypt plaintext files, zero encryption key.
+
+**Events:** Emits `auth:locked`.
+
+---
+
+#### `ChangePassword(ctx Context, oldPassword, newPassword string) error`
+
+Verify old password, re-encrypt all files with new key, update auth.json.
+
+---
+
+#### `RemovePassword(ctx Context, password string) error`
+
+Verify password, clean up .enc files, delete auth.json, zero key.
+
+---
+
+#### `GetLockoutStatus(ctx Context) LockoutStatus`
+
+Get current rate limiting state.
+
+**Returns:**
+```go
+type LockoutStatus struct {
+    FailedAttempts int    `json:"failed_attempts"`
+    LockedOut      bool   `json:"locked_out"`
+    LockoutUntil   string `json:"lockout_until"`
+    RetryAfter     int    `json:"retry_after"` // seconds
+}
+```
+
+---
+
+#### `GetPreUnlockSettings() PreUnlockSettings`
+
+Get tray/startup settings from auth.json (available before unlock when DB is encrypted).
+
+**Returns:**
+```go
+type PreUnlockSettings struct {
+    MinimizeToTray          bool `json:"minimize_to_tray"`
+    StartAtLogin            bool `json:"start_at_login"`
+    MinimizeToTrayOnStartup bool `json:"minimize_to_tray_on_startup"`
+}
+```
+
+---
+
+#### `SyncAppSettings(settings AppSettings)`
+
+Sync app settings to auth.json so they are available before unlock on next startup.
 
 ---
 

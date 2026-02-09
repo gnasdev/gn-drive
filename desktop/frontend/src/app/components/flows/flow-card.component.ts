@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, Output, EventEmitter, ViewChild, ElementRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Flow, Operation, DragData } from '../../models/flow.model';
@@ -176,6 +176,7 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
 })
 export class FlowCardComponent {
   @ViewChild('nameInput') nameInput?: ElementRef<HTMLInputElement>;
+  private readonly cdr = inject(ChangeDetectorRef);
 
   @Input() flow!: Flow;
   @Input() flowIndex!: number;
@@ -183,6 +184,7 @@ export class FlowCardComponent {
   @Input() dragData: DragData | null = null;
 
   @Output() flowChange = new EventEmitter<Flow>();
+  @Output() toggleCollapsed = new EventEmitter<void>();
   @Output() executeFlow = new EventEmitter<void>();
   @Output() stopFlow = new EventEmitter<void>();
   @Output() removeFlow = new EventEmitter<void>();
@@ -239,9 +241,9 @@ export class FlowCardComponent {
   }
 
   saveName(): void {
-    this.flow.name = this.editingName;
     this.isEditing = false;
-    this.flowChange.emit(this.flow);
+    // Emit a new object instead of mutating the @Input
+    this.flowChange.emit({ ...this.flow, name: this.editingName });
   }
 
   cancelEdit(): void {
@@ -250,11 +252,12 @@ export class FlowCardComponent {
   }
 
   onFlowChange(): void {
-    this.flowChange.emit(this.flow);
+    this.flowChange.emit({ ...this.flow });
   }
 
   onOperationChange(index: number, operation: Operation): void {
-    this.operationChange.emit({ index, operation });
+    this.operationChange.emit({ index, operation: { ...operation } });
+    this.cdr.detectChanges();
   }
 
   onOperationDragStart(event: { index: number; event: DragEvent }): void {

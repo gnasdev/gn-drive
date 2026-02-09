@@ -1,24 +1,38 @@
-<!-- Single Page Layout -->
-<div class="flex flex-col h-screen bg-sys-bg-secondary">
-  <!-- Topbar -->
-  <app-topbar (settingsClick)="openSettings()"></app-topbar>
+@if (isLoading) {
+  <!-- Loading state while checking auth -->
+  <div class="flex items-center justify-center h-screen bg-sys-bg-secondary" style="--wails-draggable: drag">
+    <div class="text-sys-fg-muted text-sm">Loading...</div>
+  </div>
+} @else if (isLocked) {
+  <!-- Unlock / Setup Screen -->
+  <app-unlock-screen
+    #unlockScreen
+    (unlocked)="onUnlocked()"
+    (skipped)="onSetupSkipped()"
+  ></app-unlock-screen>
+} @else {
+  <!-- Single Page Layout -->
+  <div class="flex flex-col h-screen bg-sys-bg-secondary">
+    <!-- Topbar -->
+    <app-topbar (settingsClick)="openSettings()"></app-topbar>
 
-  <!-- Main Content - Flows -->
-  <main class="flex-1 overflow-hidden">
-    <app-flows-container></app-flows-container>
-  </main>
-</div>
+    <!-- Main Content - Flows -->
+    <main class="flex-1 overflow-hidden">
+      <app-flows-container></app-flows-container>
+    </main>
+  </div>
 
-<!-- Settings Dialog -->
-<app-settings-dialog
-  [(visible)]="showSettingsDialog"
-></app-settings-dialog>
+  <!-- Settings Dialog -->
+  <app-settings-dialog
+    [(visible)]="showSettingsDialog"
+  ></app-settings-dialog>
 
-<!-- Error Display Component -->
-<app-error-display></app-error-display>
+  <!-- Error Display Component -->
+  <app-error-display></app-error-display>
 
-<!-- PrimeNG Toast Notifications (keeping for now) -->
-<p-toast></p-toast>
+  <!-- Neobrutalism Toast Notifications -->
+  <app-toast></app-toast>
 
-<!-- PrimeNG Confirm Dialog (keeping for now) -->
-<p-confirmdialog [dismissableMask]="true"></p-confirmdialog>
+  <!-- PrimeNG Confirm Dialog (keeping for now) -->
+  <p-confirmdialog [dismissableMask]="true"></p-confirmdialog>
+}

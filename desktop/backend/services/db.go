@@ -91,6 +91,17 @@ func CloseDatabase() {
 	}
 }
 
+// ResetSharedDB closes and resets the shared database so it can be re-initialized.
+// Used by AuthService to re-open DB after decryption.
+func ResetSharedDB() {
+	if sharedDB != nil {
+		sharedDB.Close()
+	}
+	sharedDB = nil
+	sharedDBErr = nil
+	sharedDBOnce = sync.Once{}
+}
+
 func createAllTables(db *sql.DB) error {
 	_, err := db.Exec(`
 		-- App settings (key-value store)

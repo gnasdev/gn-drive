@@ -7,6 +7,7 @@ Welcome to the NS-Drive documentation. This directory contains detailed technica
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, data flow, and design patterns |
+| [SECURITY.md](SECURITY.md) | Password protection, encryption, and rate limiting |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development setup, commands, and debugging |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines and code standards |
 | [API.md](API.md) | Backend services API reference |

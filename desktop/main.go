@@ -2,8 +2,8 @@ package main
 
 import (
 	be "desktop/backend"
-	"desktop/backend/utils"
 	"desktop/backend/services"
+	"desktop/backend/utils"
 	"embed"
 	"log"
 	"os"
@@ -23,6 +23,7 @@ func main() {
 	// Create service instances
 	appService := be.NewApp()
 	logService := services.NewLogService()
+	authService := services.NewAuthService(nil)
 	syncService := services.NewSyncService(nil)
 	configService := services.NewConfigService(nil)
 	remoteService := services.NewRemoteService(nil)
@@ -48,6 +49,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(appService),
 			application.NewService(logService),
+			application.NewService(authService),
 			application.NewService(syncService),
 			application.NewService(configService),
 			application.NewService(remoteService),
@@ -67,6 +69,7 @@ func main() {
 	// Store the application reference in all services for events
 	appService.SetApp(app)
 	logService.SetApp(app)
+	authService.SetApp(app)
 	syncService.SetApp(app)
 	configService.SetApp(app)
 	remoteService.SetApp(app)
@@ -80,6 +83,10 @@ func main() {
 	exportService.SetApp(app)
 	importService.SetApp(app)
 	flowService.SetApp(app)
+
+	// Wire AuthService dependencies
+	authService.SetAppService(appService)
+	authService.SetNotificationService(notificationService)
 
 	// Load env config and wire to SyncService
 	envConfig := utils.LoadEnvConfigFromEnvStr(be.GetEmbeddedEnvConfigStr())
@@ -121,14 +128,13 @@ func main() {
 		WorkingDir: wd,
 	})
 
-	// Initialize shared SQLite database (creates tables, runs JSON migrations)
-	if err := services.InitDatabase(); err != nil {
-		log.Fatal("Failed to initialize database:", err)
-	}
-	defer services.CloseDatabase()
+	// NOTE: Database initialization and settings loading are now handled by AuthService.
+	// AuthService.ServiceStartup() will either:
+	// - Initialize DB immediately (if no auth configured)
+	// - Wait for password unlock, then initialize DB (if auth enabled)
 
-	// Load settings early so they're available before app.Run() calls ServiceStartup()
-	notificationService.LoadSettings()
+	// Read pre-unlock settings from auth.json for tray/startup behavior
+	preSettings := authService.GetPreUnlockSettings()
 
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -166,8 +172,8 @@ func main() {
 		log.Printf("Warning: Failed to initialize system tray: %v", err)
 	}
 
-	// Minimize to tray on startup if setting is enabled
-	if notificationService.IsMinimizeToTrayOnStartup(nil) {
+	// Minimize to tray on startup if setting is enabled (from auth.json or defaults)
+	if preSettings.MinimizeToTrayOnStartup {
 		window.Hide()
 		be.HideFromDock()
 	}
