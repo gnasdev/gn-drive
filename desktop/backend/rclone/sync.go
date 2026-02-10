@@ -2,8 +2,12 @@ package rclone
 
 import (
 	"context"
+	"desktop/backend/delta"
 	"desktop/backend/dto"
 	"fmt"
+	"log"
+	"strings"
+	"time"
 
 	beConfig "desktop/backend/config"
 	"desktop/backend/models"
@@ -28,11 +32,13 @@ import (
 	_ "github.com/rclone/rclone/backend/yandex"
 )
 
-func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
+func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outStatus chan *dto.SyncStatusDTO, deltaSvc *delta.DeltaService) error {
 	// Initialize the config
 	fsConfig := fs.GetConfig(ctx)
-	fsConfig.Transfers = profile.Parallel
-	fsConfig.Checkers = profile.Parallel
+	if profile.Parallel > 0 {
+		fsConfig.Transfers = profile.Parallel
+		fsConfig.Checkers = profile.Parallel * 2
+	}
 
 	switch task {
 	case "pull":
@@ -89,7 +95,117 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
+	// Delta sync: check if we can skip or scope the sync
+	srcKey := remoteKey(profile.From)
+	dstKey := remoteKey(profile.To)
+	usedDelta := false
+	var drainedChanges []delta.FileChange
+
+	if deltaSvc != nil {
+		// Check if both sides report no changes → skip entirely
+		if deltaSvc.ShouldSkipSync(srcKey) && deltaSvc.ShouldSkipSync(dstKey) {
+			log.Printf("[delta] No changes detected on either side, skipping sync")
+			sendSkippedStatus(outStatus)
+			_ = deltaSvc.CommitDelta(srcKey)
+			_ = deltaSvc.CommitDelta(dstKey)
+			return nil
+		}
+
+		// Try to get changes for filter scoping
+		srcChanges := deltaSvc.GetChanges(srcKey)
+		if srcChanges != nil && srcChanges.HasChanges && len(srcChanges.Changes) < delta.MaxChangesBeforeFallback {
+			scopedCtx := applyScopeFilter(ctx, srcChanges.Changes)
+			if scopedCtx != ctx {
+				ctx = scopedCtx
+				usedDelta = true
+				drainedChanges = srcChanges.Changes
+				log.Printf("[delta] Scoped sync to %d changed files", len(srcChanges.Changes))
+			}
+		}
+	}
+
+	syncErr := utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.Sync(ctx, dstFs, srcFs, false), "Sync failed", nil, nil)
 	})
+
+	// Commit delta state after sync
+	if deltaSvc != nil {
+		if syncErr == nil {
+			if usedDelta {
+				_ = deltaSvc.CommitDelta(srcKey)
+				_ = deltaSvc.CommitDelta(dstKey)
+			} else {
+				// Full sync completed — establish baseline and start watchers
+				_ = deltaSvc.CommitFullSync(srcFs, srcKey)
+				_ = deltaSvc.CommitFullSync(dstFs, dstKey)
+			}
+		} else if usedDelta && len(drainedChanges) > 0 {
+			// Scoped delta sync failed — restore drained changes so they're
+			// not lost and will be picked up on the next sync attempt.
+			deltaSvc.RestoreChanges(srcKey, drainedChanges)
+			log.Printf("[delta] Restored %d drained changes after sync failure", len(drainedChanges))
+		}
+		// On error without delta: watcher continues collecting changes.
+		// Next sync will get a fresh changeset or fall back to full sync.
+	}
+
+	return syncErr
+}
+
+// remoteKey extracts a stable key from a remote path.
+// "gdrive:/data" → "gdrive:/data", "/local/path" → "local:/local/path"
+func remoteKey(path string) string {
+	if idx := strings.Index(path, ":"); idx != -1 {
+		return path
+	}
+	return "local:" + path
+}
+
+// applyScopeFilter injects include rules for changed paths and excludes everything else.
+func applyScopeFilter(ctx context.Context, changes []delta.FileChange) context.Context {
+	filterOpt := CopyFilterOpt(ctx)
+
+	seen := make(map[string]bool)
+	for _, c := range changes {
+		if seen[c.Path] {
+			continue
+		}
+		seen[c.Path] = true
+
+		if c.EntryType == fs.EntryDirectory {
+			filterOpt.IncludeRule = append(filterOpt.IncludeRule, "/"+c.Path+"/**")
+		}
+		filterOpt.IncludeRule = append(filterOpt.IncludeRule, "/"+c.Path)
+	}
+
+	// Exclude everything not in the changeset
+	filterOpt.ExcludeRule = append(filterOpt.ExcludeRule, "**")
+
+	newFilter, err := filter.NewFilter(&filterOpt)
+	if err != nil {
+		log.Printf("[delta] Failed to build scope filter, using full sync: %v", err)
+		return ctx
+	}
+	return filter.ReplaceConfig(ctx, newFilter)
+}
+
+// sendSkippedStatus sends a status indicating the sync was skipped (no changes).
+func sendSkippedStatus(outStatus chan *dto.SyncStatusDTO) {
+	if outStatus == nil {
+		return
+	}
+	status := &dto.SyncStatusDTO{
+		Command:      "sync_status",
+		Status:       "completed",
+		Progress:     100,
+		Speed:        "0 B/s",
+		ETA:          "-",
+		Timestamp:    time.Now(),
+		DeltaMode:    true,
+		DeltaSkipped: true,
+	}
+	select {
+	case outStatus <- status:
+	default:
+	}
 }

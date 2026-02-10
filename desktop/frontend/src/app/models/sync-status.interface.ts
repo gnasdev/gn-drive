@@ -3,7 +3,7 @@ export interface FileTransferInfo {
   size: number;
   bytes: number;
   progress: number; // 0-100
-  status: 'transferring' | 'completed' | 'failed' | 'checking';
+  status: 'transferring' | 'completed' | 'failed' | 'checking' | 'checked';
   speed?: number; // bytes per second
   error?: string;
 }
@@ -23,12 +23,15 @@ export interface SyncStatus {
   current_file: string;
   errors: number;
   checks: number;
+  total_checks: number;
   deletes: number;
   renames: number;
   timestamp: string;
   elapsed_time: string;
   action: "pull" | "push" | "bi" | "bi-resync";
   transfers?: FileTransferInfo[];
+  delta_mode?: boolean;
+  delta_skipped?: boolean;
 }
 
 export interface SyncStatusEvent {
@@ -46,12 +49,15 @@ export interface SyncStatusEvent {
   current_file?: string;
   errors?: number;
   checks?: number;
+  total_checks?: number;
   deletes?: number;
   renames?: number;
   timestamp?: string;
   elapsed_time?: string;
   action?: string;
   transfers?: FileTransferInfo[];
+  delta_mode?: boolean;
+  delta_skipped?: boolean;
 }
 
 export const DEFAULT_SYNC_STATUS: SyncStatus = {
@@ -67,6 +73,7 @@ export const DEFAULT_SYNC_STATUS: SyncStatus = {
   current_file: "",
   errors: 0,
   checks: 0,
+  total_checks: 0,
   deletes: 0,
   renames: 0,
   timestamp: new Date().toISOString(),

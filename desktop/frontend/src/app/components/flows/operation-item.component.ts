@@ -34,6 +34,8 @@ import { OperationSettingsPanelComponent } from '../operations-tree/operation-se
         <!-- Drag Handle -->
         <div
           class="cursor-move p-1 hover:bg-sys-accent/30 rounded"
+          [class.pointer-events-none]="isExecuting"
+          [class.opacity-50]="isExecuting"
           draggable="true"
           (dragstart)="onDragStart($event)"
           (dragend)="onDragEnd()"
@@ -150,6 +152,7 @@ export class FlowOperationItemComponent {
   @Input() operation!: Operation;
   @Input() index!: number;
   @Input() totalInFlow!: number;
+  @Input() flowRunning = false;
   @Input() isDragging = false;
   @Input() willBeDragged = false;
 
@@ -163,7 +166,7 @@ export class FlowOperationItemComponent {
   @Output() dragEnd = new EventEmitter<void>();
 
   get isExecuting(): boolean {
-    return this.operation.status === 'running' || this.operation.status === 'pending';
+    return this.flowRunning || this.operation.status === 'running' || this.operation.status === 'pending';
   }
 
   onOperationChange(): void {

@@ -230,6 +230,17 @@ func createAllTables(db *sql.DB) error {
 			FOREIGN KEY (flow_id) REFERENCES flows(id) ON DELETE CASCADE
 		);
 		CREATE INDEX IF NOT EXISTS idx_operations_flow_id ON operations(flow_id);
+
+		-- Delta sync state (tracks watcher/change-notification state per remote endpoint)
+		CREATE TABLE IF NOT EXISTS delta_state (
+			remote_key     TEXT PRIMARY KEY,
+			provider       TEXT NOT NULL DEFAULT '',
+			is_watching    INTEGER NOT NULL DEFAULT 0,
+			last_full_sync TEXT,
+			delta_count    INTEGER NOT NULL DEFAULT 0,
+			created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+			updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+		);
 	`)
 	return err
 }
@@ -326,8 +337,8 @@ func migrateProfiles(db *sql.DB, cfg *SharedConfig) {
 	stmt, err := tx.Prepare(`INSERT INTO profiles (name, from_path, to_path, included_paths, excluded_paths,
 		bandwidth, parallel, backup_path, cache_path, min_size, max_size, filter_from_file,
 		exclude_if_present, use_regex, max_delete, immutable, conflict_resolution,
-		multi_thread_streams, buffer_size, fast_list, retries, low_level_retries, max_duration)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		multi_thread_streams, buffer_size, retries, low_level_retries, max_duration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return
 	}
@@ -340,7 +351,7 @@ func migrateProfiles(db *sql.DB, cfg *SharedConfig) {
 			p.MinSize, p.MaxSize, p.FilterFromFile, p.ExcludeIfPresent,
 			boolToInt(p.UseRegex), intPtrToNullable(p.MaxDelete), boolToInt(p.Immutable),
 			p.ConflictResolution, intPtrToNullable(p.MultiThreadStreams),
-			p.BufferSize, boolToInt(p.FastList),
+			p.BufferSize,
 			intPtrToNullable(p.Retries), intPtrToNullable(p.LowLevelRetries), p.MaxDuration)
 	}
 

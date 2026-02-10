@@ -11,6 +11,7 @@ import (
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
+	fscache "github.com/rclone/rclone/fs/cache"
 	"github.com/rclone/rclone/fs/config/configfile"
 	"github.com/rclone/rclone/fs/filter"
 	fslog "github.com/rclone/rclone/fs/log"
@@ -52,18 +53,18 @@ func doInitGlobal(isDebugMode bool) error {
 	// Start accounting
 	accounting.Start(context.Background())
 
+	// Skip Google Docs/Sheets/Slides — they are cloud-native and cannot be
+	// synced as regular files without explicit import/export format conversion.
+	os.Setenv("RCLONE_DRIVE_SKIP_GDOCS", "true")
+
 	// Initialize the global config (baseline that fs.AddConfig will copy from)
 	fsConfig := fs.GetConfig(context.Background())
-	fsConfig.CheckSum = true
-	fsConfig.Progress = true
-	fsConfig.TrackRenames = true
-	fsConfig.Metadata = true
 	fsConfig.UseServerModTime = true
+	fsConfig.UseListR = true
 
 	// Fix case
 	fsConfig.NoUnicodeNormalization = false
 	fsConfig.IgnoreCaseSync = true
-	fsConfig.FixCase = true
 
 	// Configure console
 	if fsConfig.NoConsole {
@@ -144,6 +145,19 @@ func doInitGlobal(isDebugMode bool) error {
 	}
 
 	return nil
+}
+
+// ClearFsCache clears the global rclone filesystem cache.
+// Call before sync operations to ensure fresh filesystem objects.
+func ClearFsCache() {
+	fscache.Clear()
+}
+
+// ClearStatsCache resets the global rclone accounting stats.
+// Call before sync operations to ensure no stale status data carries over.
+func ClearStatsCache() {
+	accounting.GlobalStats().ResetCounters()
+	accounting.GlobalStats().ResetErrors()
 }
 
 // newDefaultFilterOpts returns fresh default filter options for per-task isolation.
@@ -327,11 +341,6 @@ func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.C
 		if err := fsConfig.BufferSize.Set(profile.BufferSize); err != nil {
 			return ctx, fmt.Errorf("invalid buffer_size %q: %w", profile.BufferSize, err)
 		}
-	}
-
-	// Performance: fast list (recursive listing)
-	if profile.FastList {
-		fsConfig.UseListR = true
 	}
 
 	// Performance: retries

@@ -354,7 +354,6 @@ export class BoardService implements OnDestroy {
         cfg.buffer_size = "16M";
         cfg.retries = 3;
         cfg.low_level_retries = 10;
-        cfg.fast_list = true;
         edge.sync_config = cfg;
 
         board.edges = [...(board.edges || []), edge];

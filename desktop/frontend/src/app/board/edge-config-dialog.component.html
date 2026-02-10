@@ -290,13 +290,6 @@
           <p class="text-xs text-gray-600 mt-1">Retries for low-level HTTP/network errors. Higher values help with unstable connections.</p>
         </div>
       </div>
-      <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-700">
-        <div>
-          <p class="text-sm text-gray-300">Fast List</p>
-          <p class="text-xs text-gray-500">Use recursive listing to reduce API calls. Significantly faster for remotes with many files, but uses more memory. Recommended for cloud storage (Google Drive, S3, etc.).</p>
-        </div>
-        <p-toggleswitch [(ngModel)]="edge.sync_config.fast_list"></p-toggleswitch>
-      </div>
     </p-card>
   </div>
   }

@@ -18,7 +18,6 @@ import (
 	"github.com/rclone/rclone/cmd"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/cache"
 	"github.com/rclone/rclone/lib/atexit"
 )
 
@@ -120,8 +119,6 @@ func RunRcloneWithRetryAndStats(ctx context.Context, retry bool, showStats bool,
 		}
 	}
 
-	// clear cache and shutdown backends
-	cache.Clear()
 	if lastErr := stats.GetLastError(); cmdErr == nil {
 		cmdErr = lastErr
 	}

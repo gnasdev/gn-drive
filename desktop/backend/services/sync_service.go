@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	beConfig "desktop/backend/config"
+	"desktop/backend/delta"
 	"desktop/backend/dto"
 	"desktop/backend/events"
 	"desktop/backend/models"
@@ -10,6 +11,7 @@ import (
 	"desktop/backend/utils"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -106,6 +108,7 @@ type SyncService struct {
 	taskCounter         int
 	mutex               sync.RWMutex
 	envConfig           beConfig.Config
+	deltaSvc            *delta.DeltaService
 }
 
 // SyncTask represents an active sync task
@@ -145,6 +148,9 @@ func (s *SyncService) SetEnvConfig(config beConfig.Config) {
 	if err := rclone.InitGlobal(config.DebugMode); err != nil {
 		log.Printf("WARNING: Failed to initialize rclone: %v", err)
 	}
+	// Initialize delta service for change-notification-based sync optimization
+	store := delta.NewDeltaStore(GetSharedDB)
+	s.deltaSvc = delta.NewDeltaService(store)
 }
 
 // SetLogService sets the log service for reliable log delivery
@@ -180,6 +186,11 @@ func (s *SyncService) ServiceShutdown(ctx context.Context) error {
 		if task.Cancel != nil {
 			task.Cancel()
 		}
+	}
+
+	// Stop all delta watchers
+	if s.deltaSvc != nil {
+		s.deltaSvc.StopAll()
 	}
 
 	return nil
@@ -350,9 +361,13 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 			status.TabId = &task.TabId
 			status.Action = string(task.Action)
 
-			// Extract LogMessages for text-based consumers
+			// Dispatch LogMessages to board log buffer and log service.
+			// NOTE: Do NOT re-log to stderr here — rclone's slog handler already
+			// writes these messages to stderr. Re-logging via log.Printf would
+			// create a feedback loop (Go 1.22+ redirects log.Printf through slog,
+			// which rclone captures via AddOutput). Even fmt.Fprintf would cause
+			// duplicate output since rclone already wrote the original message.
 			for _, logMsg := range status.LogMessages {
-				log.Printf("[sync:%s:%s] %s", string(task.Action), task.TabId, logMsg)
 				if isBoardTask {
 					AppendBoardLog(logMsg)
 				}
@@ -364,7 +379,7 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 			// Emit structured SyncStatusDTO for frontend
 			if s.eventBus != nil {
 				if emitErr := s.eventBus.Emit(status); emitErr != nil {
-					log.Printf("Failed to emit sync status: %v", emitErr)
+					fmt.Fprintf(os.Stderr, "Failed to emit sync status: %v\n", emitErr)
 				}
 			}
 		}
@@ -378,13 +393,13 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 	config := s.envConfig
 	switch task.Action {
 	case ActionPull:
-		err = rclone.Sync(ctx, config, "pull", task.Profile, outStatus)
+		err = rclone.Sync(ctx, config, "pull", task.Profile, outStatus, s.deltaSvc)
 	case ActionPush:
-		err = rclone.Sync(ctx, config, "push", task.Profile, outStatus)
+		err = rclone.Sync(ctx, config, "push", task.Profile, outStatus, s.deltaSvc)
 	case ActionBi:
-		err = rclone.BiSync(ctx, config, task.Profile, false, outStatus)
+		err = rclone.BiSync(ctx, config, task.Profile, false, outStatus, s.deltaSvc)
 	case ActionBiResync:
-		err = rclone.BiSync(ctx, config, task.Profile, true, outStatus)
+		err = rclone.BiSync(ctx, config, task.Profile, true, outStatus, s.deltaSvc)
 	default:
 		err = fmt.Errorf("unknown sync action: %s", task.Action)
 	}
@@ -434,11 +449,11 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 
 // emitSyncEvent emits a sync event to the frontend via unified EventBus
 func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, status, message string) {
-	log.Printf("[sync:%s:%s] %s: %s", action, tabId, status, message)
+	fmt.Fprintf(os.Stderr, "[sync:%s:%s] %s: %s\n", action, tabId, status, message)
 	event := events.NewSyncEvent(eventType, tabId, action, status, message)
 	if s.eventBus != nil {
 		if err := s.eventBus.EmitSyncEvent(event); err != nil {
-			log.Printf("Failed to emit sync event: %v", err)
+			fmt.Fprintf(os.Stderr, "Failed to emit sync event: %v\n", err)
 		}
 	} else if s.app != nil {
 		// Fallback to direct emission if EventBus not initialized

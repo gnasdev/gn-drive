@@ -1,16 +1,27 @@
-@if (syncStatus) {
+@if (syncStatus(); as ss) {
 <p-card>
-  @if (showTitle) {
+  @if (showTitle()) {
   <div
     class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700"
   >
     <div class="flex items-center space-x-2">
-      <i [class]="getStatusIcon()" class="text-xl text-blue-600"></i>
+      <i [class]="statusIcon()" class="text-xl text-blue-600"></i>
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
         Sync Status
       </h3>
     </div>
-    <p-tag [icon]="getActionIcon()" [value]="getActionLabel()" severity="secondary" [rounded]="true" />
+    <p-tag [icon]="actionIcon()" [value]="actionLabel()" severity="secondary" [rounded]="true" />
+  </div>
+  }
+
+  <!-- Delta Skip Indicator -->
+  @if (ss.delta_skipped) {
+  <div class="mt-4 flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+    <i class="pi pi-check-circle text-green-600 dark:text-green-400"></i>
+    <span class="text-sm text-green-700 dark:text-green-300">No changes detected — sync skipped</span>
+    @if (ss.delta_mode) {
+    <p-tag value="Delta" severity="success" [style]="{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }" />
+    }
   </div>
   }
 
@@ -21,20 +32,20 @@
         >Progress</span
       >
       <span class="text-sm font-semibold text-gray-900 dark:text-white"
-        >{{ getProgressValue().toFixed(1) }}%</span
+        >{{ progressValue().toFixed(1) }}%</span
       >
     </div>
-    <p-progressbar [value]="getProgressValue()" [showValue]="false" [style]="{ height: '0.5rem' }" />
+    <p-progressbar [value]="progressValue()" [showValue]="false" [style]="{ height: '0.5rem' }" />
     <div
       class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
     >
       <div class="flex items-center space-x-1">
         <i class="pi pi-bolt text-xs"></i>
-        <span>{{ syncStatus.speed }}</span>
+        <span>{{ ss.speed }}</span>
       </div>
       <div class="flex items-center space-x-1">
         <i class="pi pi-clock text-xs"></i>
-        <span>{{ syncStatus.elapsed_time }}</span>
+        <span>{{ ss.elapsed_time }}</span>
       </div>
     </div>
   </div>
@@ -48,30 +59,30 @@
     <div class="grid grid-cols-2 gap-3">
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <i class="pi pi-file text-xl text-blue-500"></i>
+          <i class="pi pi-file text-xl text-white dark:text-white"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Files
             </div>
             <div class="text-xs text-gray-600 dark:text-gray-400">
-              {{ syncStatus.files_transferred }}
-              @if (syncStatus.total_files > 0) { /
-              {{ syncStatus.total_files }} }
+              {{ ss.files_transferred }}
+              @if (ss.total_files > 0) { /
+              {{ ss.total_files }} }
             </div>
           </div>
         </div>
       </div>
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <i class="pi pi-server text-xl text-green-500"></i>
+          <i class="pi pi-server text-xl text-white dark:text-white"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Data
             </div>
             <div class="text-xs text-gray-600 dark:text-gray-400">
-              {{ formatBytes(syncStatus.bytes_transferred) }}
-              @if (syncStatus.total_bytes > 0) { /
-              {{ formatBytes(syncStatus.total_bytes) }} }
+              {{ formatBytes(ss.bytes_transferred) }}
+              @if (ss.total_bytes > 0) { /
+              {{ formatBytes(ss.total_bytes) }} }
             </div>
           </div>
         </div>
@@ -87,44 +98,60 @@
       Activity
     </h4>
     <div class="grid grid-cols-2 gap-3">
-      @if (syncStatus.checks > 0) {
+      @if (ss.checks > 0 || ss.total_checks > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <i class="pi pi-check-circle text-xl text-blue-500"></i>
+          <i class="pi pi-check-circle text-xl text-white dark:text-white"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Checks
             </div>
             <div class="text-xs text-gray-600 dark:text-gray-400">
-              {{ syncStatus.checks }}
+              {{ ss.checks }}
+              @if (ss.total_checks > 0) { /
+              {{ ss.total_checks }} }
             </div>
           </div>
         </div>
       </div>
-      } @if (syncStatus.deletes > 0) {
+      } @if (ss.deletes > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <i class="pi pi-trash text-xl text-red-500"></i>
+          <i class="pi pi-trash text-xl text-white dark:text-white"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Deletes
             </div>
             <div class="text-xs text-gray-600 dark:text-gray-400">
-              {{ syncStatus.deletes }}
+              {{ ss.deletes }}
             </div>
           </div>
         </div>
       </div>
-      } @if (syncStatus.errors > 0) {
+      } @if (ss.renames > 0) {
       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
         <div class="flex items-center space-x-2">
-          <i class="pi pi-exclamation-circle text-xl text-red-500"></i>
+          <i class="pi pi-pencil text-xl text-white dark:text-white"></i>
+          <div>
+            <div class="text-sm font-medium text-gray-900 dark:text-white">
+              Renames
+            </div>
+            <div class="text-xs text-gray-600 dark:text-gray-400">
+              {{ ss.renames }}
+            </div>
+          </div>
+        </div>
+      </div>
+      } @if (ss.errors > 0) {
+      <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+        <div class="flex items-center space-x-2">
+          <i class="pi pi-exclamation-circle text-xl text-white dark:text-white"></i>
           <div>
             <div class="text-sm font-medium text-gray-900 dark:text-white">
               Errors
             </div>
             <div class="text-xs text-gray-600 dark:text-gray-400">
-              {{ syncStatus.errors }}
+              {{ ss.errors }}
             </div>
           </div>
         </div>
@@ -134,8 +161,29 @@
   </div>
   }
 
-  <!-- Current File -->
-  @if (syncStatus.current_file) {
+  <!-- Active Operations (checking/transferring files) -->
+  @if (activeTransfers().length > 0) {
+  <div class="space-y-2 mt-4">
+    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+      Active Operations
+    </h4>
+    <div class="space-y-1.5 max-h-40 overflow-y-auto">
+      @for (t of activeTransfers(); track t.name) {
+      <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg text-xs">
+        <p-tag [value]="getStatusLabel(t.status)" [severity]="getStatusTagColor(t.status)" [style]="{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }" />
+        <span class="text-gray-900 dark:text-white truncate flex-1" [title]="t.name">{{ t.name }}</span>
+        @if (t.status === 'transferring' && t.progress > 0) {
+        <span class="text-gray-500 whitespace-nowrap">{{ t.progress.toFixed(0) }}%</span>
+        }
+        @if (t.status === 'transferring' && t.speed) {
+        <span class="text-gray-500 whitespace-nowrap">{{ formatSpeed(t.speed) }}</span>
+        }
+      </div>
+      }
+    </div>
+  </div>
+  } @else if (ss.current_file) {
+  <!-- Fallback: show current file if no per-file transfer info -->
   <div class="space-y-2 mt-4">
     <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
       Current File
@@ -145,7 +193,7 @@
     >
       <i class="pi pi-folder-open text-base text-blue-500"></i>
       <span class="text-sm text-gray-900 dark:text-white truncate">{{
-        syncStatus.current_file
+        ss.current_file
       }}</span>
     </div>
   </div>
@@ -164,3 +212,13 @@
   </div>
 </p-card>
 }
+
+<!-- Error Detail Dialog -->
+<neo-dialog
+  [(visible)]="showErrorDialog"
+  title="Error Details"
+  maxWidth="600px"
+>
+  <pre class="text-sm text-red-500 whitespace-pre-wrap break-all font-mono">{{ selectedError }}</pre>
+</neo-dialog>
+

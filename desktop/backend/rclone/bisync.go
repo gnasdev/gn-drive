@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"desktop/backend/config"
+	"desktop/backend/delta"
 	"desktop/backend/dto"
 	"desktop/backend/models"
 	"desktop/backend/utils"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,14 +19,14 @@ import (
 	"github.com/rclone/rclone/fs/filter"
 )
 
-func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outStatus chan *dto.SyncStatusDTO) error {
+func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outStatus chan *dto.SyncStatusDTO, deltaSvc *delta.DeltaService) error {
 	var err error
 
 	// Initialize the config
 	fsConfig := fs.GetConfig(ctx)
 	opt := &bisync.Options{}
 	opt.Force = true
-	opt.CompareFlag = "size,modtime,checksum"
+	opt.CompareFlag = "size,modtime"
 	opt.Recover = true
 	opt.CreateEmptySrcDirs = true
 
@@ -51,7 +53,7 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		opt.ConflictSuffixFlag = profile.ConflictSuffix
 	}
 
-	if err = opt.CheckSync.Set(bisync.CheckSyncTrue.String()); err != nil {
+	if err = opt.CheckSync.Set(bisync.CheckSyncFalse.String()); err != nil {
 		return err
 	}
 
@@ -180,10 +182,11 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		}
 	}
 
-	// Set parallel transfers
-	fsConfig.Transfers = profile.Parallel
-
-	fsConfig.Progress = true
+	// Set parallel transfers and checkers (skip if 0 to preserve rclone defaults)
+	if profile.Parallel > 0 {
+		fsConfig.Transfers = profile.Parallel
+		fsConfig.Checkers = profile.Parallel * 2
+	}
 
 	// Apply advanced profile options (filtering, safety, performance)
 	ctx, err = ApplyProfileOptions(ctx, profile)
@@ -195,7 +198,30 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		return err
 	}
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
+	// Delta sync: check if we can skip bisync entirely (not for resync)
+	srcKey := remoteKey(profile.From)
+	dstKey := remoteKey(profile.To)
+
+	if deltaSvc != nil && !resync && !opt.Resync {
+		if deltaSvc.ShouldSkipSync(srcKey) && deltaSvc.ShouldSkipSync(dstKey) {
+			log.Printf("[delta] No changes on either side, skipping bisync")
+			sendSkippedStatus(outStatus)
+			_ = deltaSvc.CommitDelta(srcKey)
+			_ = deltaSvc.CommitDelta(dstKey)
+			return nil
+		}
+	}
+
+	syncErr := utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(bisync.Bisync(ctx, dstFs, srcFs, opt), "Sync failed", nil, nil)
 	})
+
+	// Commit delta state after bisync
+	if deltaSvc != nil && syncErr == nil {
+		// After bisync (or resync), establish baseline and start watchers
+		_ = deltaSvc.CommitFullSync(srcFs, srcKey)
+		_ = deltaSvc.CommitFullSync(dstFs, dstKey)
+	}
+
+	return syncErr
 }

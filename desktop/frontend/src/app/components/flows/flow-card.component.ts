@@ -132,6 +132,7 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
             [operation]="operation"
             [index]="i"
             [totalInFlow]="flow.operations.length"
+            [flowRunning]="isFlowRunning"
             [isDragging]="isDragging && isSourceFlow && dragStartIndex === i"
             [willBeDragged]="isSourceFlow && dragStartIndex === i"
             (operationChange)="onOperationChange(i, $event)"
@@ -154,6 +155,8 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
         <!-- Add Operation Placeholder -->
         <div
           class="mt-3 p-3 border-2 border-dashed border-sys-border-muted bg-sys-bg/50 flex items-center justify-center gap-2 cursor-pointer hover:border-sys-accent hover:bg-sys-accent/10 transition-all"
+          [class.pointer-events-none]="isFlowRunning"
+          [class.opacity-50]="isFlowRunning"
           tabindex="0"
           role="button"
           (click)="addOperation.emit()"
@@ -213,6 +216,10 @@ export class FlowCardComponent {
     // Same flow: show drop zones except adjacent to the dragged item (no-op positions)
     if (this.dragStartIndex === null) return false;
     return dropIndex !== this.dragStartIndex && dropIndex !== this.dragStartIndex + 1;
+  }
+
+  get isFlowRunning(): boolean {
+    return this.flow.status === 'running';
   }
 
   get canExecute(): boolean {

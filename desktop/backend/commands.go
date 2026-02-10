@@ -90,7 +90,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 			}
 			status.Action = task
 
-			// Extract LogMessages for backward-compatible text output
+			// Extract LogMessages for backward-compatible text output (non-blocking)
 			for _, logMsg := range status.LogMessages {
 				if config.DebugMode {
 					fmt.Println("--------------------")
@@ -102,12 +102,19 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 				} else {
 					j, _ = utils.NewCommandOutputDTO(id, logMsg).ToJSON()
 				}
-				a.oc <- j
+				select {
+				case a.oc <- j:
+				default:
+					// Drop log message if channel full to prevent blocking status delivery
+				}
 			}
 
-			// Also send structured SyncStatusDTO
+			// Send structured SyncStatusDTO with timeout to guarantee delivery
 			if j, err := status.ToJSON(); err == nil {
-				a.oc <- j
+				select {
+				case a.oc <- j:
+				case <-time.After(100 * time.Millisecond):
+				}
 			}
 		}
 	}()
@@ -115,13 +122,13 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 	go func() {
 		switch task {
 		case "pull":
-			err = rclone.Sync(ctx, config, "pull", profile, outStatus)
+			err = rclone.Sync(ctx, config, "pull", profile, outStatus, nil)
 		case "push":
-			err = rclone.Sync(ctx, config, "push", profile, outStatus)
+			err = rclone.Sync(ctx, config, "push", profile, outStatus, nil)
 		case "bi":
-			err = rclone.BiSync(ctx, config, profile, false, outStatus)
+			err = rclone.BiSync(ctx, config, profile, false, outStatus, nil)
 		case "bi-resync":
-			err = rclone.BiSync(ctx, config, profile, true, outStatus)
+			err = rclone.BiSync(ctx, config, profile, true, outStatus, nil)
 		}
 
 		// Close the outStatus channel to unblock the reader goroutine

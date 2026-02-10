@@ -900,7 +900,6 @@ func TestBoardService_AddBoard_WithSyncConfig(t *testing.T) {
 				SyncConfig: models.Profile{
 					Name:     "gdrive-to-local",
 					Parallel: 8,
-					FastList: true,
 				},
 			},
 		},
@@ -920,9 +919,6 @@ func TestBoardService_AddBoard_WithSyncConfig(t *testing.T) {
 	}
 	if got.Edges[0].SyncConfig.Parallel != 8 {
 		t.Errorf("expected parallel=8, got %d", got.Edges[0].SyncConfig.Parallel)
-	}
-	if !got.Edges[0].SyncConfig.FastList {
-		t.Error("expected fast_list=true")
 	}
 }
 

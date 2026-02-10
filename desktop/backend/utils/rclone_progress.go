@@ -19,17 +19,72 @@ import (
 const (
 	// interval between progress status emissions
 	defaultProgressInterval = 500 * time.Millisecond
+	// maximum log messages per status DTO to prevent unbounded growth
+	maxLogMessagesPerStatus = 50
 )
 
-// shouldSkipLogMessage returns true for backend debug messages that should be filtered out
+// extractLogContent strips rclone log prefixes (stats group + timestamp + level)
+// and returns the actual message content. For example:
+//
+//	"[task-1] 2026/02/10 20:18:46 NOTICE: actual message" → "actual message"
+//	"[task-1] 2026/02/10 20:18:46 NOTICE:" → ""
+//	"plain message" → "plain message"
+func extractLogContent(message string) string {
+	// Strip ALL [...] prefixes (there may be multiple if a message was
+	// re-captured through Go's standard logger → slog → callback loop)
+	msg := message
+	for strings.HasPrefix(msg, "[") {
+		if idx := strings.Index(msg, "] "); idx != -1 {
+			msg = msg[idx+2:]
+		} else {
+			break
+		}
+	}
+
+	// Strip known rclone log level tags and everything before them
+	for _, tag := range []string{"NOTICE:", "INFO  :", "DEBUG :", "ERROR :", "WARNING:"} {
+		if idx := strings.LastIndex(msg, tag); idx != -1 {
+			msg = msg[idx+len(tag):]
+			break
+		}
+	}
+
+	return strings.TrimSpace(msg)
+}
+
+// shouldSkipLogMessage returns true for messages that should be filtered out of log output.
+// This includes internal backend debug messages and rclone's periodic stats output
+// (which we already capture via RemoteStats).
 func shouldSkipLogMessage(message string) bool {
-	return strings.Contains(message, "Emitting event to frontend") ||
+	// Internal backend debug messages
+	if strings.Contains(message, "Emitting event to frontend") ||
 		strings.Contains(message, "Event emitted successfully") ||
 		strings.Contains(message, "Event channel") ||
 		strings.Contains(message, "SetApp called") ||
 		strings.Contains(message, "SyncWithTab called") ||
 		strings.Contains(message, "Generated task ID") ||
-		strings.Contains(message, "Sending command")
+		strings.Contains(message, "Sending command") {
+		return true
+	}
+
+	// Extract actual content after stripping rclone prefix/timestamp/level
+	content := extractLogContent(message)
+
+	// Empty messages (e.g., "[sync:push:board-...] 2026/... NOTICE:" with no content)
+	if content == "" || content == "-" {
+		return true
+	}
+
+	// rclone periodic stats output (redundant — we capture stats via RemoteStats)
+	if strings.HasPrefix(content, "Transferred:") ||
+		strings.HasPrefix(content, "Checks:") ||
+		strings.HasPrefix(content, "Elapsed time:") ||
+		strings.HasPrefix(content, "Transferring:") ||
+		strings.HasPrefix(content, " *") {
+		return true
+	}
+
+	return false
 }
 
 // formatSpeed formats bytes per second to human readable format
@@ -58,7 +113,8 @@ func formatDuration(d time.Duration) string {
 
 // createStatusFromStats builds a SyncStatusDTO from rclone accounting stats.
 // Identity fields (Id, TabId, Action) are NOT set — the service layer sets them.
-func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages []string) *dto.SyncStatusDTO {
+// Returns the status DTO and the set of currently-checking file names (for accumulation tracking).
+func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages []string) (*dto.SyncStatusDTO, map[string]struct{}) {
 	stats := accounting.Stats(ctx)
 
 	syncStatus := &dto.SyncStatusDTO{
@@ -66,6 +122,9 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 		Status:    "running",
 		Timestamp: time.Now(),
 	}
+
+	// Track currently-checking file names for the caller's accumulation logic
+	currentlyChecking := make(map[string]struct{})
 
 	// Use RemoteStats for accurate totals, speed, ETA, and per-file transfer info
 	remoteStats, err := stats.RemoteStats(false)
@@ -101,6 +160,11 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 		if v, ok := remoteStats["checks"]; ok {
 			if n, ok := v.(int64); ok {
 				syncStatus.Checks = n
+			}
+		}
+		if v, ok := remoteStats["totalChecks"]; ok {
+			if n, ok := v.(int64); ok {
+				syncStatus.TotalChecks = n
 			}
 		}
 		if v, ok := remoteStats["deletes"]; ok {
@@ -156,10 +220,11 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 			}
 		}
 
-		// In-progress checks
+		// In-progress checks — also collect names for accumulation tracking
 		if v, ok := remoteStats["checking"]; ok && v != nil {
 			if checkList, ok := v.([]string); ok {
 				for _, name := range checkList {
+					currentlyChecking[name] = struct{}{}
 					transfers = append(transfers, dto.FileTransferInfo{
 						Name:   name,
 						Status: "checking",
@@ -175,12 +240,12 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 				Size:  tr.Size,
 				Bytes: tr.Bytes,
 			}
-			if tr.Checked {
-				fi.Status = "checking"
-				fi.Progress = 100
-			} else if tr.Error != nil {
+			if tr.Error != nil {
 				fi.Status = "failed"
 				fi.Error = tr.Error.Error()
+			} else if tr.Checked {
+				fi.Status = "checked"
+				fi.Progress = 100
 			} else {
 				fi.Status = "completed"
 				fi.Progress = 100
@@ -213,6 +278,9 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 		syncStatus.Progress = float64(syncStatus.BytesTransferred) / float64(syncStatus.TotalBytes) * 100
 	} else if syncStatus.TotalFiles > 0 {
 		syncStatus.Progress = float64(syncStatus.FilesTransferred) / float64(syncStatus.TotalFiles) * 100
+	} else if syncStatus.TotalChecks > 0 {
+		// During check-only phase (no transfers yet), show check progress
+		syncStatus.Progress = float64(syncStatus.Checks) / float64(syncStatus.TotalChecks) * 100
 	}
 
 	// Determine status
@@ -224,12 +292,33 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 		syncStatus.Status = "running"
 	}
 
-	// Attach accumulated log messages
+	// Derive error/check counts from the actual transfer list so displayed
+	// counts match the items shown (rclone's raw counters can diverge due to
+	// retries, transient errors, and internal list caps).
+	if len(syncStatus.Transfers) > 0 {
+		var errCount int
+		var checkCount int64
+		for _, ft := range syncStatus.Transfers {
+			switch ft.Status {
+			case "failed":
+				errCount++
+			case "checked", "checking":
+				checkCount++
+			}
+		}
+		syncStatus.Errors = errCount
+		syncStatus.Checks = checkCount
+	}
+
+	// Attach accumulated log messages (capped to prevent unbounded growth)
+	if len(logMessages) > maxLogMessagesPerStatus {
+		logMessages = logMessages[len(logMessages)-maxLogMessagesPerStatus:]
+	}
 	if len(logMessages) > 0 {
 		syncStatus.LogMessages = logMessages
 	}
 
-	return syncStatus
+	return syncStatus, currentlyChecking
 }
 
 // startProgress starts capturing rclone logs and producing structured SyncStatusDTO
@@ -284,7 +373,12 @@ func startProgress(ctx context.Context, outStatus chan *dto.SyncStatusDTO) func(
 		if text == "" || shouldSkipLogMessage(text) {
 			return
 		}
-		appendLog(text)
+		// Store cleaned content (strip rclone prefix/timestamp/level)
+		content := extractLogContent(text)
+		if content == "" {
+			return
+		}
+		appendLog(content)
 	})
 
 	// Intercept output from functions such as HashLister to stdout
@@ -305,12 +399,47 @@ func startProgress(ctx context.Context, outStatus chan *dto.SyncStatusDTO) func(
 		ticker := time.NewTicker(defaultProgressInterval)
 		defer ticker.Stop()
 
+		// Accumulate completed checks by tracking the checking set across ticks.
+		// Files that leave remoteStats["checking"] between ticks are "done checking".
+		const maxCompletedChecks = 100
+		prevChecking := make(map[string]struct{})
+		var completedChecks []dto.FileTransferInfo
+
 		for {
 			select {
 			case <-ticker.C:
 				if !isClosed.Load() {
 					msgs := drainLogs()
-					status := createStatusFromStats(ctx, startTime, msgs)
+					status, curChecking := createStatusFromStats(ctx, startTime, msgs)
+
+					// Detect files that left the checking set → completed check
+					for name := range prevChecking {
+						if _, ok := curChecking[name]; !ok {
+							completedChecks = append(completedChecks, dto.FileTransferInfo{
+								Name:     name,
+								Status:   "checked",
+								Progress: 100,
+							})
+						}
+					}
+					prevChecking = curChecking
+
+					// Bound the accumulator
+					if len(completedChecks) > maxCompletedChecks {
+						completedChecks = completedChecks[len(completedChecks)-maxCompletedChecks:]
+					}
+
+					// Inject accumulated completed checks (skip duplicates already in list)
+					existingNames := make(map[string]struct{}, len(status.Transfers))
+					for _, ft := range status.Transfers {
+						existingNames[ft.Name] = struct{}{}
+					}
+					for _, cc := range completedChecks {
+						if _, exists := existingNames[cc.Name]; !exists {
+							status.Transfers = append(status.Transfers, cc)
+						}
+					}
+
 					safeSend(status)
 				}
 			case <-stopCh:
@@ -333,7 +462,7 @@ func startProgress(ctx context.Context, outStatus chan *dto.SyncStatusDTO) func(
 		// 5. Emit one final DTO with any remaining accumulated messages
 		remaining := drainLogs()
 		if len(remaining) > 0 {
-			finalStatus := createStatusFromStats(ctx, startTime, remaining)
+			finalStatus, _ := createStatusFromStats(ctx, startTime, remaining)
 			// Direct send (non-blocking) — channel might be full
 			select {
 			case outStatus <- finalStatus:

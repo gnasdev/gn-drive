@@ -16,7 +16,6 @@ export interface SyncConfig {
   bandwidth?: number; // MB/s
   multiThreadStreams?: number;
   bufferSize?: string; // e.g., "16M"
-  fastList?: boolean;
   retries?: number;
   lowLevelRetries?: number;
   maxDuration?: string; // e.g., "1h30m"

@@ -153,12 +153,6 @@ interface PathEntry {
           </div>
           <div class="grid grid-cols-2 gap-3 mt-2">
             <neo-toggle
-              [(ngModel)]="config.fastList"
-              (ngModelChange)="onConfigChange()"
-              label="Fast List"
-              [disabled]="disabled"
-            ></neo-toggle>
-            <neo-toggle
               [(ngModel)]="config.checkFirst"
               (ngModelChange)="onConfigChange()"
               label="Check First"
@@ -700,6 +694,20 @@ export class OperationSettingsPanelComponent implements OnInit {
   }
 
   onConfigChange(): void {
+    // Coerce numeric fields — neo-input type="number" emits strings
+    const numericFields: (keyof SyncConfig)[] = [
+      'parallel', 'bandwidth', 'multiThreadStreams', 'retries',
+      'lowLevelRetries', 'tpsLimit', 'maxDelete', 'maxDepth',
+    ];
+    for (const field of numericFields) {
+      const val = this.config[field];
+      if (val === '' || val === undefined || val === null) {
+        delete this.config[field];
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.config as any)[field] = Number(val);
+      }
+    }
     this.configChange.emit({ ...this.config });
   }
 

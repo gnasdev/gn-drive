@@ -289,15 +289,15 @@ func (c *ConfigService) saveProfileToDB(p models.Profile) error {
 	_, err = db.Exec(`INSERT OR REPLACE INTO profiles (name, from_path, to_path, included_paths, excluded_paths,
 		bandwidth, parallel, backup_path, cache_path, min_size, max_size, filter_from_file,
 		exclude_if_present, use_regex, max_delete, immutable, conflict_resolution,
-		multi_thread_streams, buffer_size, fast_list, retries, low_level_retries, max_duration)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		multi_thread_streams, buffer_size, retries, low_level_retries, max_duration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.Name, p.From, p.To,
 		marshalStringSlice(p.IncludedPaths), marshalStringSlice(p.ExcludedPaths),
 		p.Bandwidth, p.Parallel, p.BackupPath, p.CachePath,
 		p.MinSize, p.MaxSize, p.FilterFromFile, p.ExcludeIfPresent,
 		boolToInt(p.UseRegex), intPtrToNullable(p.MaxDelete), boolToInt(p.Immutable),
 		p.ConflictResolution, intPtrToNullable(p.MultiThreadStreams),
-		p.BufferSize, boolToInt(p.FastList),
+		p.BufferSize,
 		intPtrToNullable(p.Retries), intPtrToNullable(p.LowLevelRetries), p.MaxDuration)
 	return err
 }
@@ -322,7 +322,7 @@ func (c *ConfigService) loadProfilesFromDB() ([]models.Profile, error) {
 	rows, err := db.Query(`SELECT name, from_path, to_path, included_paths, excluded_paths,
 		bandwidth, parallel, backup_path, cache_path, min_size, max_size, filter_from_file,
 		exclude_if_present, use_regex, max_delete, immutable, conflict_resolution,
-		multi_thread_streams, buffer_size, fast_list, retries, low_level_retries, max_duration
+		multi_thread_streams, buffer_size, retries, low_level_retries, max_duration
 		FROM profiles ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -333,14 +333,14 @@ func (c *ConfigService) loadProfilesFromDB() ([]models.Profile, error) {
 	for rows.Next() {
 		var p models.Profile
 		var includedPaths, excludedPaths string
-		var useRegex, immutable, fastList int
+		var useRegex, immutable int
 		var maxDelete, multiThreadStreams, retries, lowLevelRetries *int
 
 		if err := rows.Scan(&p.Name, &p.From, &p.To, &includedPaths, &excludedPaths,
 			&p.Bandwidth, &p.Parallel, &p.BackupPath, &p.CachePath,
 			&p.MinSize, &p.MaxSize, &p.FilterFromFile, &p.ExcludeIfPresent,
 			&useRegex, &maxDelete, &immutable, &p.ConflictResolution,
-			&multiThreadStreams, &p.BufferSize, &fastList,
+			&multiThreadStreams, &p.BufferSize,
 			&retries, &lowLevelRetries, &p.MaxDuration); err != nil {
 			return nil, fmt.Errorf("failed to scan profile: %w", err)
 		}
@@ -349,7 +349,6 @@ func (c *ConfigService) loadProfilesFromDB() ([]models.Profile, error) {
 		p.ExcludedPaths = unmarshalStringSlice(excludedPaths)
 		p.UseRegex = useRegex != 0
 		p.Immutable = immutable != 0
-		p.FastList = fastList != 0
 		p.MaxDelete = maxDelete
 		p.MultiThreadStreams = multiThreadStreams
 		p.Retries = retries

@@ -19,7 +19,7 @@ import (
 func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
-	fsConfig.Checkers = profile.Parallel
+	fsConfig.Checkers = profile.Parallel * 2
 
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
@@ -51,7 +51,7 @@ func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, o
 func Move(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
 	fsConfig := fs.GetConfig(ctx)
 	fsConfig.Transfers = profile.Parallel
-	fsConfig.Checkers = profile.Parallel
+	fsConfig.Checkers = profile.Parallel * 2
 
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {

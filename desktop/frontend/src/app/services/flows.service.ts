@@ -487,6 +487,21 @@ export class FlowsService implements OnDestroy {
               ? op.status
               : ('idle' as const),
       }));
+
+      // Mark in-progress transfers as failed in the cancelled operation's syncStatus
+      const cancelledOp = flow.operations[this.executingOperationIndex];
+      if (cancelledOp?.syncStatus?.transfers) {
+        const updatedTransfers = cancelledOp.syncStatus.transfers.map(t =>
+          t.status === 'transferring' || t.status === 'checking'
+            ? { ...t, status: 'failed' as const, error: 'Cancelled' }
+            : t
+        );
+        ops[this.executingOperationIndex] = {
+          ...ops[this.executingOperationIndex],
+          syncStatus: { ...cancelledOp.syncStatus, status: 'stopped' as const, transfers: updatedTransfers },
+        };
+      }
+
       this.updateFlowOperations(flowId, ops as Operation[]);
       this.updateFlow(flowId, { status: 'cancelled' });
     }
@@ -654,12 +669,11 @@ export class FlowsService implements OnDestroy {
 
   private syncConfigToProfile(sc: SyncConfig): models.Profile {
     const p = new models.Profile();
-    // Performance
-    p.parallel = sc.parallel || 0;
+    // Performance (apply UI placeholder defaults for critical fields)
+    p.parallel = sc.parallel || 8;
     p.bandwidth = sc.bandwidth || 0;
     if (sc.multiThreadStreams) p.multi_thread_streams = sc.multiThreadStreams;
     if (sc.bufferSize) p.buffer_size = sc.bufferSize;
-    if (sc.fastList) p.fast_list = true;
     if (sc.retries) p.retries = sc.retries;
     if (sc.lowLevelRetries) p.low_level_retries = sc.lowLevelRetries;
     if (sc.maxDuration) p.max_duration = sc.maxDuration;
@@ -715,7 +729,6 @@ export class FlowsService implements OnDestroy {
     if (p.bandwidth) sc.bandwidth = p.bandwidth;
     if (p.multi_thread_streams) sc.multiThreadStreams = p.multi_thread_streams;
     if (p.buffer_size) sc.bufferSize = p.buffer_size;
-    if (p.fast_list) sc.fastList = true;
     if (p.retries) sc.retries = p.retries;
     if (p.low_level_retries) sc.lowLevelRetries = p.low_level_retries;
     if (p.max_duration) sc.maxDuration = p.max_duration;
@@ -819,6 +832,7 @@ export class FlowsService implements OnDestroy {
       current_file: event.current_file || '',
       errors: event.errors || 0,
       checks: event.checks || 0,
+      total_checks: event.total_checks || 0,
       deletes: event.deletes || 0,
       renames: event.renames || 0,
       timestamp: event.timestamp || new Date().toISOString(),

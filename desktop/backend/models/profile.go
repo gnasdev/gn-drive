@@ -35,7 +35,6 @@ type Profile struct {
 	// Performance
 	MultiThreadStreams *int     `json:"multi_thread_streams,omitempty"` // concurrent streams per file transfer
 	BufferSize         string   `json:"buffer_size,omitempty"`          // in-memory buffer per transfer e.g. "16M","64M"
-	FastList           bool     `json:"fast_list,omitempty"`            // use recursive list (fewer API calls, more memory)
 	Retries            *int     `json:"retries,omitempty"`              // number of retries on failure
 	LowLevelRetries    *int     `json:"low_level_retries,omitempty"`    // protocol-level retries
 	MaxDuration        string   `json:"max_duration,omitempty"`         // max operation time e.g. "1h30m"

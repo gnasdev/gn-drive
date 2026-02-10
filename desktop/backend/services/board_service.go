@@ -4,6 +4,7 @@ import (
 	"context"
 	"desktop/backend/events"
 	"desktop/backend/models"
+	"desktop/backend/rclone"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -621,6 +622,10 @@ func (b *BoardService) executeEdge(ctx context.Context, board *models.Board, edg
 	b.updateEdgeStatusWithTime(flow.Status, edge.Id, "running", "", &startTime, nil)
 	flow.StatusMu.Unlock()
 	b.emitBoardEvent(events.BoardExecutionProgress, board.Id, edge.Id, "running", fmt.Sprintf("Syncing %s -> %s", sourceNode.Label, targetNode.Label))
+
+	// Clear caches before sync to ensure fresh state
+	rclone.ClearFsCache()
+	rclone.ClearStatsCache()
 
 	// Start sync via SyncService
 	// Use IDs directly since they already have "board-" and "edge-" prefixes
