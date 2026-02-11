@@ -33,9 +33,14 @@ Services are organized by business domain with clear responsibilities.
 - Support for operation cancellation
 - Window-aware operations
 
+### 4. 2-Phase Initialization
+
+- **Phase 1** (ServiceStartup): Set up working directory, env config, event channel
+- **Phase 2** (CompleteInitialization): Load profiles, rclone config — deferred until after auth unlock
+
 ## Service Architecture
 
-NS-Drive has 12+ domain-separated services registered in `main.go`:
+NS-Drive has 17 domain-separated services registered in `main.go`:
 
 ### Core Services
 
@@ -75,7 +80,7 @@ WaitForTask(ctx context.Context, taskId int) error
 **Responsibilities:**
 - Manage application configuration and working directory
 - CRUD operations for profiles
-- Load and save profiles to JSON file
+- Load and save profiles
 - Configuration initialization and validation
 
 **Key Methods:**
@@ -85,7 +90,6 @@ GetProfiles(ctx context.Context) ([]models.Profile, error)
 AddProfile(ctx context.Context, profile models.Profile) error
 UpdateProfile(ctx context.Context, profile models.Profile) error
 DeleteProfile(ctx context.Context, profileName string) error
-SaveProfiles(ctx context.Context) error
 ```
 
 **Events Emitted:**
@@ -132,15 +136,16 @@ TestRemote(ctx context.Context, name string) error
 **Key Methods:**
 ```go
 CreateTab(ctx context.Context, name string) (*Tab, error)
-GetTab(ctx context.Context, id string) (*Tab, error)
+GetTab(ctx context.Context, tabId string) (*Tab, error)
 GetAllTabs(ctx context.Context) (map[string]*Tab, error)
-UpdateTab(ctx context.Context, id string, updates map[string]interface{}) error
-RenameTab(ctx context.Context, id string, name string) error
-SetTabProfile(ctx context.Context, id string, profile models.Profile) error
-AddTabOutput(ctx context.Context, id string, output string) error
-ClearTabOutput(ctx context.Context, id string) error
-SetTabState(ctx context.Context, id string, state TabState) error
-DeleteTab(ctx context.Context, id string) error
+UpdateTab(ctx context.Context, tabId string, updates map[string]interface{}) error
+RenameTab(ctx context.Context, tabId, newName string) error
+SetTabProfile(ctx context.Context, tabId string, profile *models.Profile) error
+AddTabOutput(ctx context.Context, tabId string, output string) error
+ClearTabOutput(ctx context.Context, tabId string) error
+SetTabState(ctx context.Context, tabId string, state TabState) error
+SetTabError(ctx context.Context, tabId string, errorMsg string) error
+DeleteTab(ctx context.Context, tabId string) error
 ```
 
 **Tab States:**
@@ -178,17 +183,6 @@ EnableSchedule(ctx context.Context, id string) error
 DisableSchedule(ctx context.Context, id string) error
 ```
 
-**Storage:** `~/.config/ns-drive/schedules.json`
-
-**Schedule Entry Fields:**
-- `Id` - Unique identifier
-- `ProfileName` - Associated profile
-- `Action` - Sync action (pull/push/bi/bi-resync/copy/move)
-- `CronExpr` - Cron expression
-- `Enabled` - Whether schedule is active
-- `LastRun` / `NextRun` - Timestamps
-- `LastResult` - success/failed/cancelled
-
 ---
 
 #### HistoryService (`desktop/backend/services/history_service.go`)
@@ -203,20 +197,9 @@ DisableSchedule(ctx context.Context, id string) error
 AddEntry(ctx context.Context, entry models.HistoryEntry) error
 GetHistory(ctx context.Context, limit, offset int) ([]models.HistoryEntry, error)
 GetHistoryForProfile(ctx context.Context, profileName string) ([]models.HistoryEntry, error)
-GetStats(ctx context.Context) (*HistoryStats, error)
+GetStats(ctx context.Context) (*models.AggregateStats, error)
 ClearHistory(ctx context.Context) error
 ```
-
-**Storage:** `~/.config/ns-drive/history.json`
-
-**History Entry Fields:**
-- `Id` - Unique identifier
-- `Timestamp` - Operation time
-- `ProfileName` - Associated profile
-- `Action` - Sync action performed
-- `Status` - success/failed/cancelled
-- `BytesTransferred` - Data transferred
-- `Message` - Result message
 
 ---
 
@@ -230,80 +213,77 @@ ClearHistory(ctx context.Context) error
 - Topological sort for execution order
 - Cycle detection
 
-**Key Entities:**
-```go
-type BoardNode struct {
-    Id         string
-    RemoteName string
-    Path       string
-    Label      string
-    X, Y       float64  // Canvas coordinates
-}
-
-type BoardEdge struct {
-    Id         string
-    SourceId   string
-    TargetId   string
-    Action     string  // pull/push/bi/bi-resync
-    SyncConfig *Profile
-}
-
-type Board struct {
-    Id          string
-    Name        string
-    Description string
-    Nodes       []BoardNode
-    Edges       []BoardEdge
-    CreatedAt   time.Time
-    UpdatedAt   time.Time
-}
-```
-
 **Key Methods:**
 ```go
 GetBoards(ctx context.Context) ([]models.Board, error)
+GetBoard(ctx context.Context, boardId string) (*models.Board, error)
 AddBoard(ctx context.Context, board models.Board) error
 UpdateBoard(ctx context.Context, board models.Board) error
 DeleteBoard(ctx context.Context, id string) error
-ExecuteBoard(ctx context.Context, id string) error
+ExecuteBoard(ctx context.Context, id string) (*models.BoardExecutionStatus, error)
 StopBoardExecution(ctx context.Context, id string) error
-GetBoardExecutionStatus(ctx context.Context, id string) (*BoardExecutionStatus, error)
+GetBoardExecutionStatus(ctx context.Context, id string) (*models.BoardExecutionStatus, error)
+GetExecutionLogs(ctx context.Context) []string
+ClearExecutionLogs(ctx context.Context)
+OnRemoteDeleted(remoteName string) error
 ```
-
-**Storage:** `~/.config/ns-drive/boards.json`
 
 **Execution Features:**
 - Topological sort for dependency resolution
 - Cycle detection to prevent infinite loops
 - Parallel edge execution where possible
 - Status tracking per edge
+- Execution log capture
+
+---
+
+#### FlowService (`desktop/backend/services/flow_service.go`)
+
+**Responsibilities:**
+- Manage flows (named groups of sync operations)
+- Persist flows to database
+- Handle remote deletion cascade
+
+**Key Methods:**
+```go
+GetFlows(ctx context.Context) ([]models.Flow, error)
+SaveFlows(ctx context.Context, flows []models.Flow) error
+OnRemoteDeleted(ctx context.Context, remoteName string) error
+```
+
+**Flow Structure:**
+- Each flow contains multiple operations (source → target sync pairs)
+- Operations reference remotes and can have individual sync configs
+- Flows support scheduling via cron expressions
 
 ---
 
 #### OperationService (`desktop/backend/services/operation_service.go`)
 
 **Responsibilities:**
-- File operations beyond sync
+- File operations beyond sync (copy, move, check, dry-run)
 - Remote file browsing
 - Storage information
 
 **Key Methods:**
 ```go
-// File operations
-Copy(ctx context.Context, source, dest string) error
-Move(ctx context.Context, source, dest string) error
-Check(ctx context.Context, source, dest string) error
-DryRun(ctx context.Context, action string, profile models.Profile) (string, error)
+// File operations (return task IDs)
+Copy(ctx context.Context, profile models.Profile, tabId string) (int, error)
+Move(ctx context.Context, profile models.Profile, tabId string) (int, error)
+CheckFiles(ctx context.Context, profile models.Profile, tabId string) (int, error)
+DryRun(ctx context.Context, action string, profile models.Profile, tabId string) (int, error)
+StopOperation(ctx context.Context, taskId int) error
+GetActiveTasks(ctx context.Context) (map[int]*OperationTask, error)
 
 // File browsing
-ListFiles(ctx context.Context, remote, path string) ([]FileEntry, error)
-DeleteFile(ctx context.Context, remote, path string) error
-PurgeDir(ctx context.Context, remote, path string) error
-MakeDir(ctx context.Context, remote, path string) error
+ListFiles(ctx context.Context, remotePath string, recursive bool) ([]models.FileEntry, error)
+DeleteFile(ctx context.Context, remotePath string) error
+PurgeDir(ctx context.Context, remotePath string) error
+MakeDir(ctx context.Context, remotePath string) error
 
 // Storage info
-GetAbout(ctx context.Context, remote string) (*QuotaInfo, error)
-GetSize(ctx context.Context, remote, path string) (int64, error)
+GetAbout(ctx context.Context, remoteName string) (*models.QuotaInfo, error)
+GetSize(ctx context.Context, remotePath string) (int64, int64, error)
 ```
 
 ---
@@ -316,7 +296,7 @@ GetSize(ctx context.Context, remote, path string) (int64, error)
 
 **Key Methods:**
 ```go
-CreateCryptRemote(ctx context.Context, name, underlying, password, salt string) error
+CreateCryptRemote(ctx context.Context, cfg CryptRemoteConfig) error
 DeleteCryptRemote(ctx context.Context, name string) error
 ListCryptRemotes(ctx context.Context) ([]string, error)
 ```
@@ -345,7 +325,7 @@ Lock(ctx context.Context) error
 ChangePassword(ctx context.Context, oldPassword, newPassword string) error
 RemovePassword(ctx context.Context, password string) error
 GetLockoutStatus(ctx context.Context) LockoutStatus
-GetPreUnlockSettings() PreUnlockSettings
+GetPreUnlockSettings() AppSettings
 SyncAppSettings(settings AppSettings)
 ```
 
@@ -370,15 +350,13 @@ SyncAppSettings(settings AppSettings)
 
 **Responsibilities:**
 - System tray integration
-- Tray menu with board shortcuts
+- Tray menu with board and flow shortcuts
 - Minimize to tray functionality
 
 **Key Methods:**
 ```go
 Initialize() error
-RefreshMenu() error
-executeBoard(id string) error
-showWindow() error
+RefreshMenu()
 ```
 
 ---
@@ -386,23 +364,36 @@ showWindow() error
 #### NotificationService (`desktop/backend/services/notification_service.go`)
 
 **Responsibilities:**
-- Desktop notifications
-- App settings management
+- Desktop notifications (native macOS via UNUserNotificationCenter)
+- App settings management and persistence
 
 **Key Methods:**
 ```go
 SendNotification(ctx context.Context, title, body string) error
-SetEnabled(ctx context.Context, enabled bool) error
-SetMinimizeToTray(ctx context.Context, enabled bool) error
+SetEnabled(ctx context.Context, enabled bool)
+IsEnabled(ctx context.Context) bool
+SetDebugMode(ctx context.Context, enabled bool)
+IsDebugMode(ctx context.Context) bool
+SetMinimizeToTray(ctx context.Context, enabled bool)
+IsMinimizeToTray(ctx context.Context) bool
+SetMinimizeToTrayOnStartup(ctx context.Context, enabled bool)
+IsMinimizeToTrayOnStartup(ctx context.Context) bool
 SetStartAtLogin(ctx context.Context, enabled bool) error
-GetSettings(ctx context.Context) (*AppSettings, error)
+IsStartAtLogin(ctx context.Context) bool
+GetSettings(ctx context.Context) AppSettings
+LoadSettings()
 ```
 
 **App Settings:**
-- `NotificationsEnabled` - Show desktop notifications
-- `MinimizeToTray` - Minimize to system tray instead of closing
-- `StartAtLogin` - Launch app at system startup
-- `DebugMode` - Enable debug logging
+```go
+type AppSettings struct {
+    NotificationsEnabled    bool `json:"notifications_enabled"`
+    DebugMode               bool `json:"debug_mode"`
+    MinimizeToTray          bool `json:"minimize_to_tray"`
+    StartAtLogin            bool `json:"start_at_login"`
+    MinimizeToTrayOnStartup bool `json:"minimize_to_tray_on_startup"`
+}
+```
 
 ---
 
@@ -415,12 +406,13 @@ GetSettings(ctx context.Context) (*AppSettings, error)
 
 **Key Methods:**
 ```go
-Log(tabId, message string, level LogLevel) error
-LogSync(tabId, action, status, message string) error
-GetLogsSince(ctx context.Context, tabId string, afterSeqNo int64) ([]LogEntry, error)
+Log(tabId, message, level string) uint64
+LogSync(tabId, action, status, message string) uint64
+GetLogsSince(ctx context.Context, tabId string, afterSeqNo uint64) ([]LogEntry, error)
 GetLatestLogs(ctx context.Context, tabId string, count int) ([]LogEntry, error)
-GetCurrentSeqNo(ctx context.Context) (int64, error)
+GetCurrentSeqNo(ctx context.Context) (uint64, error)
 ClearLogs(ctx context.Context, tabId string) error
+GetBufferSize(ctx context.Context) (int, error)
 ```
 
 **Log Levels:** debug, info, warning, error
@@ -436,132 +428,85 @@ ClearLogs(ctx context.Context, tabId string) error
 #### ExportService (`desktop/backend/services/export_service.go`)
 
 **Responsibilities:**
-- Configuration backup
-- Selective export (profiles, remotes, boards)
-- Optional token inclusion
+- Configuration backup to binary `.nsd` format
+- Selective export (boards, remotes, settings)
+- Optional token exclusion
+- Optional password encryption (AES-256-GCM)
 
 **Key Methods:**
 ```go
-GetExportPreview(ctx context.Context, options ExportOptions) (*ExportPreview, error)
+GetExportPreview(ctx context.Context, options ExportOptions) (*ExportManifest, error)
 ExportToBytes(ctx context.Context, options ExportOptions) ([]byte, error)
 ExportToFile(ctx context.Context, path string, options ExportOptions) error
-ExportWithDialog(ctx context.Context, options ExportOptions) error
+SelectExportFile(ctx context.Context) (string, error)
+ExportWithDialog(ctx context.Context, options ExportOptions) (string, error)
 ```
 
 **Export Options:**
-- `IncludeProfiles` - Export profiles
-- `IncludeRemotes` - Export remotes
 - `IncludeBoards` - Export boards
-- `IncludeTokens` - Include OAuth tokens (security risk)
+- `IncludeRemotes` - Export remotes
+- `IncludeSettings` - Export app settings
+- `ExcludeTokens` - Exclude OAuth tokens from remotes
+- `EncryptPassword` - Encrypt the export file with a password
 
 ---
 
 #### ImportService (`desktop/backend/services/import_service.go`)
 
 **Responsibilities:**
-- Configuration restore
-- Merge vs replace modes
-- Validation before import
+- Configuration restore from `.nsd` files
+- Overwrite vs merge modes
+- Encrypted import support
+- Validation and preview before import
 
 **Key Methods:**
 ```go
-ValidateImportFile(ctx context.Context, path string) (*ImportValidation, error)
-ImportFromFile(ctx context.Context, path string, options ImportOptions) (*ImportResult, error)
-PreviewWithDialog(ctx context.Context) (*ImportPreview, error)
+ValidateImportFile(ctx context.Context, filePath string) (*ImportPreview, error)
+ValidateImportFileWithPassword(ctx context.Context, filePath, password string) (*ImportPreview, error)
+ImportFromFile(ctx context.Context, filePath string, options ImportOptions) (*ImportResult, error)
+ImportFromBytes(ctx context.Context, data []byte, options ImportOptions) (*ImportResult, error)
+SelectImportFile(ctx context.Context) (string, error)
+PreviewWithDialog(ctx context.Context) (*ImportPreview, string, error)
+ImportWithDialog(ctx context.Context, options ImportOptions) (*ImportResult, error)
 ```
 
 **Import Options:**
-- `MergeProfiles` - Merge or replace existing profiles
-- `MergeRemotes` - Merge or replace existing remotes
-- `MergeBoards` - Merge or replace existing boards
+- `OverwriteBoards` - Overwrite existing boards with same name
+- `OverwriteRemotes` - Overwrite existing remotes with same name
+- `MergeMode` - Add new items only, skip existing
+- `Password` - Password for encrypted backups
 
 ---
 
-## Data Models
+## Data Storage
 
-All models located in `desktop/backend/models/`:
+### SQLite Database (`ns-drive.db`)
 
-### Profile
-```go
-type Profile struct {
-    Name          string   `json:"name"`
-    From          string   `json:"from"`           // source remote:path
-    To            string   `json:"to"`             // destination remote:path
-    IncludedPaths []string `json:"included_paths"` // Include patterns
-    ExcludedPaths []string `json:"excluded_paths"` // Exclude patterns
-    Bandwidth     int      `json:"bandwidth"`      // MB/s limit
-    Parallel      int      `json:"parallel"`       // Concurrent transfers
-}
-```
+Primary data store for all application data:
+- Profiles
+- Boards
+- Flows and operations
+- Schedules
+- History entries
+- App settings
 
-### ScheduleEntry
-```go
-type ScheduleEntry struct {
-    Id          string     `json:"id"`
-    ProfileName string     `json:"profile_name"`
-    Action      string     `json:"action"`
-    CronExpr    string     `json:"cron_expr"`
-    Enabled     bool       `json:"enabled"`
-    LastRun     *time.Time `json:"last_run"`
-    NextRun     *time.Time `json:"next_run"`
-    LastResult  string     `json:"last_result"`
-}
-```
+Managed by `db.go` with shared connection via `GetSharedDB()`, `InitDatabase()`, `CloseDatabase()`, `ResetSharedDB()`.
 
-### Board / BoardNode / BoardEdge
-```go
-type BoardNode struct {
-    Id         string  `json:"id"`
-    RemoteName string  `json:"remote_name"`
-    Path       string  `json:"path"`
-    Label      string  `json:"label"`
-    X          float64 `json:"x"`
-    Y          float64 `json:"y"`
-}
+### rclone Configuration (`rclone.conf`)
 
-type BoardEdge struct {
-    Id         string   `json:"id"`
-    SourceId   string   `json:"source_id"`
-    TargetId   string   `json:"target_id"`
-    Action     string   `json:"action"`
-    SyncConfig *Profile `json:"sync_config"`
-}
+Standard rclone configuration format for remote storage backends.
 
-type Board struct {
-    Id          string      `json:"id"`
-    Name        string      `json:"name"`
-    Description string      `json:"description"`
-    Nodes       []BoardNode `json:"nodes"`
-    Edges       []BoardEdge `json:"edges"`
-    CreatedAt   time.Time   `json:"created_at"`
-    UpdatedAt   time.Time   `json:"updated_at"`
-}
-```
+### Auth Metadata (`auth.json`)
 
-### HistoryEntry
-```go
-type HistoryEntry struct {
-    Id               string    `json:"id"`
-    Timestamp        time.Time `json:"timestamp"`
-    ProfileName      string    `json:"profile_name"`
-    Action           string    `json:"action"`
-    Status           string    `json:"status"`
-    BytesTransferred int64     `json:"bytes_transferred"`
-    Message          string    `json:"message"`
-}
-```
+Stores password hash, rate limiting state, and pre-unlock app settings. Always unencrypted.
 
-### FileEntry
-```go
-type FileEntry struct {
-    Name    string    `json:"name"`
-    Path    string    `json:"path"`
-    Type    string    `json:"type"`  // file or dir
-    Size    int64     `json:"size"`
-    ModTime time.Time `json:"mod_time"`
-    IsDir   bool      `json:"is_dir"`
-}
-```
+### Configuration Locations
+
+| File | Purpose |
+|------|---------|
+| `~/.config/ns-drive/rclone.conf` | Rclone remotes (encrypted when locked) |
+| `~/.config/ns-drive/ns-drive.db` | SQLite database (encrypted when locked) |
+| `~/.config/ns-drive/auth.json` | Auth metadata and pre-unlock settings |
 
 ---
 
@@ -581,8 +526,11 @@ Format: `domain:action`
 | Remote | `remote:added`, `remote:updated`, `remote:deleted`, `remote:tested` |
 | Tab | `tab:created`, `tab:updated`, `tab:deleted`, `tab:output`, `tab:state_changed` |
 | Board | `board:created`, `board:updated`, `board:deleted`, `board:execution_status` |
+| Operation | `operation:started`, `operation:completed`, `operation:failed` |
 | Log | `log:message`, `sync:event` |
 | Error | `error:occurred` |
+
+> See [EVENTS.md](EVENTS.md) for detailed event documentation.
 
 ---
 
@@ -602,13 +550,16 @@ import * as models from "../../wailsjs/desktop/backend/models/models";
 ```typescript
 import { Events } from "@wailsio/runtime";
 
-Events.On("sync:progress", (event) => {
-    console.log("Sync progress:", event.data);
+// All structured events flow through "tofe" channel
+Events.On("tofe", (event) => {
+    const parsedEvent = parseEvent(event.data);
+    if (isSyncEvent(parsedEvent)) { ... }
+    if (isConfigEvent(parsedEvent)) { ... }
 });
 
-Events.On("board:execution_status", (event) => {
-    // Update board execution UI
-});
+// Auth events also use the tofe channel
+Events.On("auth:unlocked", () => { ... });
+Events.On("auth:locked", () => { ... });
 ```
 
 ---
@@ -621,34 +572,20 @@ Events.On("board:execution_status", (event) => {
 |-----------|---------|
 | `board/` | Visual workflow editor with drag-drop canvas |
 | `remotes/` | Remote storage management UI |
-| `settings/` | App settings (notifications, tray, login) |
-| `components/` | Shared components (sidebar, toast, dialog) |
+| `settings/` | App settings (notifications, tray, login, security) |
+| `components/` | Shared components (sidebar, toast, dialog, unlock-screen) |
 
 ### Services
 
 | Service | Purpose |
 |---------|---------|
-| `app.service.ts` | Backend communication |
+| `app.service.ts` | Backend communication, event routing |
 | `auth.service.ts` | Auth state management (lock/unlock) |
 | `tab.service.ts` | Tab state management |
-| `log-consumer.service.ts` | Log event consumption |
+| `log-consumer.service.ts` | Log event consumption with deduplication |
 | `theme.service.ts` | Dark/light theme |
 | `navigation.service.ts` | Route navigation |
-
----
-
-## Configuration Storage
-
-| File | Purpose |
-|------|---------|
-| `~/.config/ns-drive/profiles.json` | Sync profiles |
-| `~/.config/ns-drive/rclone.conf` | Rclone remotes (encrypted when locked) |
-| `~/.config/ns-drive/ns-drive.db` | SQLite database (encrypted when locked) |
-| `~/.config/ns-drive/auth.json` | Auth metadata and pre-unlock settings |
-| `~/.config/ns-drive/schedules.json` | Scheduled tasks |
-| `~/.config/ns-drive/boards.json` | Workflow boards |
-| `~/.config/ns-drive/history.json` | Operation history |
-| `~/.config/ns-drive/app_settings.json` | App settings |
+| `error.service.ts` | Error handling and reporting |
 
 ---
 
@@ -658,8 +595,9 @@ Events.On("board:execution_status", (event) => {
 
 1. Create service in `desktop/backend/services/`
 2. Implement `SetApp()` for EventBus access
-3. Register service in `main.go`
-4. Generate bindings: `wails3 generate bindings`
+3. Implement `ServiceName()`, `ServiceStartup()`, `ServiceShutdown()`
+4. Register service in `main.go`
+5. Generate bindings: `wails3 generate bindings`
 
 ### Event Best Practices
 

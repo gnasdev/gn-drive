@@ -16,14 +16,19 @@ All events flow through the Wails `"tofe"` (to-frontend) event channel as JSON-s
 
 | Event Type | Description | Fields |
 |------------|-------------|--------|
-| `auth:unlocked` | App unlocked (password verified or no auth) | - |
-| `auth:locked` | App locked (user action or shutdown) | - |
+| `auth:unlocked` | App unlocked (password verified or no auth) | type, timestamp |
+| `auth:locked` | App locked (user action or shutdown) | type, timestamp |
 
-Auth events are emitted directly via `application.WailsEvent` (not through the EventBus `tofe` channel). Frontend listens with:
+Auth events are emitted through the EventBus `tofe` channel. Frontend auth service also listens directly on `auth:unlocked` and `auth:locked` as backup, but primary state management is via direct method call responses.
 
 ```typescript
-Events.On("auth:unlocked", () => { /* initialize app */ });
-Events.On("auth:locked", () => { /* show lock screen */ });
+// Primary: state updated after method call
+await Unlock(password);
+this.isLocked$.next(false);
+
+// Backup: event listener
+Events.On("auth:unlocked", () => { this.isLocked$.next(false); });
+Events.On("auth:locked", () => { this.isLocked$.next(true); });
 ```
 
 ---
@@ -33,16 +38,34 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 | Event Type | Description | Fields |
 |------------|-------------|--------|
 | `sync:started` | Sync operation started | tabId, action, status, message |
-| `sync:progress` | Sync progress update | tabId, action, progress, status, message |
+| `sync:progress` | Sync progress update | tabId, action, progress, status, message, seqNo |
 | `sync:completed` | Sync completed successfully | tabId, action, status, message |
 | `sync:failed` | Sync failed with error | tabId, action, status, message |
 | `sync:cancelled` | Sync was cancelled | tabId, action, status, message |
+
+**Progress Data:**
+```go
+type SyncProgressData struct {
+    TransferredBytes int64  `json:"transferredBytes"`
+    TotalBytes       int64  `json:"totalBytes"`
+    TransferredFiles int    `json:"transferredFiles"`
+    TotalFiles       int    `json:"totalFiles"`
+    CurrentFile      string `json:"currentFile"`
+    Speed            string `json:"speed"`
+    ETA              string `json:"eta"`
+    Errors           int    `json:"errors"`
+    Checks           int    `json:"checks"`
+    Deletes          int    `json:"deletes"`
+    Renames          int    `json:"renames"`
+    ElapsedTime      string `json:"elapsedTime"`
+}
+```
 
 **Example Payload:**
 ```json
 {
     "type": "sync:started",
-    "timestamp": "2024-01-15T10:30:00Z",
+    "timestamp": "2026-02-09T10:30:00Z",
     "tabId": "tab_abc123_1705312200000",
     "action": "pull",
     "status": "starting",
@@ -65,7 +88,7 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 ```json
 {
     "type": "profile:added",
-    "timestamp": "2024-01-15T10:30:00Z",
+    "timestamp": "2026-02-09T10:30:00Z",
     "profileId": "my-backup",
     "data": {
         "name": "my-backup",
@@ -108,31 +131,29 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 | `board:created` | New board created | boardId, data |
 | `board:updated` | Board modified | boardId, data |
 | `board:deleted` | Board removed | boardId |
-| `board:execution_status` | Execution status update | boardId, status, edgeStatuses |
+| `board:execution_status` | Execution status update | boardId, status, edgeId, message |
 
 **Example Execution Status Payload:**
 ```json
 {
     "type": "board:execution_status",
-    "timestamp": "2024-01-15T10:30:00Z",
+    "timestamp": "2026-02-09T10:30:00Z",
     "boardId": "board-123",
     "status": "running",
-    "edgeStatuses": [
-        {
-            "edgeId": "edge-1",
-            "status": "completed",
-            "startTime": "2024-01-15T10:30:00Z",
-            "endTime": "2024-01-15T10:31:00Z"
-        },
-        {
-            "edgeId": "edge-2",
-            "status": "running",
-            "startTime": "2024-01-15T10:31:00Z"
-        }
-    ],
-    "startTime": "2024-01-15T10:30:00Z"
+    "edgeId": "edge-1",
+    "message": "Syncing edge-1"
 }
 ```
+
+---
+
+### Operation Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `operation:started` | File operation started | tabId, operation, status, message |
+| `operation:completed` | File operation completed | tabId, operation, status, message |
+| `operation:failed` | File operation failed | tabId, operation, status, message |
 
 ---
 
@@ -157,6 +178,15 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 
 ---
 
+### Crypt Events
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `crypt:created` | Crypt remote created | remoteName |
+| `crypt:deleted` | Crypt remote deleted | remoteName |
+
+---
+
 ### Log Events
 
 | Event Type | Description | Fields |
@@ -168,7 +198,7 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 ```json
 {
     "type": "log:message",
-    "timestamp": "2024-01-15T10:30:00Z",
+    "timestamp": 1705312200000,
     "tabId": "tab_abc123",
     "seqNo": 42,
     "message": "Transferred: 100 MB / 1 GB",
@@ -190,7 +220,7 @@ Events.On("auth:locked", () => { /* show lock screen */ });
 ```json
 {
     "type": "error:occurred",
-    "timestamp": "2024-01-15T10:30:00Z",
+    "timestamp": "2026-02-09T10:30:00Z",
     "code": "SYNC_ERROR",
     "message": "Failed to connect to remote",
     "details": "network timeout after 30s",
@@ -236,6 +266,83 @@ For backward compatibility, legacy command events are also supported:
 
 ## Backend Usage
 
+### Event Types (Go)
+
+```go
+// events/types.go
+type EventType string
+
+type BaseEvent struct {
+    Type      EventType   `json:"type"`
+    Timestamp time.Time   `json:"timestamp"`
+    Data      interface{} `json:"data"`
+}
+
+type SyncEvent struct {
+    BaseEvent
+    TabId    string `json:"tabId,omitempty"`
+    Action   string `json:"action"`
+    Progress int    `json:"progress,omitempty"`
+    Status   string `json:"status"`
+    Message  string `json:"message,omitempty"`
+    SeqNo    uint64 `json:"seqNo,omitempty"`
+}
+
+type ConfigEvent struct {
+    BaseEvent
+    ProfileId string `json:"profileId,omitempty"`
+}
+
+type RemoteEvent struct {
+    BaseEvent
+    RemoteName string `json:"remoteName,omitempty"`
+}
+
+type TabEvent struct {
+    BaseEvent
+    TabId   string `json:"tabId"`
+    TabName string `json:"tabName,omitempty"`
+}
+
+type BoardEvent struct {
+    BaseEvent
+    BoardId string `json:"boardId"`
+    EdgeId  string `json:"edgeId,omitempty"`
+    Status  string `json:"status"`
+    Message string `json:"message,omitempty"`
+}
+
+type OperationEvent struct {
+    BaseEvent
+    TabId     string `json:"tabId,omitempty"`
+    Operation string `json:"operation"`
+    Status    string `json:"status"`
+    Message   string `json:"message,omitempty"`
+}
+
+type ScheduleEvent struct {
+    BaseEvent
+    ScheduleId string `json:"scheduleId"`
+}
+
+type HistoryEvent struct {
+    BaseEvent
+}
+
+type CryptEvent struct {
+    BaseEvent
+    RemoteName string `json:"remoteName"`
+}
+
+type ErrorEvent struct {
+    BaseEvent
+    Code    string `json:"code"`
+    Message string `json:"message"`
+    Details string `json:"details,omitempty"`
+    TabId   string `json:"tabId,omitempty"`
+}
+```
+
 ### Emitting Events
 
 Use the EventBus for all event emission:
@@ -253,19 +360,6 @@ func (s *SyncService) emitSyncEvent(eventType events.EventType, tabId, action, s
 s.emitSyncEvent(events.SyncStarted, tabId, "pull", "starting", "Sync operation started")
 ```
 
-### Event Constructors
-
-```go
-// events/types.go
-func NewSyncEvent(eventType EventType, tabId, action, status, message string) *SyncEvent
-func NewConfigEvent(eventType EventType, profileId string, data interface{}) *ConfigEvent
-func NewRemoteEvent(eventType EventType, remoteName string, data interface{}) *RemoteEvent
-func NewTabEvent(eventType EventType, tabId, tabName string, data interface{}) *TabEvent
-func NewBoardEvent(eventType EventType, boardId string, data interface{}) *BoardEvent
-func NewErrorEvent(code, message, details, tabId string) *ErrorEvent
-func NewLogEvent(tabId string, seqNo int64, message string, level LogLevel) *LogEvent
-```
-
 ### EventBus Interface
 
 ```go
@@ -275,14 +369,17 @@ type EventBus interface {
     EmitWithType(eventType EventType, data interface{}) error
 }
 
-// Convenience methods
+// Convenience methods on WailsEventBus
 func (b *WailsEventBus) EmitSyncEvent(event *SyncEvent) error
 func (b *WailsEventBus) EmitConfigEvent(event *ConfigEvent) error
 func (b *WailsEventBus) EmitRemoteEvent(event *RemoteEvent) error
 func (b *WailsEventBus) EmitTabEvent(event *TabEvent) error
 func (b *WailsEventBus) EmitBoardEvent(event *BoardEvent) error
+func (b *WailsEventBus) EmitOperationEvent(event *OperationEvent) error
+func (b *WailsEventBus) EmitScheduleEvent(event *ScheduleEvent) error
+func (b *WailsEventBus) EmitHistoryEvent(event *HistoryEvent) error
+func (b *WailsEventBus) EmitCryptEvent(event *CryptEvent) error
 func (b *WailsEventBus) EmitErrorEvent(event *ErrorEvent) error
-func (b *WailsEventBus) EmitLogEvent(event *LogEvent) error
 ```
 
 ---
@@ -294,9 +391,9 @@ func (b *WailsEventBus) EmitLogEvent(event *LogEvent) error
 ```typescript
 // app.service.ts
 import { Events } from "@wailsio/runtime";
-import { parseEvent, isSyncEvent, isConfigEvent, isBoardEvent } from "./models/events";
+import { parseEvent, isSyncEvent, isConfigEvent, isErrorEvent, isLegacyCommandDTO } from "./models/events";
 
-// Set up listener
+// Set up listener on "tofe" channel
 this.eventCleanup = Events.On("tofe", (event) => {
     const parsedEvent = parseEvent(event.data);
 
@@ -304,10 +401,11 @@ this.eventCleanup = Events.On("tofe", (event) => {
         this.handleSyncEvent(parsedEvent);
     } else if (isConfigEvent(parsedEvent)) {
         this.handleConfigEvent(parsedEvent);
-    } else if (isBoardEvent(parsedEvent)) {
-        this.handleBoardEvent(parsedEvent);
+    } else if (isErrorEvent(parsedEvent)) {
+        this.handleErrorEvent(parsedEvent);
+    } else if (isLegacyCommandDTO(parsedEvent)) {
+        this.handleLegacyCommand(parsedEvent);
     }
-    // ... handle other event types
 });
 
 // Cleanup on destroy
@@ -366,6 +464,7 @@ export interface SyncEvent {
     progress?: number;
     status: string;
     message?: string;
+    seqNo?: number;
 }
 
 export interface ConfigEvent {
@@ -380,7 +479,8 @@ export interface BoardEvent {
     timestamp: string;
     boardId: string;
     status?: string;
-    edgeStatuses?: EdgeExecutionStatus[];
+    edgeId?: string;
+    message?: string;
     data?: unknown;
 }
 
@@ -411,12 +511,21 @@ export interface ErrorEvent {
 
 Events are routed based on the presence of `tabId`:
 
-1. **Events with `tabId`**: Routed to `TabService.handleTypedSyncEvent()` or `TabService.handleCommandEvent()`
-2. **Events without `tabId`**: Handled globally in `AppService`
+1. **Sync progress with `tabId`**: Routed to `LogConsumerService.handleLogEvent()` for deduplication
+2. **Other sync events with `tabId`**: Routed to `TabService.handleTypedSyncEvent()`
+3. **Error events with `tabId`**: Routed to the specific tab
+4. **Events without `tabId`**: Handled globally in `AppService`
+5. **Legacy command DTOs**: Handled by `AppService.handleLegacyCommand()`
 
 ```typescript
 // app.service.ts
 private handleSyncEvent(event: SyncEvent) {
+    // Route progress events to LogConsumerService
+    if (event.tabId && event.type === "sync:progress") {
+        this.logConsumerService.handleLogEvent(event);
+        return;
+    }
+    // Route other tab events to TabService
     if (event.tabId) {
         this.tabService.handleTypedSyncEvent(event);
         return;
@@ -430,7 +539,7 @@ private handleSyncEvent(event: SyncEvent) {
 
 ## Log Event Sequencing
 
-The LogService uses sequence numbers for reliable log delivery:
+The LogService uses sequence numbers (uint64) for reliable log delivery:
 
 ```typescript
 // log-consumer.service.ts

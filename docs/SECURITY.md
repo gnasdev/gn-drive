@@ -10,6 +10,7 @@ NS-Drive supports optional master password protection that encrypts all sensitiv
 | Encryption | AES-256-GCM (authenticated encryption) |
 | File format | `[12-byte nonce][ciphertext + GCM tag]` |
 | Password hash | `argon2id$v=19$m=65536,t=3,p=4$<salt_b64>$<hash_b64>` |
+| Salt length | 32 bytes (password), 16 bytes (export) |
 | Minimum password | 4 characters |
 
 ## What Gets Encrypted
@@ -19,7 +20,7 @@ When password protection is enabled and the app is locked:
 | File | Contents | Encrypted form |
 |------|----------|----------------|
 | `rclone.conf` | OAuth tokens, API keys, remote configs | `rclone.conf.enc` |
-| `ns-drive.db` | Profiles, boards, flows, schedules, history, settings | `ns-drive.db.enc` |
+| `ns-drive.db` | Profiles, boards, flows, schedules, history, settings (SQLite) | `ns-drive.db.enc` |
 
 ### Always Unencrypted
 
@@ -32,6 +33,8 @@ When password protection is enabled and the app is locked:
   "failed_attempts": 0,
   "lockout_until": "",
   "app_settings": {
+    "notifications_enabled": false,
+    "debug_mode": false,
     "minimize_to_tray": false,
     "start_at_login": false,
     "minimize_to_tray_on_startup": false
@@ -48,7 +51,9 @@ When password protection is enabled and the app is locked:
 ```
 SetSharedConfig → AuthService.ServiceStartup():
   Read auth.json → auth disabled
-  → InitDatabase → LoadSettings → load rclone config
+  → recoverFromCrash() → initializeApp():
+    ResetSharedDB → InitDatabase → LoadSettings
+    → CompleteInitialization (rclone config)
   → emit auth:unlocked → app ready
 ```
 
@@ -57,23 +62,27 @@ SetSharedConfig → AuthService.ServiceStartup():
 ```
 SetSharedConfig → AuthService.ServiceStartup():
   Read auth.json → auth enabled
-  → Load app_settings from auth.json (for tray/startup)
+  → recoverFromCrash()
   → emit auth:locked → show unlock screen
 
 User enters password → Unlock():
-  Verify password (Argon2id)
+  Check lockout → enforce rate limit delay
+  → Verify password (Argon2id, constant-time compare)
   → Decrypt .enc files → remove .enc
-  → InitDatabase → LoadSettings → load rclone config
-  → emit auth:unlocked → app ready
+  → initializeApp():
+    ResetSharedDB → InitDatabase → LoadSettings
+    → CompleteInitialization (rclone config)
+  → Reset failed attempts → emit auth:unlocked → app ready
 ```
 
 ### Lock
 
 ```
 Lock():
-  CloseDatabase → ResetSharedDB
-  → Encrypt plaintext files → remove plaintext + WAL/SHM
-  → Zero encryption key
+  lockInternal():
+    CloseDatabase → ResetSharedDB
+    → Encrypt plaintext files → remove plaintext + WAL/SHM
+    → Zero encryption key
   → emit auth:locked → show unlock screen
 ```
 
@@ -106,17 +115,20 @@ Server-side enforcement prevents brute-force attacks:
 1. Derive key with Argon2id (random 32-byte salt)
 2. Write `auth.json` with hash and `enabled: true`
 3. Store key in memory — files stay plaintext for current session
-4. On next Lock or Shutdown, `lockInternal()` encrypts files
+4. Delete legacy JSON config files (profiles.json, schedules.json, boards.json, history.json, app_settings.json) since data is in SQLite DB
+5. On next Lock or Shutdown, `lockInternal()` encrypts files
 
 ### Change Password
 
 1. Verify old password
-2. Close database connection
+2. Close database connection, reset shared DB
 3. Encrypt files with new key
 4. Update `auth.json` with new hash
 5. Decrypt files with new key (restore working state)
-6. Re-initialize database
+6. Re-initialize database and reload settings
 7. Zero old key, store new key
+
+If any step fails, the service attempts recovery. In worst case, it locks the app so the user must re-unlock with the new password.
 
 ### Remove Password
 
@@ -132,7 +144,7 @@ On startup, `recoverFromCrash()` handles interrupted encrypt/decrypt:
 
 | State | Auth Enabled | Action |
 |-------|-------------|--------|
-| Both plaintext and `.enc` exist | Yes | Remove plaintext (encrypted is authoritative) |
+| Both plaintext and `.enc` exist | Yes | Remove plaintext + WAL/SHM (encrypted is authoritative) |
 | Both plaintext and `.enc` exist | No | Remove `.enc` (plaintext is authoritative) |
 | Only `.enc` exists | Yes | Normal — wait for unlock to decrypt |
 | Only plaintext exists | Yes | Normal — files weren't encrypted yet (e.g., SetupPassword without Lock) |
@@ -144,7 +156,7 @@ Export files (`.nsd`) can optionally be encrypted with a separate password:
 - Uses same AES-256-GCM algorithm
 - 16-byte random salt stored in the export header reserved bytes
 - Key derived with Argon2id from the export password
-- Each section is individually encrypted after compression
+- Each section is individually encrypted after gzip compression
 - `FlagEncrypted` bit set in header flags
 
 Import detects the encrypted flag and prompts for the export password.
@@ -155,16 +167,27 @@ Import detects the encrypted flag and prompts for the export password.
 
 | Method | Description |
 |--------|-------------|
-| `IsAuthEnabled(ctx)` | Check if password protection is configured |
-| `IsUnlocked(ctx)` | Check if app is currently unlocked |
-| `SetupPassword(ctx, password)` | Enable password protection |
-| `Unlock(ctx, password)` | Verify password, decrypt files, initialize app |
-| `Lock(ctx)` | Encrypt files, zero key |
-| `ChangePassword(ctx, old, new)` | Re-encrypt with new key |
-| `RemovePassword(ctx, password)` | Disable password protection |
-| `GetLockoutStatus(ctx)` | Get rate limiting state |
-| `GetPreUnlockSettings()` | Get tray/startup settings before unlock |
+| `IsAuthEnabled(ctx) bool` | Check if password protection is configured |
+| `IsUnlocked(ctx) bool` | Check if app is currently unlocked |
+| `SetupPassword(ctx, password) error` | Enable password protection |
+| `Unlock(ctx, password) error` | Verify password, decrypt files, initialize app |
+| `Lock(ctx) error` | Encrypt files, zero key |
+| `ChangePassword(ctx, old, new) error` | Re-encrypt with new key |
+| `RemovePassword(ctx, password) error` | Disable password protection |
+| `GetLockoutStatus(ctx) LockoutStatus` | Get rate limiting state |
+| `GetPreUnlockSettings() AppSettings` | Get tray/startup settings before unlock |
 | `SyncAppSettings(settings)` | Sync settings to auth.json |
+
+### LockoutStatus
+
+```go
+type LockoutStatus struct {
+    FailedAttempts int    `json:"failed_attempts"`
+    LockedUntil    string `json:"locked_until"`
+    IsLocked       bool   `json:"is_locked"`
+    RetryAfterSecs int    `json:"retry_after_secs"`
+}
+```
 
 ### Events
 
@@ -172,6 +195,8 @@ Import detects the encrypted flag and prompts for the export password.
 |-------|------|
 | `auth:unlocked` | App unlocked (password verified or no auth) |
 | `auth:locked` | App locked (user action or shutdown) |
+
+Events are emitted through the EventBus `tofe` channel (same as all other events).
 
 ## Frontend
 
@@ -181,6 +206,8 @@ Observable state:
 - `isLocked$` — whether the app is currently locked
 - `authEnabled$` — whether password protection is configured
 - `loading$` — whether initial auth check is in progress
+
+State is updated directly after backend method calls (unlock, lock, setup, remove). Event listeners on `auth:unlocked` and `auth:locked` serve as backup handlers.
 
 ### UnlockScreenComponent
 
