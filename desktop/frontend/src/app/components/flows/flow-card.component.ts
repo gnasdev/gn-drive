@@ -281,7 +281,7 @@ export class FlowCardComponent {
 
   onOperationChange(index: number, operation: Operation): void {
     this.operationChange.emit({ index, operation: { ...operation } });
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
   }
 
   onOperationDragStart(event: { index: number; event: DragEvent }): void {

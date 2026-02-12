@@ -162,7 +162,7 @@ export class RemoteDropdownComponent implements OnInit, OnDestroy, ControlValueA
     // Subscribe to remote changes
     this.subscription = this.appService.remotes$.subscribe((remotes) => {
       this.remotes = remotes.map((r) => ({ name: r.name, type: r.type }));
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     });
   }
 

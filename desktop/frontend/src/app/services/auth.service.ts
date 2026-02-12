@@ -1,4 +1,4 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { Events } from '@wailsio/runtime';
 import {
@@ -21,8 +21,6 @@ export interface LockoutStatus {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly ngZone = inject(NgZone);
-
   readonly isLocked$ = new BehaviorSubject<boolean>(true);
   readonly authEnabled$ = new BehaviorSubject<boolean>(false);
   readonly loading$ = new BehaviorSubject<boolean>(true);
@@ -35,15 +33,11 @@ export class AuthService {
 
   private listenEvents(): void {
     const cleanup1 = Events.On('auth:unlocked', () => {
-      this.ngZone.run(() => {
-        this.isLocked$.next(false);
-        this.authEnabled$.next(true);
-      });
+      this.isLocked$.next(false);
+      this.authEnabled$.next(true);
     });
     const cleanup2 = Events.On('auth:locked', () => {
-      this.ngZone.run(() => {
-        this.isLocked$.next(true);
-      });
+      this.isLocked$.next(true);
     });
     if (cleanup1) this.eventCleanups.push(cleanup1);
     if (cleanup2) this.eventCleanups.push(cleanup2);

@@ -1,4 +1,4 @@
-import { inject, Injectable, NgZone, OnDestroy } from '@angular/core';
+import { inject, Injectable, OnDestroy } from '@angular/core';
 import { Events } from '@wailsio/runtime';
 import { BehaviorSubject, Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -35,8 +35,6 @@ import {
 })
 export class FlowsService implements OnDestroy {
   private readonly errorService = inject(ErrorService);
-  private readonly ngZone = inject(NgZone);
-
   // State
   readonly state$ = new BehaviorSubject<FlowsState>({
     flows: [],
@@ -63,12 +61,12 @@ export class FlowsService implements OnDestroy {
       const rawData = event.data;
       const parsedEvent = parseEvent(rawData);
       if (parsedEvent && isSyncStatusDTO(parsedEvent)) {
-        this.ngZone.run(() => this.handleSyncStatusEvent(parsedEvent as unknown as SyncStatusEvent));
+        this.handleSyncStatusEvent(parsedEvent as unknown as SyncStatusEvent);
       } else if (parsedEvent && isSyncEvent(parsedEvent)) {
-        this.ngZone.run(() => this.handleSyncLogEvent(parsedEvent));
+        this.handleSyncLogEvent(parsedEvent);
       }
       if (parsedEvent && isBoardEvent(parsedEvent)) {
-        this.ngZone.run(() => this.handleBoardCompletionEvent(parsedEvent));
+        this.handleBoardCompletionEvent(parsedEvent);
       }
     });
 
@@ -76,7 +74,7 @@ export class FlowsService implements OnDestroy {
     this.trayEventCleanup = Events.On('tray:execute_flow', (event) => {
       const flowId = event.data as string;
       if (flowId) {
-        this.ngZone.run(() => this.executeFlow(flowId));
+        this.executeFlow(flowId);
       }
     });
 

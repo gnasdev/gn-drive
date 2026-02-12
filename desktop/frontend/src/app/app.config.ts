@@ -1,4 +1,4 @@
-import { ApplicationConfig, ErrorHandler } from "@angular/core";
+import { ApplicationConfig, ErrorHandler, provideZonelessChangeDetection } from "@angular/core";
 import { provideHttpClient, HTTP_INTERCEPTORS } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
 import { providePrimeNG } from "primeng/config";
@@ -9,6 +9,7 @@ import NsDrivePreset from "./primeng-preset";
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideZonelessChangeDetection(),
     provideHttpClient(),
     provideAnimationsAsync(),
     providePrimeNG({

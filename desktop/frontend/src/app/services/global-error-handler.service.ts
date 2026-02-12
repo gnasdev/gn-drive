@@ -1,11 +1,10 @@
-import { ErrorHandler, Injectable, NgZone, inject } from "@angular/core";
+import { ErrorHandler, Injectable, inject } from "@angular/core";
 import { ErrorService } from "./error.service";
 import { LoggingService } from "./logging.service";
 
 @Injectable()
 export class GlobalErrorHandler implements ErrorHandler {
   private errorService = inject(ErrorService);
-  private zone = inject(NgZone);
   private loggingService = inject(LoggingService);
 
 
@@ -21,20 +20,17 @@ export class GlobalErrorHandler implements ErrorHandler {
       error instanceof Error ? error : undefined
     );
 
-    // Run inside Angular zone to ensure change detection works
-    this.zone.run(() => {
-      // Check if it's a known error type
-      if (this.isChunkLoadError(error)) {
-        this.handleChunkLoadError();
-      } else if (this.isNetworkError(error)) {
-        this.errorService.handleNetworkError();
-      } else if (this.isTimeoutError(error)) {
-        this.errorService.handleTimeoutError();
-      } else {
-        // Generic error handling
-        this.errorService.handleApiError(error, "global_error_handler");
-      }
-    });
+    // Check if it's a known error type
+    if (this.isChunkLoadError(error)) {
+      this.handleChunkLoadError();
+    } else if (this.isNetworkError(error)) {
+      this.errorService.handleNetworkError();
+    } else if (this.isTimeoutError(error)) {
+      this.errorService.handleTimeoutError();
+    } else {
+      // Generic error handling
+      this.errorService.handleApiError(error, "global_error_handler");
+    }
   }
 
   private isChunkLoadError(error: unknown): boolean {

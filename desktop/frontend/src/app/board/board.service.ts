@@ -1,4 +1,4 @@
-import { inject, Injectable, NgZone, OnDestroy } from "@angular/core";
+import { inject, Injectable, OnDestroy } from "@angular/core";
 import { Events } from "@wailsio/runtime";
 import { BehaviorSubject, Subject, Subscription } from "rxjs";
 import { debounceTime } from "rxjs/operators";
@@ -42,7 +42,6 @@ export class BoardService implements OnDestroy {
     readonly latestLogLines$ = new BehaviorSubject<string>("");
 
     private readonly errorService = inject(ErrorService);
-    private readonly ngZone = inject(NgZone);
     private eventCleanup: (() => void) | undefined;
     private logPollingInterval: ReturnType<typeof setInterval> | null = null;
     private autoSaveSubscription: Subscription | null = null;
@@ -53,9 +52,9 @@ export class BoardService implements OnDestroy {
             const rawData = event.data;
             const parsedEvent = parseEvent(rawData);
             if (parsedEvent && isBoardEvent(parsedEvent)) {
-                this.ngZone.run(() => this.handleBoardEvent(parsedEvent));
+                this.handleBoardEvent(parsedEvent);
             } else if (parsedEvent && isSyncEvent(parsedEvent)) {
-                this.ngZone.run(() => this.handleSyncLogEvent(parsedEvent));
+                this.handleSyncLogEvent(parsedEvent);
             }
         });
 
@@ -84,11 +83,9 @@ export class BoardService implements OnDestroy {
                 // Poll for logs
                 const logs = await GetExecutionLogs();
                 if (logs && logs.length > 0) {
-                    this.ngZone.run(() => {
-                        for (const logEntry of logs) {
-                            this.appendLogEntry(logEntry);
-                        }
-                    });
+                    for (const logEntry of logs) {
+                        this.appendLogEntry(logEntry);
+                    }
                 }
 
                 // Also poll for execution status (fallback in case events are missed)
@@ -99,33 +96,29 @@ export class BoardService implements OnDestroy {
                             currentStatus.board_id,
                         );
                         if (status && status.status !== "running") {
-                            this.ngZone.run(() => {
-                                this.executionStatus$.next(status);
-                                if (
-                                    status.status === "completed" ||
-                                    status.status === "failed" ||
-                                    status.status === "cancelled"
-                                ) {
-                                    this.stopLogPolling();
-                                    if (status.status !== "cancelled") {
-                                        this.fetchRemainingLogs();
-                                    }
+                            this.executionStatus$.next(status);
+                            if (
+                                status.status === "completed" ||
+                                status.status === "failed" ||
+                                status.status === "cancelled"
+                            ) {
+                                this.stopLogPolling();
+                                if (status.status !== "cancelled") {
+                                    this.fetchRemainingLogs();
                                 }
-                            });
+                            }
                         }
                     } catch {
                         // If GetBoardExecutionStatus fails, the execution might have finished
                         // and been cleaned up from activeFlows
-                        this.ngZone.run(() => {
-                            if (currentStatus) {
-                                currentStatus.status = "completed";
-                                this.executionStatus$.next({
-                                    ...currentStatus,
-                                });
-                            }
-                            this.stopLogPolling();
-                            this.fetchRemainingLogs();
-                        });
+                        if (currentStatus) {
+                            currentStatus.status = "completed";
+                            this.executionStatus$.next({
+                                ...currentStatus,
+                            });
+                        }
+                        this.stopLogPolling();
+                        this.fetchRemainingLogs();
                     }
                 }
             } catch (err) {

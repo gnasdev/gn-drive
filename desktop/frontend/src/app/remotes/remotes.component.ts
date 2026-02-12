@@ -61,7 +61,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       combineLatest([
         this.appService.configInfo$,
         this.appService.remotes$,
-      ]).subscribe(() => this.cdr.detectChanges())
+      ]).subscribe(() => this.cdr.markForCheck())
     );
     this.appService.getConfigInfo();
   }
@@ -102,7 +102,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
 
   async reauthRemote(remote: { name: string; type: string }): Promise<void> {
     this.isReauthenticating = remote.name;
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
     try {
       await this.appService.reauthRemote(remote.name);
       this.errorService.showSuccess(
@@ -113,7 +113,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       this.errorService.handleApiError(error, "reauth_remote");
     } finally {
       this.isReauthenticating = null;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 
@@ -121,7 +121,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
     this.appService.saveConfigInfo();
     this.saveBtnText$.next("Saved ~");
     setTimeout(() => this.saveBtnText$.next("Save ✓"), 1000);
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
   }
 
   // Modal methods
@@ -141,7 +141,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
     }
 
     this.isAddingRemote$.next(true);
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
 
     try {
       await this.appService.addRemote({
@@ -156,7 +156,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       this.errorService.handleApiError(error, "add_remote_modal");
     } finally {
       this.isAddingRemote$.next(false);
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 
@@ -198,7 +198,7 @@ export class RemotesComponent implements OnInit, OnDestroy {
       console.error("Error deleting remote:", error);
       this.errorService.handleApiError(error, "delete_remote");
     } finally {
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 

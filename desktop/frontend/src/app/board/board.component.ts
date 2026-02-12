@@ -177,7 +177,7 @@ export class BoardComponent implements OnInit, OnDestroy {
         this.subscriptions.add(
             this.boardService.boards$.subscribe((boards) => {
                 this.boards = boards;
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             }),
         );
 
@@ -185,7 +185,7 @@ export class BoardComponent implements OnInit, OnDestroy {
             this.boardService.activeBoard$.subscribe((board) => {
                 this.activeBoard = board;
                 this.updateAvailableRemotes();
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             }),
         );
 
@@ -210,7 +210,7 @@ export class BoardComponent implements OnInit, OnDestroy {
                     }
                 }
                 this.updateAvailableRemotes();
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             }),
         );
 
@@ -218,7 +218,7 @@ export class BoardComponent implements OnInit, OnDestroy {
             this.boardService.executionStatus$.subscribe((status) => {
                 this.executionStatus = status;
                 this.isExecuting = status?.status === "running";
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             }),
         );
 
@@ -231,7 +231,7 @@ export class BoardComponent implements OnInit, OnDestroy {
                         this.boardService.getEdgeLog(this.logsDialogEdgeId) ||
                         "No log output available.";
                 }
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             }),
         );
     }
@@ -267,14 +267,14 @@ export class BoardComponent implements OnInit, OnDestroy {
     async openBoard(board: models.Board): Promise<void> {
         await this.boardService.setActiveBoard(board.id);
         this.viewMode = "editor";
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
     }
 
     backToList(): void {
         this.boardService.activeBoard$.next(null);
         this.boardService.clearSelection();
         this.viewMode = "list";
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
     }
 
     createNewBoard(): void {
@@ -359,7 +359,7 @@ export class BoardComponent implements OnInit, OnDestroy {
         const label = remote.value === "local" ? "Local" : remote.value;
         this.boardService.addNode(remote.value, "", label, 350, 200);
         this.updateAvailableRemotes();
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
     }
 
     async executeBoard(): Promise<void> {

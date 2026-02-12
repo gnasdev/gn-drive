@@ -137,7 +137,7 @@ export class ErrorDisplayComponent implements OnInit, OnDestroy {
       }
 
       this.previousErrorCount = this.activeErrors.length;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     });
   }
 

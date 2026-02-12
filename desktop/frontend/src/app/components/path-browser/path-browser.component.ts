@@ -81,7 +81,7 @@ export class PathBrowserComponent {
     // Toggle dropdown off if clicking same segment
     if (this.activeSegmentIndex === index) {
       this.activeSegmentIndex = null;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
       return;
     }
 
@@ -91,7 +91,7 @@ export class PathBrowserComponent {
     this.activeSegmentIndex = index;
     this.dropdownLoading = true;
     this.dropdownEntries = [];
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
 
     try {
       const segmentPath = index === -1 ? "" : this.segments[index].fullPath;
@@ -123,7 +123,7 @@ export class PathBrowserComponent {
       // Only update loading state if this is still the active browse
       if (this.browseGeneration === generation) {
         this.dropdownLoading = false;
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       }
     }
   }
@@ -138,7 +138,7 @@ export class PathBrowserComponent {
     this.lastSegmentIsFile = false;
     this.activeSegmentIndex = null;
     this.pathChange.emit(this.path);
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
   }
 
   async onEntrySelect(entry: { name: string; is_dir: boolean }): Promise<void> {
@@ -153,7 +153,7 @@ export class PathBrowserComponent {
     this.lastSegmentIsFile = !entry.is_dir;
     this.activeSegmentIndex = null;
     this.pathChange.emit(this.path);
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
 
     // Auto-navigate deeper: if selected entry is a directory,
     // open the dropdown for the new last segment
@@ -168,7 +168,7 @@ export class PathBrowserComponent {
   closeDropdown(): void {
     if (this.activeSegmentIndex !== null) {
       this.activeSegmentIndex = null;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 }

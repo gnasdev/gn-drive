@@ -126,10 +126,10 @@ export class FlowsContainerComponent implements OnInit, OnDestroy {
     this.flowsService.loadFlows();
     this.subscription.add(
       this.flowsService.state$.subscribe((state) => {
-        this.flows = state.flows;
+        this.flows = [...state.flows];
         this.isDragging = state.isDragging;
         this.dragData = state.dragData;
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       })
     );
   }
@@ -245,7 +245,7 @@ export class FlowsContainerComponent implements OnInit, OnDestroy {
       console.error('Failed to remove remote:', err);
     } finally {
       this.isRemovingRemote = false;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 }
