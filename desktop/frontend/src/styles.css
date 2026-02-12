@@ -4,47 +4,47 @@
 
 /* ========================================
    System Colors - CSS Custom Properties
-   Yellow-Black-White NeoBrutalism Theme
+   Solarized Light NeoBrutalism Theme
    ======================================== */
 :root {
-  /* Background colors - White theme */
-  --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F5F5F5;
-  --color-bg-tertiary: #E5E5E5;
-  --color-bg-inverse: #000000;
+  /* Background colors - Solarized Light */
+  --color-bg-primary: #fdf6e3;       /* base3  */
+  --color-bg-secondary: #eee8d5;     /* base2  */
+  --color-bg-tertiary: #ddd6c1;      /* darker base2 */
+  --color-bg-inverse: #002b36;       /* base03 */
 
-  /* Foreground/Text colors - Black */
-  --color-fg-primary: #000000;
-  --color-fg-secondary: #1A1A1A;
-  --color-fg-tertiary: #404040;
-  --color-fg-inverse: #FFFFFF;
-  --color-fg-muted: #525252;
+  /* Foreground/Text colors - Solarized */
+  --color-fg-primary: #073642;       /* base02 */
+  --color-fg-secondary: #586e75;     /* base01 */
+  --color-fg-tertiary: #657b83;      /* base00 */
+  --color-fg-inverse: #fdf6e3;       /* base3  */
+  --color-fg-muted: #93a1a1;         /* base1  */
 
-  /* Border colors - Black */
-  --color-border-default: #000000;
-  --color-border-subtle: #D4D4D4;
-  --color-border-muted: #A3A3A3;
+  /* Border colors - Solarized */
+  --color-border-default: #586e75;   /* base01 */
+  --color-border-subtle: #d3cbb7;    /* warm gray */
+  --color-border-muted: #93a1a1;     /* base1  */
 
-  /* Accent colors (Yellow-Black NeoBrutalism) */
-  --color-accent-primary: #FEF08A;     /* Yellow - primary */
-  --color-accent-secondary: #FACC15;   /* Darker yellow */
-  --color-accent-success: #86EFAC;     /* Green */
-  --color-accent-warning: #FDBA74;     /* Orange */
-  --color-accent-danger: #FCA5A5;      /* Red */
-  --color-accent-info: #93C5FD;        /* Blue */
+  /* Accent colors - Solarized */
+  --color-accent-primary: #d5c48c;   /* light solarized yellow */
+  --color-accent-secondary: #b58900; /* solarized yellow */
+  --color-accent-success: #b5cc72;   /* light solarized green  */
+  --color-accent-warning: #e8a362;   /* light solarized orange */
+  --color-accent-danger: #e8908e;    /* light solarized red    */
+  --color-accent-info: #7eb8d9;      /* light solarized blue   */
 
-  /* Shadow - Black for neo effect */
-  --color-shadow: #000000;
+  /* Shadow - Solarized base1 for softer neo effect */
+  --color-shadow: #93a1a1;
 
-  /* Status colors (for badges, indicators) */
-  --color-status-success: #16A34A;
-  --color-status-success-bg: #DCFCE7;
-  --color-status-warning: #CA8A04;
-  --color-status-warning-bg: #FEF9C3;
-  --color-status-error: #DC2626;
-  --color-status-error-bg: #FEE2E2;
-  --color-status-info: #2563EB;
-  --color-status-info-bg: #DBEAFE;
+  /* Status colors - Solarized accents */
+  --color-status-success: #859900;     /* solarized green  */
+  --color-status-success-bg: #d5e3a5;
+  --color-status-warning: #b58900;     /* solarized yellow */
+  --color-status-warning-bg: #e8dba0;
+  --color-status-error: #dc322f;       /* solarized red    */
+  --color-status-error-bg: #f0b8b7;
+  --color-status-info: #268bd2;        /* solarized blue   */
+  --color-status-info-bg: #b3d4ea;
 }
 
 /* Override primeicons font-display from 'block' to 'swap' to prevent render-blocking */
@@ -170,6 +170,6 @@ body {
 
 /* Dialog backdrop */
 .p-dialog-mask {
-  background: rgba(0, 0, 0, 0.6) !important;
+  background: rgba(0, 43, 54, 0.6) !important;
   backdrop-filter: blur(4px);
 }

@@ -8,6 +8,7 @@ import { FlowOperationItemComponent } from './operation-item.component';
 import { DropZoneComponent } from './drop-zone.component';
 import { OperationLogsPanelComponent } from '../operations-tree/operation-logs-panel.component';
 import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
+import { ConfirmDialogComponent, ConfirmDialogData } from '../confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-flow-card',
@@ -19,6 +20,7 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
     FlowOperationItemComponent,
     DropZoneComponent,
     OperationLogsPanelComponent,
+    ConfirmDialogComponent,
   ],
   template: `
     <div
@@ -96,7 +98,7 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
           <neo-button
             variant="secondary"
             size="sm"
-            (onClick)="removeFlow.emit()"
+            (onClick)="onDeleteFlow()"
             [disabled]="flow.status === 'running'"
           >
             <i class="pi pi-trash text-sys-status-error"></i>
@@ -175,6 +177,14 @@ import { RemoteInfo } from '../remote-dropdown/remote-dropdown.component';
         }
       </div>
     </div>
+
+    <!-- Delete Flow Confirm Dialog -->
+    <app-confirm-dialog
+      [isOpen]="showDeleteConfirm"
+      [data]="deleteConfirmData"
+      (confirmed)="confirmDeleteFlow()"
+      (cancelled)="showDeleteConfirm = false"
+    ></app-confirm-dialog>
   `,
 })
 export class FlowCardComponent {
@@ -205,6 +215,13 @@ export class FlowCardComponent {
   dragStartIndex: number | null = null;
   isEditing = false;
   editingName = '';
+  showDeleteConfirm = false;
+  deleteConfirmData: ConfirmDialogData = {
+    title: 'Delete Flow',
+    message: 'This flow has operations. Are you sure you want to delete it?',
+    confirmText: 'Delete',
+    confirmSeverity: 'danger',
+  };
 
   get isSourceFlow(): boolean {
     return this.dragData?.sourceFlowId === this.flow.id;
@@ -275,6 +292,19 @@ export class FlowCardComponent {
   onOperationDragEnd(): void {
     this.dragStartIndex = null;
     this.dragEnd.emit();
+  }
+
+  onDeleteFlow(): void {
+    if (this.flow.operations.length > 0) {
+      this.showDeleteConfirm = true;
+    } else {
+      this.removeFlow.emit();
+    }
+  }
+
+  confirmDeleteFlow(): void {
+    this.showDeleteConfirm = false;
+    this.removeFlow.emit();
   }
 
   onDropAtIndex(index: number): void {

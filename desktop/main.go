@@ -140,7 +140,7 @@ func main() {
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "ns-drive",
 		Width:  800,
-		Height: 1000,
+		Height: 800,
 	})
 
 	// Set window reference on shared EventBus for window-specific events

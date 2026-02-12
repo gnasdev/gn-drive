@@ -26,11 +26,12 @@ interface PathEntry {
     PathBrowserComponent,
   ],
   template: `
-    <div class="border-t-2 border-sys-border bg-sys-bg p-4 space-y-4" [class.opacity-50]="disabled" [class.pointer-events-none]="disabled">
-      <!-- Action Type & Dry Run -->
-      <div class="grid grid-cols-2 gap-4">
+    <div class="border-t-2 border-sys-border bg-sys-bg p-4 space-y-3" [class.opacity-50]="disabled" [class.pointer-events-none]="disabled">
+
+      <!-- ===== Action & Mode ===== -->
+      <div class="grid grid-cols-2 gap-4 items-end">
         <div>
-          <span class="block text-sm font-bold mb-1">Action</span>
+          <span class="block text-xs font-bold text-sys-fg-muted mb-1">Action</span>
           <neo-dropdown
             [options]="actionOptions"
             [fullWidth]="true"
@@ -39,138 +40,143 @@ interface PathEntry {
             [disabled]="disabled"
           ></neo-dropdown>
         </div>
-        <div>
-          <span class="block text-sm font-bold mb-1">Dry Run</span>
+        <div class="flex items-center h-10.5">
           <neo-toggle
             [(ngModel)]="config.dryRun"
             (ngModelChange)="onConfigChange()"
-            label="Preview only"
+            label="Dry Run (preview only)"
             [disabled]="disabled"
           ></neo-toggle>
         </div>
       </div>
 
-      <!-- Performance -->
-      <div>
-        <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
-          <i class="pi pi-bolt"></i> Performance
-        </h3>
-        <div class="grid grid-cols-2 gap-3">
-          <neo-input
-            label="Parallel"
-            type="number"
-            placeholder="8"
-            [(ngModel)]="config.parallel"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-          <neo-input
-            label="Bandwidth (MB/s)"
-            type="number"
-            placeholder="0 (unlimited)"
-            [(ngModel)]="config.bandwidth"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
+      <!-- ===== Performance ===== -->
+      <div class="border-2 border-sys-border">
+        <div class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary border-b-2 border-sys-border border-l-4 border-l-[#268bd2]">
+          <i class="pi pi-bolt text-xs text-[#268bd2]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Performance</span>
         </div>
-        <details class="mt-2" open>
-          <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Performance</summary>
-          <div class="grid grid-cols-2 gap-3 mt-2">
+        <div class="p-3 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
             <neo-input
-              label="Multi-thread Streams"
+              label="Parallel"
               type="number"
-              placeholder="4"
-              [(ngModel)]="config.multiThreadStreams"
+              placeholder="8"
+              [(ngModel)]="config.parallel"
               (ngModelChange)="onConfigChange()"
               [disabled]="disabled"
             ></neo-input>
             <neo-input
-              label="Buffer Size"
-              placeholder="16M"
-              [(ngModel)]="config.bufferSize"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Retries"
-              type="number"
-              placeholder="3"
-              [(ngModel)]="config.retries"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Low-level Retries"
-              type="number"
-              placeholder="10"
-              [(ngModel)]="config.lowLevelRetries"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Max Duration"
-              placeholder="e.g. 1h30m"
-              [(ngModel)]="config.maxDuration"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Retries Sleep"
-              placeholder="e.g. 10s"
-              [(ngModel)]="config.retriesSleep"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="TPS Limit"
+              label="Bandwidth (MB/s)"
               type="number"
               placeholder="0 (unlimited)"
-              [(ngModel)]="config.tpsLimit"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Connect Timeout"
-              placeholder="e.g. 30s"
-              [(ngModel)]="config.connTimeout"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="IO Timeout"
-              placeholder="e.g. 5m"
-              [(ngModel)]="config.ioTimeout"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Order By"
-              placeholder="e.g. size,desc"
-              [(ngModel)]="config.orderBy"
+              [(ngModel)]="config.bandwidth"
               (ngModelChange)="onConfigChange()"
               [disabled]="disabled"
             ></neo-input>
           </div>
-          <div class="grid grid-cols-2 gap-3 mt-2">
-            <neo-toggle
-              [(ngModel)]="config.checkFirst"
-              (ngModelChange)="onConfigChange()"
-              label="Check First"
-              [disabled]="disabled"
-            ></neo-toggle>
-          </div>
-        </details>
+          <details>
+            <summary class="text-xs text-sys-fg-muted cursor-pointer select-none hover:text-sys-fg flex items-center gap-1">
+              <i class="pi pi-cog text-[10px]"></i> Advanced
+            </summary>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <neo-input
+                label="Multi-thread Streams"
+                type="number"
+                placeholder="4"
+                [(ngModel)]="config.multiThreadStreams"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Buffer Size"
+                placeholder="16M"
+                [(ngModel)]="config.bufferSize"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Retries"
+                type="number"
+                placeholder="3"
+                [(ngModel)]="config.retries"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Low-level Retries"
+                type="number"
+                placeholder="10"
+                [(ngModel)]="config.lowLevelRetries"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Max Duration"
+                placeholder="e.g. 1h30m"
+                [(ngModel)]="config.maxDuration"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Retries Sleep"
+                placeholder="e.g. 10s"
+                [(ngModel)]="config.retriesSleep"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="TPS Limit"
+                type="number"
+                placeholder="0 (unlimited)"
+                [(ngModel)]="config.tpsLimit"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Connect Timeout"
+                placeholder="e.g. 30s"
+                [(ngModel)]="config.connTimeout"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="IO Timeout"
+                placeholder="e.g. 5m"
+                [(ngModel)]="config.ioTimeout"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Order By"
+                placeholder="e.g. size,desc"
+                [(ngModel)]="config.orderBy"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+            </div>
+            <div class="mt-3">
+              <neo-toggle
+                [(ngModel)]="config.checkFirst"
+                (ngModelChange)="onConfigChange()"
+                label="Check First"
+                [disabled]="disabled"
+              ></neo-toggle>
+            </div>
+          </details>
+        </div>
       </div>
 
-      <!-- Filtering -->
-      <div>
-        <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
-          <i class="pi pi-filter"></i> Filtering
-        </h3>
-        <div class="space-y-3">
+      <!-- ===== Filtering ===== -->
+      <div class="border-2 border-sys-border">
+        <div class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary border-b-2 border-sys-border border-l-4 border-l-[#6c71c4]">
+          <i class="pi pi-filter text-xs text-[#6c71c4]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Filtering</span>
+        </div>
+        <div class="p-3 space-y-3">
           <!-- Include Paths -->
           <div>
-            <span class="block text-sm font-medium mb-1">Include Paths</span>
+            <span class="block text-xs font-bold text-sys-fg-muted mb-1">Include Paths</span>
             @for (entry of includedPathEntries; track $index; let i = $index) {
               <div class="flex items-center gap-2 mb-1">
                 <button type="button" (click)="togglePathMode(includedPathEntries, i)"
@@ -208,7 +214,7 @@ interface PathEntry {
           </div>
           <!-- Exclude Paths -->
           <div>
-            <span class="block text-sm font-medium mb-1">Exclude Paths</span>
+            <span class="block text-xs font-bold text-sys-fg-muted mb-1">Exclude Paths</span>
             @for (entry of excludedPathEntries; track $index; let i = $index) {
               <div class="flex items-center gap-2 mb-1">
                 <button type="button" (click)="togglePathMode(excludedPathEntries, i)"
@@ -244,220 +250,232 @@ interface PathEntry {
               <i class="pi pi-plus mr-1"></i> Add path
             </button>
           </div>
+          <!-- Advanced Filtering -->
+          <details>
+            <summary class="text-xs text-sys-fg-muted cursor-pointer select-none hover:text-sys-fg flex items-center gap-1">
+              <i class="pi pi-cog text-[10px]"></i> Advanced
+            </summary>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <!-- Min Size -->
+              <div>
+                <span class="block text-xs font-bold text-sys-fg-muted mb-1">Min Size</span>
+                <div class="flex gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                    placeholder="0"
+                    [(ngModel)]="minSizeNum"
+                    (ngModelChange)="onSizeFieldChange('minSize')"
+                    [disabled]="disabled"
+                  />
+                  <neo-dropdown
+                    [options]="sizeUnitOptions"
+                    [(ngModel)]="minSizeUnit"
+                    (ngModelChange)="onSizeFieldChange('minSize')"
+                    [disabled]="disabled"
+                  ></neo-dropdown>
+                </div>
+              </div>
+              <!-- Max Size -->
+              <div>
+                <span class="block text-xs font-bold text-sys-fg-muted mb-1">Max Size</span>
+                <div class="flex gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                    placeholder="0"
+                    [(ngModel)]="maxSizeNum"
+                    (ngModelChange)="onSizeFieldChange('maxSize')"
+                    [disabled]="disabled"
+                  />
+                  <neo-dropdown
+                    [options]="sizeUnitOptions"
+                    [(ngModel)]="maxSizeUnit"
+                    (ngModelChange)="onSizeFieldChange('maxSize')"
+                    [disabled]="disabled"
+                  ></neo-dropdown>
+                </div>
+              </div>
+              <!-- Max Age -->
+              <div>
+                <span class="block text-xs font-bold text-sys-fg-muted mb-1">Max Age</span>
+                <div class="flex gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                    placeholder="0"
+                    [(ngModel)]="maxAgeNum"
+                    (ngModelChange)="onAgeFieldChange('maxAge')"
+                    [disabled]="disabled"
+                  />
+                  <neo-dropdown
+                    [options]="ageUnitOptions"
+                    [(ngModel)]="maxAgeUnit"
+                    (ngModelChange)="onAgeFieldChange('maxAge')"
+                    [disabled]="disabled"
+                  ></neo-dropdown>
+                </div>
+              </div>
+              <!-- Min Age -->
+              <div>
+                <span class="block text-xs font-bold text-sys-fg-muted mb-1">Min Age</span>
+                <div class="flex gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
+                    placeholder="0"
+                    [(ngModel)]="minAgeNum"
+                    (ngModelChange)="onAgeFieldChange('minAge')"
+                    [disabled]="disabled"
+                  />
+                  <neo-dropdown
+                    [options]="ageUnitOptions"
+                    [(ngModel)]="minAgeUnit"
+                    (ngModelChange)="onAgeFieldChange('minAge')"
+                    [disabled]="disabled"
+                  ></neo-dropdown>
+                </div>
+              </div>
+              <neo-input
+                label="Max Depth"
+                type="number"
+                placeholder="empty = no limit"
+                [(ngModel)]="config.maxDepth"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+              <neo-input
+                label="Exclude If Present"
+                placeholder="e.g. .nosync"
+                [(ngModel)]="config.excludeIfPresent"
+                (ngModelChange)="onConfigChange()"
+                [disabled]="disabled"
+              ></neo-input>
+            </div>
+            <div class="flex gap-6 mt-3">
+              <neo-toggle
+                [(ngModel)]="config.useRegex"
+                (ngModelChange)="onConfigChange()"
+                label="Use Regex"
+                [disabled]="disabled"
+              ></neo-toggle>
+              <neo-toggle
+                [(ngModel)]="config.deleteExcluded"
+                (ngModelChange)="onConfigChange()"
+                label="Delete Excluded"
+                [disabled]="disabled"
+              ></neo-toggle>
+            </div>
+          </details>
         </div>
-        <details class="mt-2" open>
-          <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Filtering</summary>
-          <div class="grid grid-cols-2 gap-3 mt-2">
-            <!-- Min Size: number + unit -->
-            <div>
-              <span class="block text-sm font-medium mb-1">Min Size</span>
-              <div class="flex gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
-                  placeholder="0"
-                  [(ngModel)]="minSizeNum"
-                  (ngModelChange)="onSizeFieldChange('minSize')"
-                  [disabled]="disabled"
-                />
-                <neo-dropdown
-                  [options]="sizeUnitOptions"
-                  [(ngModel)]="minSizeUnit"
-                  (ngModelChange)="onSizeFieldChange('minSize')"
-                  [disabled]="disabled"
-                ></neo-dropdown>
-              </div>
-            </div>
-            <!-- Max Size: number + unit -->
-            <div>
-              <span class="block text-sm font-medium mb-1">Max Size</span>
-              <div class="flex gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
-                  placeholder="0"
-                  [(ngModel)]="maxSizeNum"
-                  (ngModelChange)="onSizeFieldChange('maxSize')"
-                  [disabled]="disabled"
-                />
-                <neo-dropdown
-                  [options]="sizeUnitOptions"
-                  [(ngModel)]="maxSizeUnit"
-                  (ngModelChange)="onSizeFieldChange('maxSize')"
-                  [disabled]="disabled"
-                ></neo-dropdown>
-              </div>
-            </div>
-            <!-- Max Age: number + unit -->
-            <div>
-              <span class="block text-sm font-medium mb-1">Max Age</span>
-              <div class="flex gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
-                  placeholder="0"
-                  [(ngModel)]="maxAgeNum"
-                  (ngModelChange)="onAgeFieldChange('maxAge')"
-                  [disabled]="disabled"
-                />
-                <neo-dropdown
-                  [options]="ageUnitOptions"
-                  [(ngModel)]="maxAgeUnit"
-                  (ngModelChange)="onAgeFieldChange('maxAge')"
-                  [disabled]="disabled"
-                ></neo-dropdown>
-              </div>
-            </div>
-            <!-- Min Age: number + unit -->
-            <div>
-              <span class="block text-sm font-medium mb-1">Min Age</span>
-              <div class="flex gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  class="flex-1 w-0 px-3 py-2 bg-sys-bg border-2 border-sys-border shadow-neo-sm font-medium text-sm placeholder:text-sys-fg-tertiary focus:outline-none focus:ring-2 focus:ring-sys-accent-secondary disabled:opacity-50"
-                  placeholder="0"
-                  [(ngModel)]="minAgeNum"
-                  (ngModelChange)="onAgeFieldChange('minAge')"
-                  [disabled]="disabled"
-                />
-                <neo-dropdown
-                  [options]="ageUnitOptions"
-                  [(ngModel)]="minAgeUnit"
-                  (ngModelChange)="onAgeFieldChange('minAge')"
-                  [disabled]="disabled"
-                ></neo-dropdown>
-              </div>
-            </div>
-            <neo-input
-              label="Max Depth"
-              type="number"
-              placeholder="empty = no limit"
-              [(ngModel)]="config.maxDepth"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-            <neo-input
-              label="Exclude If Present"
-              placeholder="e.g. .nosync"
-              [(ngModel)]="config.excludeIfPresent"
-              (ngModelChange)="onConfigChange()"
-              [disabled]="disabled"
-            ></neo-input>
-          </div>
-          <div class="grid grid-cols-2 gap-3 mt-2">
-            <neo-toggle
-              [(ngModel)]="config.useRegex"
-              (ngModelChange)="onConfigChange()"
-              label="Use Regex"
-              [disabled]="disabled"
-            ></neo-toggle>
-            <neo-toggle
-              [(ngModel)]="config.deleteExcluded"
-              (ngModelChange)="onConfigChange()"
-              label="Delete Excluded"
-              [disabled]="disabled"
-            ></neo-toggle>
-          </div>
-        </details>
       </div>
 
-      <!-- Safety -->
-      <details open>
-        <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
-          <i class="pi pi-shield"></i> Safety
+      <!-- ===== Safety ===== -->
+      <details class="border-2 border-sys-border group">
+        <summary class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary cursor-pointer select-none hover:bg-sys-bg-secondary/80 border-l-4 border-l-[#b58900]">
+          <i class="pi pi-shield text-xs text-[#b58900]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Safety</span>
+          <i class="pi pi-chevron-down text-[10px] text-sys-fg-muted ml-auto transition-transform group-open:rotate-180"></i>
         </summary>
-        <div class="grid grid-cols-2 gap-3 mt-2">
-          <neo-input
-            label="Max Delete (%)"
-            type="number"
-            placeholder="100"
-            [(ngModel)]="config.maxDelete"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-          <neo-input
-            label="Max Transfer"
-            placeholder="e.g. 10G"
-            [(ngModel)]="config.maxTransfer"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-          <neo-input
-            label="Max Delete Size"
-            placeholder="e.g. 1G"
-            [(ngModel)]="config.maxDeleteSize"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-          <neo-input
-            label="Suffix"
-            placeholder="e.g. .bak"
-            [(ngModel)]="config.suffix"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-          <neo-input
-            label="Backup Path"
-            placeholder="path for backups"
-            [(ngModel)]="config.backupPath"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-input>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-2">
-          <neo-toggle
-            [(ngModel)]="config.immutable"
-            (ngModelChange)="onConfigChange()"
-            label="Immutable"
-            [disabled]="disabled"
-          ></neo-toggle>
-          <neo-toggle
-            [(ngModel)]="config.suffixKeepExtension"
-            (ngModelChange)="onConfigChange()"
-            label="Suffix Keep Extension"
-            [disabled]="disabled"
-          ></neo-toggle>
+        <div class="p-3 border-t-2 border-sys-border space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <neo-input
+              label="Max Delete (%)"
+              type="number"
+              placeholder="100"
+              [(ngModel)]="config.maxDelete"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-input
+              label="Max Transfer"
+              placeholder="e.g. 10G"
+              [(ngModel)]="config.maxTransfer"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-input
+              label="Max Delete Size"
+              placeholder="e.g. 1G"
+              [(ngModel)]="config.maxDeleteSize"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-input
+              label="Suffix"
+              placeholder="e.g. .bak"
+              [(ngModel)]="config.suffix"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-input
+              label="Backup Path"
+              placeholder="path for backups"
+              [(ngModel)]="config.backupPath"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+          </div>
+          <div class="flex gap-6">
+            <neo-toggle
+              [(ngModel)]="config.immutable"
+              (ngModelChange)="onConfigChange()"
+              label="Immutable"
+              [disabled]="disabled"
+            ></neo-toggle>
+            <neo-toggle
+              [(ngModel)]="config.suffixKeepExtension"
+              (ngModelChange)="onConfigChange()"
+              label="Suffix Keep Extension"
+              [disabled]="disabled"
+            ></neo-toggle>
+          </div>
         </div>
       </details>
 
-      <!-- Comparison -->
-      <details open>
-        <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
-          <i class="pi pi-check-circle"></i> Comparison
+      <!-- ===== Comparison ===== -->
+      <details class="border-2 border-sys-border group">
+        <summary class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary cursor-pointer select-none hover:bg-sys-bg-secondary/80 border-l-4 border-l-[#859900]">
+          <i class="pi pi-check-circle text-xs text-[#859900]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Comparison</span>
+          <i class="pi pi-chevron-down text-[10px] text-sys-fg-muted ml-auto transition-transform group-open:rotate-180"></i>
         </summary>
-        <div class="grid grid-cols-3 gap-3 mt-2">
-          <neo-toggle
-            [(ngModel)]="config.sizeOnly"
-            (ngModelChange)="onConfigChange()"
-            label="Size Only"
-            [disabled]="disabled"
-          ></neo-toggle>
-          <neo-toggle
-            [(ngModel)]="config.updateMode"
-            (ngModelChange)="onConfigChange()"
-            label="Update (skip newer)"
-            [disabled]="disabled"
-          ></neo-toggle>
-          <neo-toggle
-            [(ngModel)]="config.ignoreExisting"
-            (ngModelChange)="onConfigChange()"
-            label="Ignore Existing"
-            [disabled]="disabled"
-          ></neo-toggle>
+        <div class="p-3 border-t-2 border-sys-border">
+          <div class="flex gap-6 flex-wrap">
+            <neo-toggle
+              [(ngModel)]="config.sizeOnly"
+              (ngModelChange)="onConfigChange()"
+              label="Size Only"
+              [disabled]="disabled"
+            ></neo-toggle>
+            <neo-toggle
+              [(ngModel)]="config.updateMode"
+              (ngModelChange)="onConfigChange()"
+              label="Update (skip newer)"
+              [disabled]="disabled"
+            ></neo-toggle>
+            <neo-toggle
+              [(ngModel)]="config.ignoreExisting"
+              (ngModelChange)="onConfigChange()"
+              label="Ignore Existing"
+              [disabled]="disabled"
+            ></neo-toggle>
+          </div>
         </div>
       </details>
 
-      <!-- Sync-specific (push/pull) -->
+      <!-- ===== Sync Options (push/pull only) ===== -->
       @if (config.action === 'push' || config.action === 'pull') {
-        <details open>
-          <summary class="text-sm font-bold flex items-center gap-2 cursor-pointer select-none">
-            <i class="pi pi-sync"></i> Sync Options
-          </summary>
-          <div class="mt-2">
+        <div class="border-2 border-sys-border">
+          <div class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary border-b-2 border-sys-border border-l-4 border-l-[#2aa198]">
+            <i class="pi pi-sync text-xs text-[#2aa198]"></i>
+            <span class="text-xs font-bold uppercase tracking-wide">Sync Options</span>
+          </div>
+          <div class="p-3">
             <neo-dropdown
               label="Delete Timing"
               [options]="deleteTimingOptions"
@@ -467,104 +485,113 @@ interface PathEntry {
               [disabled]="disabled"
             ></neo-dropdown>
           </div>
-        </details>
+        </div>
       }
 
-      <!-- Bisync Options -->
+      <!-- ===== Bisync Options (bi/bi-resync only) ===== -->
       @if (config.action === 'bi' || config.action === 'bi-resync') {
-        <div>
-          <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
-            <i class="pi pi-arrows-h"></i> Bisync Options
-          </h3>
-          <neo-dropdown
-            label="Conflict Resolution"
-            [options]="conflictOptions"
-            [fullWidth]="true"
-            [(ngModel)]="config.conflictResolution"
-            (ngModelChange)="onConfigChange()"
-            [disabled]="disabled"
-          ></neo-dropdown>
-          <details class="mt-2" open>
-            <summary class="text-xs text-sys-text-secondary cursor-pointer select-none hover:text-sys-text">Advanced Bisync</summary>
-            <div class="grid grid-cols-2 gap-3 mt-2">
-              <neo-dropdown
-                label="Conflict Loser"
-                [options]="conflictLoserOptions"
-                [fullWidth]="true"
-                [(ngModel)]="config.conflictLoser"
-                (ngModelChange)="onConfigChange()"
-                [disabled]="disabled"
-              ></neo-dropdown>
-              <neo-input
-                label="Conflict Suffix"
-                placeholder="e.g. .conflict"
-                [(ngModel)]="config.conflictSuffix"
-                (ngModelChange)="onConfigChange()"
-                [disabled]="disabled"
-              ></neo-input>
-              <neo-input
-                label="Max Lock"
-                placeholder="e.g. 15m"
-                [(ngModel)]="config.maxLock"
-                (ngModelChange)="onConfigChange()"
-                [disabled]="disabled"
-              ></neo-input>
-            </div>
-            <div class="grid grid-cols-2 gap-3 mt-2">
-              <neo-toggle
-                [(ngModel)]="config.resilient"
-                (ngModelChange)="onConfigChange()"
-                label="Resilient"
-                [disabled]="disabled"
-              ></neo-toggle>
-              <neo-toggle
-                [(ngModel)]="config.checkAccess"
-                (ngModelChange)="onConfigChange()"
-                label="Check Access"
-                [disabled]="disabled"
-              ></neo-toggle>
-            </div>
-          </details>
+        <div class="border-2 border-sys-border">
+          <div class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary border-b-2 border-sys-border border-l-4 border-l-[#d33682]">
+            <i class="pi pi-arrows-h text-xs text-[#d33682]"></i>
+            <span class="text-xs font-bold uppercase tracking-wide">Bisync Options</span>
+          </div>
+          <div class="p-3 space-y-3">
+            <neo-dropdown
+              label="Conflict Resolution"
+              [options]="conflictOptions"
+              [fullWidth]="true"
+              [(ngModel)]="config.conflictResolution"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-dropdown>
+            <details>
+              <summary class="text-xs text-sys-fg-muted cursor-pointer select-none hover:text-sys-fg flex items-center gap-1">
+                <i class="pi pi-cog text-[10px]"></i> Advanced
+              </summary>
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <neo-dropdown
+                  label="Conflict Loser"
+                  [options]="conflictLoserOptions"
+                  [fullWidth]="true"
+                  [(ngModel)]="config.conflictLoser"
+                  (ngModelChange)="onConfigChange()"
+                  [disabled]="disabled"
+                ></neo-dropdown>
+                <neo-input
+                  label="Conflict Suffix"
+                  placeholder="e.g. .conflict"
+                  [(ngModel)]="config.conflictSuffix"
+                  (ngModelChange)="onConfigChange()"
+                  [disabled]="disabled"
+                ></neo-input>
+                <neo-input
+                  label="Max Lock"
+                  placeholder="e.g. 15m"
+                  [(ngModel)]="config.maxLock"
+                  (ngModelChange)="onConfigChange()"
+                  [disabled]="disabled"
+                ></neo-input>
+              </div>
+              <div class="flex gap-6 mt-3">
+                <neo-toggle
+                  [(ngModel)]="config.resilient"
+                  (ngModelChange)="onConfigChange()"
+                  label="Resilient"
+                  [disabled]="disabled"
+                ></neo-toggle>
+                <neo-toggle
+                  [(ngModel)]="config.checkAccess"
+                  (ngModelChange)="onConfigChange()"
+                  label="Check Access"
+                  [disabled]="disabled"
+                ></neo-toggle>
+              </div>
+            </details>
+          </div>
         </div>
       }
 
-      <!-- Schedule -->
-      <div>
-        <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
-          <i class="pi pi-clock"></i> Schedule
-        </h3>
-        <div class="flex items-center gap-4">
-          <neo-toggle
-            [(ngModel)]="scheduleEnabled"
-            (ngModelChange)="onScheduleToggle()"
-            label="Enable scheduling"
-            [disabled]="disabled"
-          ></neo-toggle>
-          @if (scheduleEnabled) {
-            <neo-input
-              class="flex-1"
-              placeholder="0 */6 * * * (every 6 hours)"
-              [(ngModel)]="cronExpr"
-              (ngModelChange)="onCronChange()"
-              [disabled]="disabled"
-            ></neo-input>
-          }
+      <!-- ===== Schedule ===== -->
+      <div class="border-2 border-sys-border">
+        <div class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary border-b-2 border-sys-border border-l-4 border-l-[#cb4b16]">
+          <i class="pi pi-clock text-xs text-[#cb4b16]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Schedule</span>
         </div>
-        @if (scheduleEnabled) {
-          <div class="mt-2 flex gap-2 flex-wrap">
-            @for (preset of cronPresets; track preset.value) {
-              <neo-button
-                variant="secondary"
-                size="sm"
-                (onClick)="setCronPreset(preset.value)"
+        <div class="p-3 space-y-3">
+          <div class="flex items-center gap-4">
+            <neo-toggle
+              [(ngModel)]="scheduleEnabled"
+              (ngModelChange)="onScheduleToggle()"
+              label="Enable scheduling"
+              [disabled]="disabled"
+            ></neo-toggle>
+            @if (scheduleEnabled) {
+              <neo-input
+                class="flex-1"
+                placeholder="0 */6 * * * (every 6 hours)"
+                [(ngModel)]="cronExpr"
+                (ngModelChange)="onCronChange()"
                 [disabled]="disabled"
-              >
-                {{ preset.label }}
-              </neo-button>
+              ></neo-input>
             }
           </div>
-        }
+          @if (scheduleEnabled) {
+            <div class="flex gap-2 flex-wrap">
+              @for (preset of cronPresets; track preset.value) {
+                <neo-button
+                  variant="secondary"
+                  size="sm"
+                  (onClick)="setCronPreset(preset.value)"
+                  [disabled]="disabled"
+                >
+                  {{ preset.label }}
+                </neo-button>
+              }
+            </div>
+          }
+        </div>
       </div>
+
     </div>
   `,
 })
