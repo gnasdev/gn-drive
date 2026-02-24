@@ -14,7 +14,7 @@
   <!-- Single Page Layout -->
   <div class="flex flex-col h-screen bg-sys-bg-secondary">
     <!-- Topbar -->
-    <app-topbar (settingsClick)="openSettings()"></app-topbar>
+    <app-topbar (settingsClick)="openSettings()" (aboutClick)="openAbout()"></app-topbar>
 
     <!-- Main Content - Flows -->
     <main class="flex-1 overflow-hidden">
@@ -26,6 +26,11 @@
   <app-settings-dialog
     [(visible)]="showSettingsDialog"
   ></app-settings-dialog>
+
+  <!-- About Dialog -->
+  <app-about-dialog
+    [(visible)]="showAboutDialog"
+  ></app-about-dialog>
 
   <!-- Error Display Component -->
   <app-error-display></app-error-display>

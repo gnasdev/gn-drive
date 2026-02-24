@@ -30,6 +30,13 @@ import { AuthService } from '../../services/auth.service';
         <neo-button
           variant="ghost"
           size="sm"
+          (onClick)="aboutClick.emit()"
+        >
+          <i class="pi pi-info-circle text-lg"></i>
+        </neo-button>
+        <neo-button
+          variant="ghost"
+          size="sm"
           (onClick)="settingsClick.emit()"
         >
           <i class="pi pi-cog text-lg"></i>
@@ -42,6 +49,7 @@ export class TopbarComponent {
   readonly authService = inject(AuthService);
 
   @Output() settingsClick = new EventEmitter<void>();
+  @Output() aboutClick = new EventEmitter<void>();
 
   locking = false;
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"desktop/backend/errors"
 	"desktop/backend/models"
+	"desktop/backend/rclone"
 	"desktop/backend/utils"
 	_ "embed"
 	"fmt"
@@ -16,6 +17,14 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// AppInfo holds application metadata exposed to frontend
+type AppInfo struct {
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Commit      string `json:"commit"`
+	Description string `json:"description"`
+}
+
 // App struct - now implements Wails v3 service interface
 type App struct {
 	app            *application.App
@@ -26,6 +35,8 @@ type App struct {
 	initialized    bool
 	initMutex      sync.Mutex
 	cachedRemotes  []fsConfig.Remote
+	appVersion     string
+	appCommit      string
 }
 
 // NewApp creates a new App application struct
@@ -48,6 +59,22 @@ func NewAppWithApplication(app *application.App) *App {
 // SetApp sets the application reference for events
 func (a *App) SetApp(app *application.App) {
 	a.app = app
+}
+
+// SetVersionInfo sets the version and commit info from build-time ldflags
+func (a *App) SetVersionInfo(version, commit string) {
+	a.appVersion = version
+	a.appCommit = commit
+}
+
+// GetAppInfo returns application metadata for the frontend
+func (a *App) GetAppInfo(ctx context.Context) AppInfo {
+	return AppInfo{
+		Name:        "NS-Drive",
+		Version:     a.appVersion,
+		Commit:      a.appCommit,
+		Description: "A desktop application for rclone file synchronization",
+	}
 }
 
 //go:embed .env
@@ -119,6 +146,9 @@ func (a *App) CompleteInitialization(ctx context.Context) error {
 
 	// Cache initial remotes list
 	a.cachedRemotes = fsConfig.GetRemotes()
+
+	// Clean up any orphaned temp crypt remotes from previous crashes
+	rclone.CleanupOrphanedTempCryptRemotes()
 
 	a.initialized = true
 	log.Printf("App: Initialization completed (rclone config loaded)")

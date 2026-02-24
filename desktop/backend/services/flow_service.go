@@ -218,6 +218,8 @@ func (s *FlowService) SaveFlows(ctx context.Context, flows []models.Flow) error 
 		}
 
 		for j, op := range f.Operations {
+			// Strip encryption passwords before persisting
+			op.SyncConfig.StripEncryptPasswords()
 			syncConfigJSON, err := json.Marshal(op.SyncConfig)
 			if err != nil {
 				return fmt.Errorf("failed to marshal sync_config for operation %s: %w", op.Id, err)

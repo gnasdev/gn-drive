@@ -86,7 +86,7 @@ import { NeoToggleComponent } from '../neo/neo-toggle.component';
     <neo-dialog
       [visible]="visible"
       (visibleChange)="visibleChange.emit($event)"
-      title="Settings v1.0.0"
+      title="Settings"
       maxWidth="80vw"
       maxHeight="80vh"
       [headerYellow]="true"

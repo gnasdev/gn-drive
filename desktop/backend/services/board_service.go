@@ -1194,6 +1194,8 @@ func (b *BoardService) saveBoardToDB(board models.Board) error {
 
 	// Insert edges
 	for _, edge := range board.Edges {
+		// Strip encryption passwords before persisting
+		edge.SyncConfig.StripEncryptPasswords()
 		syncConfigJSON, jsonErr := json.Marshal(edge.SyncConfig)
 		if jsonErr != nil {
 			log.Printf("[BoardService] Warning: failed to marshal sync_config for edge %s: %v", edge.Id, jsonErr)

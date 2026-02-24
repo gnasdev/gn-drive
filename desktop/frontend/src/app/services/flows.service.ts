@@ -715,6 +715,13 @@ export class FlowsService implements OnDestroy {
     if (sc.checkAccess) p.check_access = true;
     if (sc.conflictLoser) p.conflict_loser = sc.conflictLoser;
     if (sc.conflictSuffix) p.conflict_suffix = sc.conflictSuffix;
+    // Encryption
+    if (sc.encryptSource) p.encrypt_source = true;
+    if (sc.encryptDest) p.encrypt_dest = true;
+    if (sc.encryptPassword) p.encrypt_password = sc.encryptPassword;
+    if (sc.encryptPassword2) p.encrypt_password2 = sc.encryptPassword2;
+    if (sc.encryptFilename) p.encrypt_filename = sc.encryptFilename;
+    if (sc.encryptDirectory) p.encrypt_directory = true;
     return p;
   }
 
@@ -770,6 +777,13 @@ export class FlowsService implements OnDestroy {
     if (p.check_access) sc.checkAccess = true;
     if (p.conflict_loser) sc.conflictLoser = p.conflict_loser as SyncConfig['conflictLoser'];
     if (p.conflict_suffix) sc.conflictSuffix = p.conflict_suffix;
+    // Encryption
+    if (p.encrypt_source) sc.encryptSource = true;
+    if (p.encrypt_dest) sc.encryptDest = true;
+    if (p.encrypt_password) sc.encryptPassword = p.encrypt_password;
+    if (p.encrypt_password2) sc.encryptPassword2 = p.encrypt_password2;
+    if (p.encrypt_filename) sc.encryptFilename = p.encrypt_filename as SyncConfig['encryptFilename'];
+    if (p.encrypt_directory) sc.encryptDirectory = true;
     return sc;
   }
 

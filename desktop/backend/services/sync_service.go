@@ -329,6 +329,15 @@ func (s *SyncService) executeSyncTask(ctx context.Context, task *SyncTask) {
 		return
 	}
 
+	// Apply on-the-fly crypt wrapping if configured
+	cryptCleanup, err := rclone.ApplyCryptWrapping(ctx, &task.Profile)
+	if err != nil {
+		taskErr = fmt.Errorf("failed to setup encryption: %w", err)
+		s.handleSyncError(task, taskErr.Error())
+		return
+	}
+	defer cryptCleanup()
+
 	// Create structured status channel
 	outStatus := make(chan *dto.SyncStatusDTO, 100)
 	var outStatusClosed bool

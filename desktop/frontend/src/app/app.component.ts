@@ -8,6 +8,7 @@ import { ErrorDisplayComponent } from './components/error-display/error-display.
 import { TopbarComponent } from './components/topbar/topbar.component.js';
 import { FlowsContainerComponent } from './components/flows/flows-container.component.js';
 import { SettingsDialogComponent } from './components/dialogs/settings-dialog.component.js';
+import { AboutDialogComponent } from './components/dialogs/about-dialog.component.js';
 import { UnlockScreenComponent } from './components/unlock-screen/unlock-screen.component.js';
 import { ConsoleLoggerService } from './services/console-logger.service.js';
 import { LoggingService } from './services/logging.service.js';
@@ -21,6 +22,7 @@ import { AuthService } from './services/auth.service.js';
     TopbarComponent,
     FlowsContainerComponent,
     SettingsDialogComponent,
+    AboutDialogComponent,
     ErrorDisplayComponent,
     UnlockScreenComponent,
     ToastComponent,
@@ -42,6 +44,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private appInitialized = false;
 
   showSettingsDialog = false;
+  showAboutDialog = false;
   isLocked = true;
   isLoading = true;
 
@@ -90,6 +93,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   openSettings(): void {
     this.showSettingsDialog = true;
+    this.cdr.markForCheck();
+  }
+
+  openAbout(): void {
+    this.showAboutDialog = true;
     this.cdr.markForCheck();
   }
 

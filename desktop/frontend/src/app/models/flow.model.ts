@@ -64,6 +64,14 @@ export interface SyncConfig {
   checkAccess?: boolean;
   conflictLoser?: 'num' | 'pathname' | 'delete';
   conflictSuffix?: string;
+
+  // Encryption (on-the-fly crypt wrapping)
+  encryptSource?: boolean;
+  encryptDest?: boolean;
+  encryptPassword?: string;
+  encryptPassword2?: string;
+  encryptFilename?: 'standard' | 'obfuscate' | 'off';
+  encryptDirectory?: boolean;
 }
 
 export type SyncAction = 'push' | 'pull' | 'bi' | 'bi-resync';

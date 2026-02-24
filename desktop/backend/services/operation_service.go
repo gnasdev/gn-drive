@@ -237,6 +237,14 @@ func (o *OperationService) executeOperation(ctx context.Context, task *Operation
 		return
 	}
 
+	// Apply on-the-fly crypt wrapping if configured
+	cryptCleanup, err := rclone.ApplyCryptWrapping(ctx, &task.Profile)
+	if err != nil {
+		o.handleOperationError(task, fmt.Sprintf("Failed to setup encryption: %v", err))
+		return
+	}
+	defer cryptCleanup()
+
 	outStatus := make(chan *dto.SyncStatusDTO, 100)
 
 	utils.AddCmd(task.Id, func() {

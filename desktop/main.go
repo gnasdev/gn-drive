@@ -13,6 +13,12 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
+// Version and Commit are set at build time via ldflags
+var (
+	Version = "dev"
+	Commit  = "unknown"
+)
+
 //go:embed all:frontend/dist/browser
 var assets embed.FS
 
@@ -22,6 +28,7 @@ var appIcon []byte
 func main() {
 	// Create service instances
 	appService := be.NewApp()
+	appService.SetVersionInfo(Version, Commit)
 	logService := services.NewLogService()
 	authService := services.NewAuthService(nil)
 	syncService := services.NewSyncService(nil)

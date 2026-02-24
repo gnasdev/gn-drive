@@ -468,6 +468,63 @@ interface PathEntry {
         </div>
       </details>
 
+      <!-- ===== Encryption ===== -->
+      <details class="border-2 border-sys-border group">
+        <summary class="flex items-center gap-2 px-3 py-2 bg-sys-bg-secondary cursor-pointer select-none hover:bg-sys-bg-secondary/80 border-l-4 border-l-[#dc322f]">
+          <i class="pi pi-lock text-xs text-[#dc322f]"></i>
+          <span class="text-xs font-bold uppercase tracking-wide">Encryption</span>
+          <i class="pi pi-chevron-down text-[10px] text-sys-fg-muted ml-auto transition-transform group-open:rotate-180"></i>
+        </summary>
+        <div class="p-3 border-t-2 border-sys-border space-y-3">
+          <div class="flex gap-6">
+            <neo-toggle
+              [(ngModel)]="config.encryptSource"
+              (ngModelChange)="onConfigChange()"
+              label="Encrypt Source"
+              [disabled]="disabled"
+            ></neo-toggle>
+            <neo-toggle
+              [(ngModel)]="config.encryptDest"
+              (ngModelChange)="onConfigChange()"
+              label="Encrypt Dest"
+              [disabled]="disabled"
+            ></neo-toggle>
+          </div>
+          @if (config.encryptSource || config.encryptDest) {
+            <neo-input
+              label="Password"
+              type="password"
+              placeholder="Encryption password"
+              [(ngModel)]="config.encryptPassword"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-input
+              label="Salt Password (optional)"
+              type="password"
+              placeholder="Optional second password"
+              [(ngModel)]="config.encryptPassword2"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-input>
+            <neo-dropdown
+              label="Filename Encryption"
+              [options]="filenameEncryptOptions"
+              [fullWidth]="true"
+              [(ngModel)]="config.encryptFilename"
+              (ngModelChange)="onConfigChange()"
+              [disabled]="disabled"
+            ></neo-dropdown>
+            <neo-toggle
+              [(ngModel)]="config.encryptDirectory"
+              (ngModelChange)="onConfigChange()"
+              label="Encrypt Directory Names"
+              [disabled]="disabled"
+            ></neo-toggle>
+          }
+        </div>
+      </details>
+
       <!-- ===== Sync Options (push/pull only) ===== -->
       @if (config.action === 'push' || config.action === 'pull') {
         <div class="border-2 border-sys-border">
@@ -641,6 +698,12 @@ export class OperationSettingsPanelComponent implements OnInit {
     { label: 'Every 6h', value: '0 */6 * * *' },
     { label: 'Daily', value: '0 0 * * *' },
     { label: 'Weekly', value: '0 0 * * 0' },
+  ];
+
+  filenameEncryptOptions: DropdownOption[] = [
+    { value: 'standard', label: 'Standard' },
+    { value: 'obfuscate', label: 'Obfuscate' },
+    { value: 'off', label: 'Off' },
   ];
 
   sizeUnitOptions = [

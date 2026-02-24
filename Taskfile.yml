@@ -110,7 +110,7 @@ tasks:
     dir: desktop
     cmds:
       - echo "Generating bindings..."
-      - wails3 generate bindings -ts
+      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
       - echo "Building frontend..."
       - cd frontend && bun install --frozen-lockfile && bun run build
       - echo "Building backend..."

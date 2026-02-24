@@ -59,6 +59,20 @@ type Profile struct {
 	CheckAccess    bool   `json:"check_access,omitempty"`    // --check-access
 	ConflictLoser  string `json:"conflict_loser,omitempty"`  // --conflict-loser: "num","pathname","delete"
 	ConflictSuffix string `json:"conflict_suffix,omitempty"` // --conflict-suffix
+
+	// Encryption (on-the-fly crypt wrapping, runtime only - not persisted to DB)
+	EncryptSource    bool   `json:"encrypt_source,omitempty"`    // Wrap source with crypt remote
+	EncryptDest      bool   `json:"encrypt_dest,omitempty"`      // Wrap destination with crypt remote
+	EncryptPassword  string `json:"encrypt_password,omitempty"`  // Crypt password
+	EncryptPassword2 string `json:"encrypt_password2,omitempty"` // Salt password (optional)
+	EncryptFilename  string `json:"encrypt_filename,omitempty"`  // "standard", "obfuscate", "off"
+	EncryptDirectory bool   `json:"encrypt_directory,omitempty"` // Encrypt directory names
+}
+
+// StripEncryptPasswords clears encryption passwords so they are not persisted to DB.
+func (p *Profile) StripEncryptPasswords() {
+	p.EncryptPassword = ""
+	p.EncryptPassword2 = ""
 }
 
 type Profiles []Profile
