@@ -20,11 +20,15 @@
     "@angular/platform-browser": "^21.1.0",
     "@angular/platform-browser-dynamic": "^21.1.0",
     "@angular/router": "^21.1.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@primeuix/themes": "^2.0.3",
     "@wailsio/runtime": "^3.0.0-alpha.66",
+    "minimatch": "^10.2.1",
     "primeicons": "^7.0.0",
     "primeng": "^21.1.1",
+    "qs": "^6.14.2",
     "rxjs": "~7.8.0",
+    "tar": "^7.5.8",
     "tslib": "^2.3.0"
   },
   "devDependencies": {
