@@ -1,6 +1,6 @@
-# NS-Drive Backend
+# NG Drive Backend
 
-Go backend for NS-Drive, built with Wails v3 and rclone integration.
+Go backend for NG Drive, built with Wails v3 and rclone integration.
 
 ## Structure
 
@@ -50,7 +50,7 @@ Features:
 Manages sync profiles:
 - CRUD operations
 - Profile validation
-- File persistence (`~/.config/ns-drive/profiles.json`)
+- File persistence (`~/.config/ng-drive/profiles.json`)
 - Rollback on save failure
 
 ### RemoteService
@@ -114,7 +114,7 @@ return &errors.AppError{
 
 ## Configuration
 
-Files stored in `~/.config/ns-drive/`:
+Files stored in `~/.config/ng-drive/`:
 - `profiles.json` - Sync profiles (0600 permissions)
 - `rclone.conf` - Remote configurations (0600 permissions)
 

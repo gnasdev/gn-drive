@@ -1,6 +1,6 @@
-# Contributing to NS-Drive
+# Contributing to NG Drive
 
-Thank you for your interest in contributing to NS-Drive! This document provides guidelines and best practices for contributing.
+Thank you for your interest in contributing to NG Drive! This document provides guidelines and best practices for contributing.
 
 ## Getting Started
 

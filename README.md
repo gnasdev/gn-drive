@@ -1,4 +1,4 @@
-# NS-Drive
+# NG Drive
 
 Desktop application for cloud storage synchronization powered by [rclone](https://rclone.org/). Provides a GUI for managing cloud remotes, sync profiles, and automated workflows.
 
@@ -31,7 +31,7 @@ Download the latest release for your platform, or build from source with `task b
 **macOS note:** On first launch, macOS may block the app. Fix with:
 
 ```bash
-xattr -cr /Applications/ns-drive.app
+xattr -cr /Applications/ng-drive.app
 ```
 
 Or right-click the app > "Open" > click "Open" in the dialog.

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to NS-Drive will be documented in this file.
+All notable changes to NG Drive will be documented in this file.
 
 ## [v0.3.0] - 2026-02-12
 
@@ -35,7 +35,7 @@ All notable changes to NS-Drive will be documented in this file.
 
 ### Features
 
-- **Master password protection** — Added optional master password that encrypts `rclone.conf` and `ns-drive.db` at rest using AES-256-GCM with Argon2id key derivation. Includes lock/unlock lifecycle, rate limiting with exponential backoff, crash recovery, and encrypted export/import support.
+- **Master password protection** — Added optional master password that encrypts `rclone.conf` and `ng-drive.db` at rest using AES-256-GCM with Argon2id key derivation. Includes lock/unlock lifecycle, rate limiting with exponential backoff, crash recovery, and encrypted export/import support.
 
 ### Fixes
 
@@ -63,7 +63,7 @@ All notable changes to NS-Drive will be documented in this file.
 - **Log service** — Added log buffer and log service for reliable log delivery with sequence numbers.
 - **Import/Export** — Configuration backup (profiles, remotes, boards) with optional token inclusion and merge/replace restore modes.
 - **System tray** — System tray integration with quick board execution.
-- **Start at login** — Option to launch NS-Drive automatically at system startup.
+- **Start at login** — Option to launch NG Drive automatically at system startup.
 - **Desktop notifications** — Notifications for sync completion and failure events.
 - **Board system** — Visual workflow orchestration with DAG execution, magnet highlight, and edge reconnection.
 - **Profile editor** — Profile creation and editing dialog with validation.

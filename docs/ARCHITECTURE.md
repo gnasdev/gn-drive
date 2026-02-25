@@ -1,8 +1,8 @@
-# NS-Drive Architecture Documentation
+# NG Drive Architecture Documentation
 
 ## Overview
 
-NS-Drive is a desktop application for cloud storage synchronization with a modern, domain-separated service architecture following Wails v3 best practices. This document outlines the architecture and communication patterns.
+NG Drive is a desktop application for cloud storage synchronization with a modern, domain-separated service architecture following Wails v3 best practices. This document outlines the architecture and communication patterns.
 
 ## Technology Stack
 
@@ -40,7 +40,7 @@ Services are organized by business domain with clear responsibilities.
 
 ## Service Architecture
 
-NS-Drive has 17 domain-separated services registered in `main.go`:
+NG Drive has 17 domain-separated services registered in `main.go`:
 
 ### Core Services
 
@@ -309,7 +309,7 @@ ListCryptRemotes(ctx context.Context) ([]string, error)
 
 **Responsibilities:**
 - Master password protection with Argon2id KDF
-- AES-256-GCM file encryption for sensitive data (rclone.conf, ns-drive.db)
+- AES-256-GCM file encryption for sensitive data (rclone.conf, ng-drive.db)
 - App lock/unlock lifecycle management
 - Rate limiting with exponential backoff
 - Crash recovery for interrupted encrypt/decrypt operations
@@ -331,7 +331,7 @@ SyncAppSettings(settings AppSettings)
 
 **Encrypted Files (when locked):**
 - `rclone.conf` → `rclone.conf.enc`
-- `ns-drive.db` → `ns-drive.db.enc`
+- `ng-drive.db` → `ng-drive.db.enc`
 
 **Always Unencrypted:**
 - `auth.json` — stores password hash, rate limit state, and pre-unlock app settings
@@ -480,7 +480,7 @@ ImportWithDialog(ctx context.Context, options ImportOptions) (*ImportResult, err
 
 ## Data Storage
 
-### SQLite Database (`ns-drive.db`)
+### SQLite Database (`ng-drive.db`)
 
 Primary data store for all application data:
 - Profiles
@@ -504,9 +504,9 @@ Stores password hash, rate limiting state, and pre-unlock app settings. Always u
 
 | File | Purpose |
 |------|---------|
-| `~/.config/ns-drive/rclone.conf` | Rclone remotes (encrypted when locked) |
-| `~/.config/ns-drive/ns-drive.db` | SQLite database (encrypted when locked) |
-| `~/.config/ns-drive/auth.json` | Auth metadata and pre-unlock settings |
+| `~/.config/ng-drive/rclone.conf` | Rclone remotes (encrypted when locked) |
+| `~/.config/ng-drive/ng-drive.db` | SQLite database (encrypted when locked) |
+| `~/.config/ng-drive/auth.json` | Auth metadata and pre-unlock settings |
 
 ---
 

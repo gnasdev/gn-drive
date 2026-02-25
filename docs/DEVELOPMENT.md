@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers setting up your development environment and common development tasks for NS-Drive.
+This guide covers setting up your development environment and common development tasks for NG Drive.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 ```bash
 # Clone repository
 git clone <repository-url>
-cd ns-drive
+cd ng-drive
 
 # Install Go dependencies
 cd desktop && go mod tidy
@@ -89,7 +89,7 @@ The app window opens automatically when ready.
 ## Project Structure
 
 ```
-ns-drive/
+ng-drive/
 ├── desktop/
 │   ├── main.go                 # Application entry point (12 services)
 │   ├── backend/
@@ -210,12 +210,12 @@ cd desktop && go clean -cache
 
 | File | Location | Description |
 |------|----------|-------------|
-| `profiles.json` | `~/.config/ns-drive/` | Sync profiles |
-| `rclone.conf` | `~/.config/ns-drive/` | Remote configurations |
-| `schedules.json` | `~/.config/ns-drive/` | Scheduled tasks |
-| `boards.json` | `~/.config/ns-drive/` | Workflow boards |
-| `history.json` | `~/.config/ns-drive/` | Operation history |
-| `app_settings.json` | `~/.config/ns-drive/` | App settings |
+| `profiles.json` | `~/.config/ng-drive/` | Sync profiles |
+| `rclone.conf` | `~/.config/ng-drive/` | Remote configurations |
+| `schedules.json` | `~/.config/ng-drive/` | Scheduled tasks |
+| `boards.json` | `~/.config/ng-drive/` | Workflow boards |
+| `history.json` | `~/.config/ng-drive/` | Operation history |
+| `app_settings.json` | `~/.config/ng-drive/` | App settings |
 | `config.yml` | `desktop/build/` | Wails dev configuration |
 
 ## Common Issues

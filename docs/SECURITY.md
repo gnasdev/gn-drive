@@ -1,6 +1,6 @@
 # Security: Password Protection & Encryption
 
-NS-Drive supports optional master password protection that encrypts all sensitive data at rest. When enabled, users must enter a password to unlock the app on each launch.
+NG Drive supports optional master password protection that encrypts all sensitive data at rest. When enabled, users must enter a password to unlock the app on each launch.
 
 ## Overview
 
@@ -20,7 +20,7 @@ When password protection is enabled and the app is locked:
 | File | Contents | Encrypted form |
 |------|----------|----------------|
 | `rclone.conf` | OAuth tokens, API keys, remote configs | `rclone.conf.enc` |
-| `ns-drive.db` | Profiles, boards, flows, schedules, history, settings (SQLite) | `ns-drive.db.enc` |
+| `ng-drive.db` | Profiles, boards, flows, schedules, history, settings (SQLite) | `ng-drive.db.enc` |
 
 ### Always Unencrypted
 

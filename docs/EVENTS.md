@@ -1,6 +1,6 @@
 # Event System Documentation
 
-NS-Drive uses an event-driven architecture for backend-to-frontend communication. All events are emitted through a unified channel and handled by the frontend.
+NG Drive uses an event-driven architecture for backend-to-frontend communication. All events are emitted through a unified channel and handled by the frontend.
 
 ## Overview
 
