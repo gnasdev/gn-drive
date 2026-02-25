@@ -6,7 +6,7 @@ import "sync"
 // to avoid duplicate file I/O across services.
 type SharedConfig struct {
 	HomeDir    string
-	ConfigDir  string // e.g. ~/.config/ns-drive/
+	ConfigDir  string // e.g. ~/.config/ng-drive/
 	WorkingDir string
 }
 

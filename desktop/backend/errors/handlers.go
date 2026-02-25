@@ -37,7 +37,7 @@ func getLogFile() *os.File {
 		return os.Stderr
 	}
 
-	logPath := filepath.Join(wd, "ns-drive-errors.log")
+	logPath := filepath.Join(wd, "ng-drive-errors.log")
 	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("Failed to open log file: %v", err)

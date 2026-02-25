@@ -63,9 +63,9 @@ func LoadEnvConfigFromEnvStr(envConfigStr string) beConfig.Config {
 
 	cfg := beConfig.Config{
 		DebugMode:       false,
-		ProfileFilePath: filepath.Join(homeDir, ".config", "ns-drive", "profiles.json"),
-		ResyncFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "resync"),
-		RcloneFilePath:  filepath.Join(homeDir, ".config", "ns-drive", "rclone.conf"),
+		ProfileFilePath: filepath.Join(homeDir, ".config", "ng-drive", "profiles.json"),
+		ResyncFilePath:  filepath.Join(homeDir, ".config", "ng-drive", "resync"),
+		RcloneFilePath:  filepath.Join(homeDir, ".config", "ng-drive", "rclone.conf"),
 	}
 
 	// Parse the env string manually to avoid Viper concurrency issues

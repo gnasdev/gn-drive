@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# NS-Drive macOS Production Build Script
+# NG Drive macOS Production Build Script
 # Creates a signed .app bundle for macOS distribution
 
 set -e
@@ -13,9 +13,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_NAME="ns-drive"
-APP_DISPLAY_NAME="NS-Drive"
-BUNDLE_ID="com.nsdrive.app"
+APP_NAME="ng-drive"
+APP_DISPLAY_NAME="NG Drive"
+BUNDLE_ID="com.ngdrive.app"
 VERSION="${VERSION:-1.0.0}"
 COPYRIGHT="Copyright $(date +%Y)"
 
@@ -186,7 +186,7 @@ create_app_icon() {
     log_info "Creating app icon..."
 
     local ICON_SOURCE="$DESKTOP_DIR/build/appicon.png"
-    local ICONSET_DIR="/tmp/ns-drive-icons.iconset"
+    local ICONSET_DIR="/tmp/ng-drive-icons.iconset"
     local ICON_DEST="$APP_BUNDLE/Contents/Resources/iconfile.icns"
 
     if [ ! -f "$ICON_SOURCE" ]; then
@@ -272,7 +272,7 @@ show_summary() {
 main() {
     echo ""
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}  NS-Drive macOS Production Build${NC}"
+    echo -e "${BLUE}  NG Drive macOS Production Build${NC}"
     echo -e "${BLUE}========================================${NC}"
     echo ""
 

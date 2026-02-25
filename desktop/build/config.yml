@@ -18,7 +18,7 @@ dev_mode:
       - "*.go"
   git_ignore: true
   executes:
-    - cmd: go build -o bin/ns-drive
+    - cmd: go build -o bin/ng-drive
       type: blocking
-    - cmd: ./bin/ns-drive
+    - cmd: ./bin/ng-drive
       type: primary

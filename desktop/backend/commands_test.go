@@ -10,7 +10,7 @@ import (
 
 func TestDeleteRemote_CascadeDeleteProfiles(t *testing.T) {
 	// Create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "ns-drive-test")
+	tempDir, err := os.MkdirTemp("", "ng-drive-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestDeleteRemote_CascadeDeleteProfiles(t *testing.T) {
 
 func TestDeleteRemote_NoProfilesAffected(t *testing.T) {
 	// Create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "ns-drive-test")
+	tempDir, err := os.MkdirTemp("", "ng-drive-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

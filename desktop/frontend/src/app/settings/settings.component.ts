@@ -135,7 +135,7 @@ import {
                                     Start at Login
                                 </p>
                                 <p class="text-xs text-gray-500">
-                                    Automatically start NS-Drive when you log in
+                                    Automatically start NG Drive when you log in
                                 </p>
                             </div>
                             <p-toggleswitch
@@ -223,13 +223,13 @@ import {
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Boards</span>
                             <span class="text-gray-500 font-mono text-xs"
-                                >~/.config/ns-drive/boards.json</span
+                                >~/.config/ng-drive/boards.json</span
                             >
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Rclone Config</span>
                             <span class="text-gray-500 font-mono text-xs"
-                                >~/.config/ns-drive/rclone.conf</span
+                                >~/.config/ng-drive/rclone.conf</span
                             >
                         </div>
                     </div>
@@ -245,7 +245,7 @@ import {
                     </div>
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-400">NS-Drive Version</span>
+                            <span class="text-gray-400">NG Drive Version</span>
                             <span class="text-gray-300">1.0.0</span>
                         </div>
                         <div class="flex justify-between text-sm">

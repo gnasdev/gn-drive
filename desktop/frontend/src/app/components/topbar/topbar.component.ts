@@ -12,7 +12,7 @@ import { AuthService } from '../../services/auth.service';
       <!-- App Name -->
       <div class="flex items-center gap-2">
         <i class="pi pi-cloud text-xl text-sys-fg"></i>
-        <h1 class="text-xl font-bold text-sys-fg">NS-Drive</h1>
+        <h1 class="text-xl font-bold text-sys-fg">NG Drive</h1>
       </div>
 
       <!-- Action Buttons -->

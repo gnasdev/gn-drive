@@ -6,5 +6,5 @@ build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 *.log
 .config
-/ns-drive
-/ns-drive.app
+/ng-drive
+/ng-drive.app

@@ -307,7 +307,7 @@ Please use the following steps to set up your iCloud remote:
 8. Enter the 2FA code from your Apple device
 9. Complete the setup process
 
-After setup, restart NS-Drive to see your iCloud remote.
+After setup, restart NG Drive to see your iCloud remote.
 
 Note: Advanced Data Protection must be disabled in iCloud settings.`, remoteName)
 

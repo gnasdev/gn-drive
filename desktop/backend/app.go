@@ -70,7 +70,7 @@ func (a *App) SetVersionInfo(version, commit string) {
 // GetAppInfo returns application metadata for the frontend
 func (a *App) GetAppInfo(ctx context.Context) AppInfo {
 	return AppInfo{
-		Name:        "NS-Drive",
+		Name:        "NG Drive",
 		Version:     a.appVersion,
 		Commit:      a.appCommit,
 		Description: "A desktop application for rclone file synchronization",

@@ -52,7 +52,7 @@ func CdToNormalizeWorkingDir(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		// In development, we're in /path/to/ns-drive/desktop, we want to go to /path/to/ns-drive
+		// In development, we're in /path/to/ng-drive/desktop, we want to go to /path/to/ng-drive
 		if filepath.Base(wd) == "desktop" {
 			wd = filepath.Dir(wd)
 		}
@@ -195,7 +195,7 @@ func MigrateConfigFiles() error {
 
 	// Define old and new paths
 	oldConfigDir := ".config"
-	newConfigDir := filepath.Join(homeDir, ".config", "ns-drive")
+	newConfigDir := filepath.Join(homeDir, ".config", "ng-drive")
 
 	// Create new config directory if it doesn't exist
 	if err := os.MkdirAll(newConfigDir, 0755); err != nil {

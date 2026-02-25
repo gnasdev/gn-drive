@@ -32,13 +32,13 @@ interface SidebarItem {
                 <div class="flex items-center gap-2 min-w-0">
                     <img
                         src="assets/appicon.png"
-                        alt="NS Drive"
+                        alt="NG Drive"
                         class="w-8 h-8 rounded-full shrink-0"
                     />
                     @if (!collapsed) {
                         <span
                             class="text-gray-200 font-semibold text-sm truncate"
-                            >NS Drive</span
+                            >NG Drive</span
                         >
                     }
                 </div>

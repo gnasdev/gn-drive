@@ -537,7 +537,7 @@ func (a *AuthService) SyncAppSettings(settings AppSettings) {
 func (a *AuthService) recoverFromCrash(cfg *SharedConfig) {
 	files := []string{
 		filepath.Join(cfg.ConfigDir, "rclone.conf"),
-		filepath.Join(cfg.ConfigDir, "ns-drive.db"),
+		filepath.Join(cfg.ConfigDir, "ng-drive.db"),
 	}
 
 	for _, basePath := range files {
@@ -615,11 +615,11 @@ func (a *AuthService) lockInternal() {
 	a.unlocked = false
 }
 
-// encryptConfigFiles encrypts rclone.conf and ns-drive.db
+// encryptConfigFiles encrypts rclone.conf and ng-drive.db
 func (a *AuthService) encryptConfigFiles(cfg *SharedConfig, key []byte) error {
 	filesToEncrypt := []string{
 		filepath.Join(cfg.ConfigDir, "rclone.conf"),
-		filepath.Join(cfg.ConfigDir, "ns-drive.db"),
+		filepath.Join(cfg.ConfigDir, "ng-drive.db"),
 	}
 
 	for _, srcPath := range filesToEncrypt {
@@ -642,11 +642,11 @@ func (a *AuthService) encryptConfigFiles(cfg *SharedConfig, key []byte) error {
 	return nil
 }
 
-// decryptConfigFiles decrypts rclone.conf.enc and ns-drive.db.enc
+// decryptConfigFiles decrypts rclone.conf.enc and ng-drive.db.enc
 func (a *AuthService) decryptConfigFiles(cfg *SharedConfig, key []byte) error {
 	filesToDecrypt := []string{
 		filepath.Join(cfg.ConfigDir, "rclone.conf"),
-		filepath.Join(cfg.ConfigDir, "ns-drive.db"),
+		filepath.Join(cfg.ConfigDir, "ng-drive.db"),
 	}
 
 	for _, basePath := range filesToDecrypt {
@@ -670,7 +670,7 @@ func (a *AuthService) decryptConfigFiles(cfg *SharedConfig, key []byte) error {
 func (a *AuthService) cleanupEncryptedFiles(cfg *SharedConfig) {
 	encFiles := []string{
 		filepath.Join(cfg.ConfigDir, "rclone.conf.enc"),
-		filepath.Join(cfg.ConfigDir, "ns-drive.db.enc"),
+		filepath.Join(cfg.ConfigDir, "ng-drive.db.enc"),
 	}
 	for _, f := range encFiles {
 		os.Remove(f)

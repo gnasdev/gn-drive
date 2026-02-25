@@ -21,7 +21,7 @@ var (
 	sharedDBErr  error
 )
 
-// GetSharedDB returns the singleton database connection to ns-drive.db
+// GetSharedDB returns the singleton database connection to ng-drive.db
 func GetSharedDB() (*sql.DB, error) {
 	sharedDBOnce.Do(func() {
 		cfg := GetSharedConfig()
@@ -30,7 +30,7 @@ func GetSharedDB() (*sql.DB, error) {
 			return
 		}
 
-		dbPath := filepath.Join(cfg.ConfigDir, "ns-drive.db")
+		dbPath := filepath.Join(cfg.ConfigDir, "ng-drive.db")
 		if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 			sharedDBErr = fmt.Errorf("failed to create db directory: %w", err)
 			return

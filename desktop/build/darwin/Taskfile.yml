@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  APP_NAME: ns-drive
+  APP_NAME: ng-drive
   BIN_DIR: bin
   BINARY_NAME: "{{.APP_NAME}}"
 

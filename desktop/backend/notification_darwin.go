@@ -21,7 +21,7 @@ static void requestNotifAuth() {
 			requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
 			completionHandler:^(BOOL granted, NSError *error) {
 				if (error) {
-					NSLog(@"NS-Drive: Notification auth error: %@", error);
+					NSLog(@"NG Drive: Notification auth error: %@", error);
 				}
 			}];
 	});

@@ -45,9 +45,9 @@ func getFrontendLogFile() string {
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Printf("Failed to get working directory: %v", err)
-		return "ns-drive-frontend.log"
+		return "ng-drive-frontend.log"
 	}
-	return filepath.Join(wd, "ns-drive-frontend.log")
+	return filepath.Join(wd, "ng-drive-frontend.log")
 }
 
 // LogEntry logs a frontend log entry
