@@ -110,19 +110,19 @@ export class AboutDialogComponent implements OnInit {
 
   ecosystemApps: EcosystemApp[] = [
     {
-      name: 'ns-shop',
+      name: 'gn-shop',
       description: 'E-commerce fashion store',
       url: 'shop.gnas.dev',
       icon: 'pi pi-shopping-bag',
     },
     {
-      name: 'vocab-kmp',
+      name: 'gn-engreel',
       description: 'Vocabulary learning app',
-      url: 'vocab.gnas.dev',
+      url: 'engreel.gnas.dev',
       icon: 'pi pi-book',
     },
     {
-      name: 'ns-money-kmp',
+      name: 'gn-money',
       description: 'Personal finance manager',
       url: 'money.gnas.dev',
       icon: 'pi pi-wallet',
