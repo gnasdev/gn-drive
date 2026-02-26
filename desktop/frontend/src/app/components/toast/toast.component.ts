@@ -56,9 +56,12 @@ interface ToastItem {
       @for (toast of toasts; track toast.id) {
         <div
           @toastAnim
+          role="button"
+          tabindex="0"
           class="pointer-events-auto border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 flex items-start gap-3 cursor-pointer transition-transform hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
           [ngClass]="getSeverityClasses(toast.severity)"
           (click)="removeToast(toast.id)"
+          (keydown.enter)="removeToast(toast.id)"
         >
           <!-- Icon -->
           <div class="flex-shrink-0 text-lg font-bold mt-0.5">

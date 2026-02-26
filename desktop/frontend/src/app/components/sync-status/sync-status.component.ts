@@ -3,7 +3,7 @@ import { CommonModule } from "@angular/common";
 import { Card } from "primeng/card";
 import { ProgressBar } from "primeng/progressbar";
 import { Tag } from "primeng/tag";
-import { SyncStatus, FileTransferInfo } from "../../models/sync-status.interface";
+import { SyncStatus } from "../../models/sync-status.interface";
 import { NeoDialogComponent } from "../neo/neo-dialog.component";
 
 @Component({

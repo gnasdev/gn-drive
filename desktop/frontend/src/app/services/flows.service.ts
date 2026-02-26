@@ -15,7 +15,7 @@ import {
   GetFlows,
   SaveFlows,
 } from '../../../wailsjs/desktop/backend/services/flowservice.js';
-import { isBoardEvent, isSyncEvent, isSyncStatusDTO, parseEvent, type BoardEvent, type SyncEvent } from '../models/events.js';
+import { isBoardEvent, isSyncEvent, isSyncStatusDTO, parseEvent, type BoardEvent } from '../models/events.js';
 import { type SyncStatus, type SyncStatusEvent } from '../models/sync-status.interface.js';
 import { ErrorService } from './error.service.js';
 import {
@@ -63,7 +63,7 @@ export class FlowsService implements OnDestroy {
       if (parsedEvent && isSyncStatusDTO(parsedEvent)) {
         this.handleSyncStatusEvent(parsedEvent as unknown as SyncStatusEvent);
       } else if (parsedEvent && isSyncEvent(parsedEvent)) {
-        this.handleSyncLogEvent(parsedEvent);
+        this.handleSyncLogEvent();
       }
       if (parsedEvent && isBoardEvent(parsedEvent)) {
         this.handleBoardCompletionEvent(parsedEvent);
@@ -815,7 +815,7 @@ export class FlowsService implements OnDestroy {
     }
   }
 
-  private handleSyncLogEvent(_event: SyncEvent): void {
+  private handleSyncLogEvent(): void {
     // Operation status is managed by executeFlow via board completion events.
     // No need to duplicate status updates here — doing so would prematurely
     // change the operation status and cause the UI to lose the syncStatus display.
