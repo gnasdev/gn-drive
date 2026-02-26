@@ -1,6 +1,6 @@
-# NG Drive Frontend
+# GN Drive Frontend
 
-Angular 21 frontend for NG Drive with Tailwind CSS styling.
+Angular 21 frontend for GN Drive with Tailwind CSS styling.
 
 ## Structure
 

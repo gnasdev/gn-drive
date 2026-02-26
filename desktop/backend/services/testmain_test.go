@@ -7,7 +7,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Set up test database in a temp directory
-	tmpDir, err := os.MkdirTemp("", "ng-drive-test-*")
+	tmpDir, err := os.MkdirTemp("", "gn-drive-test-*")
 	if err != nil {
 		panic("failed to create temp dir: " + err.Error())
 	}

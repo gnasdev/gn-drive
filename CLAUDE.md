@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NG Drive is a desktop application for cloud storage synchronization powered by rclone. Built with Go 1.25 + Wails v3 backend and Angular 21 + Tailwind CSS + PrimeNG frontend. Data stored in SQLite (`~/.config/ng-drive/ng-drive.db`), encrypted when master password is enabled.
+GN Drive is a desktop application for cloud storage synchronization powered by rclone. Built with Go 1.25 + Wails v3 backend and Angular 21 + Tailwind CSS + PrimeNG frontend. Data stored in SQLite (`~/.config/gn-drive/gn-drive.db`), encrypted when master password is enabled.
 
 ## Commands
 
@@ -14,7 +14,7 @@ task dev:fe                # Terminal 1: Angular dev server (port 9245)
 task dev:be                # Terminal 2: Wails backend (after frontend ready)
 
 # Build
-task build                 # Production binary → ./ng-drive
+task build                 # Production binary → ./gn-drive
 task build:macos           # Signed macOS .app bundle
 
 # Test
@@ -101,8 +101,8 @@ import * as models from "../../wailsjs/desktop/backend/models/models";
 
 ### Configuration
 
-All stored in `~/.config/ng-drive/`:
-- `ng-drive.db` — SQLite database (encrypted when auth enabled)
+All stored in `~/.config/gn-drive/`:
+- `gn-drive.db` — SQLite database (encrypted when auth enabled)
 - `rclone.conf` — rclone remotes (encrypted when auth enabled)
 - `auth.json` — Auth metadata and pre-unlock app settings (always plaintext)
 
@@ -115,7 +115,7 @@ All stored in `~/.config/ng-drive/`:
 
 - Frontend uses **Bun** as package manager
 - Dev server port configurable via `WAILS_VITE_PORT` env var (default: 9245)
-- `NG_DRIVE_DEBUG=true` enables debug mode in dev
+- `GN_DRIVE_DEBUG=true` enables debug mode in dev
 - Services use `SetApp()` for EventBus access, wired in main.go after creation
 - Shared SQLite via `GetSharedDB()` singleton pattern with mutex protection
 - Tests clean DB tables for isolation (see `*_test.go` files for patterns)

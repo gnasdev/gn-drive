@@ -47,7 +47,7 @@ interface EcosystemApp {
           <div class="flex items-center gap-3 mb-3">
             <i class="pi pi-cloud text-2xl"></i>
             <div>
-              <h2 class="font-bold text-lg">{{ appInfo?.name || 'NG Drive' }}</h2>
+              <h2 class="font-bold text-lg">{{ appInfo?.name || 'GN Drive' }}</h2>
               <p class="text-xs text-sys-fg-muted">{{ appInfo?.description }}</p>
             </div>
           </div>

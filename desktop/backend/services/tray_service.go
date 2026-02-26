@@ -92,7 +92,7 @@ func (t *TrayService) Initialize() error {
 		t.tray.SetIcon(t.iconData)
 	}
 
-	t.tray.SetTooltip("NG Drive")
+	t.tray.SetTooltip("GN Drive")
 
 	// Build menu
 	t.buildMenu()
@@ -165,7 +165,7 @@ func (t *TrayService) populateMenu(menu *application.Menu) {
 	}
 
 	// Add standard items
-	menu.Add("Open NG Drive").OnClick(func(ctx *application.Context) {
+	menu.Add("Open GN Drive").OnClick(func(ctx *application.Context) {
 		t.showWindow()
 	})
 

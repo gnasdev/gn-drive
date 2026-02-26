@@ -141,8 +141,8 @@ func (n *NotificationService) SetStartAtLogin(ctx context.Context, enabled bool)
 	}
 
 	app := &autostart.App{
-		Name:        "NG Drive",
-		DisplayName: "NG Drive",
+		Name:        "GN Drive",
+		DisplayName: "GN Drive",
 		Exec:        []string{execPath},
 	}
 

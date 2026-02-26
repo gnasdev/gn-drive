@@ -48,7 +48,7 @@ func main() {
 
 	// Create application with all services registered
 	app := application.New(application.Options{
-		Name:        "ng-drive",
+		Name:        "gn-drive",
 		Description: "A desktop application for rclone file synchronization",
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -127,7 +127,7 @@ func main() {
 		log.Printf("Warning: Could not get user home directory: %v", err)
 		homeDir = "."
 	}
-	configDir := filepath.Join(homeDir, ".config", "ng-drive")
+	configDir := filepath.Join(homeDir, ".config", "gn-drive")
 	wd, _ := os.Getwd()
 	services.SetSharedConfig(&services.SharedConfig{
 		HomeDir:    homeDir,
@@ -145,7 +145,7 @@ func main() {
 
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "ng-drive",
+		Title:  "gn-drive",
 		Width:  800,
 		Height: 800,
 	})

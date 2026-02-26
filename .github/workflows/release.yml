@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  APP_NAME: ng-drive
+  APP_NAME: gn-drive
   WAILS_VERSION: v3.0.0-alpha.57
 
 jobs:
@@ -23,15 +23,15 @@ jobs:
           - os: macos-latest
             goos: darwin
             goarch: arm64
-            artifact: ng-drive-darwin-arm64
+            artifact: gn-drive-darwin-arm64
           - os: ubuntu-latest
             goos: linux
             goarch: amd64
-            artifact: ng-drive-linux-amd64
+            artifact: gn-drive-linux-amd64
           - os: windows-latest
             goos: windows
             goarch: amd64
-            artifact: ng-drive-windows-amd64
+            artifact: gn-drive-windows-amd64
 
     runs-on: ${{ matrix.os }}
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
@@ -122,11 +122,11 @@ jobs:
                   <key>CFBundlePackageType</key>
                   <string>APPL</string>
                   <key>CFBundleName</key>
-                  <string>NG Drive</string>
+                  <string>GN Drive</string>
                   <key>CFBundleExecutable</key>
                   <string>${APP_NAME}</string>
                   <key>CFBundleIdentifier</key>
-                  <string>com.ngdrive.app</string>
+                  <string>com.gndrive.app</string>
                   <key>CFBundleVersion</key>
                   <string>${VERSION}</string>
                   <key>CFBundleShortVersionString</key>
@@ -144,19 +144,19 @@ jobs:
           echo -n "APPL????" > "${APP_DIR}/Contents/PkgInfo"
 
           # Generate icons
-          mkdir -p /tmp/ng-drive-icons.iconset
-          sips -z 16 16 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_16x16.png >/dev/null 2>&1
-          sips -z 32 32 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_16x16@2x.png >/dev/null 2>&1
-          sips -z 32 32 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_32x32.png >/dev/null 2>&1
-          sips -z 64 64 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_32x32@2x.png >/dev/null 2>&1
-          sips -z 128 128 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_128x128.png >/dev/null 2>&1
-          sips -z 256 256 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_128x128@2x.png >/dev/null 2>&1
-          sips -z 256 256 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_256x256.png >/dev/null 2>&1
-          sips -z 512 512 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_256x256@2x.png >/dev/null 2>&1
-          sips -z 512 512 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_512x512.png >/dev/null 2>&1
-          sips -z 1024 1024 build/appicon.png --out /tmp/ng-drive-icons.iconset/icon_512x512@2x.png >/dev/null 2>&1
-          iconutil -c icns /tmp/ng-drive-icons.iconset -o "${APP_DIR}/Contents/Resources/iconfile.icns"
-          rm -rf /tmp/ng-drive-icons.iconset
+          mkdir -p /tmp/gn-drive-icons.iconset
+          sips -z 16 16 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_16x16.png >/dev/null 2>&1
+          sips -z 32 32 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_16x16@2x.png >/dev/null 2>&1
+          sips -z 32 32 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_32x32.png >/dev/null 2>&1
+          sips -z 64 64 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_32x32@2x.png >/dev/null 2>&1
+          sips -z 128 128 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_128x128.png >/dev/null 2>&1
+          sips -z 256 256 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_128x128@2x.png >/dev/null 2>&1
+          sips -z 256 256 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_256x256.png >/dev/null 2>&1
+          sips -z 512 512 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_256x256@2x.png >/dev/null 2>&1
+          sips -z 512 512 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_512x512.png >/dev/null 2>&1
+          sips -z 1024 1024 build/appicon.png --out /tmp/gn-drive-icons.iconset/icon_512x512@2x.png >/dev/null 2>&1
+          iconutil -c icns /tmp/gn-drive-icons.iconset -o "${APP_DIR}/Contents/Resources/iconfile.icns"
+          rm -rf /tmp/gn-drive-icons.iconset
 
           # Ad-hoc sign
           codesign --force --deep --sign "-" "${APP_DIR}"

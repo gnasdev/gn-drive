@@ -1,6 +1,6 @@
-# Contributing to NG Drive
+# Contributing to GN Drive
 
-Thank you for your interest in contributing to NG Drive! This document provides guidelines and best practices for contributing.
+Thank you for your interest in contributing to GN Drive! This document provides guidelines and best practices for contributing.
 
 ## Getting Started
 

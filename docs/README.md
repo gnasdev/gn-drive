@@ -1,6 +1,6 @@
-# NG Drive Documentation
+# GN Drive Documentation
 
-Welcome to the NG Drive documentation. This directory contains detailed technical documentation for developers and contributors.
+Welcome to the GN Drive documentation. This directory contains detailed technical documentation for developers and contributors.
 
 ## Documentation Index
 
@@ -21,7 +21,7 @@ Welcome to the NG Drive documentation. This directory contains detailed technica
 
 ## Getting Started
 
-1. **New to NG Drive?** Start with the [main README](../README.md) for installation and quick start
+1. **New to GN Drive?** Start with the [main README](../README.md) for installation and quick start
 2. **Want to contribute?** Read [CONTRIBUTING.md](CONTRIBUTING.md)
 3. **Understanding the architecture?** See [ARCHITECTURE.md](ARCHITECTURE.md)
 4. **Setting up development?** Check [DEVELOPMENT.md](DEVELOPMENT.md)

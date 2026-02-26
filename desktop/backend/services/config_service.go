@@ -88,8 +88,8 @@ func (c *ConfigService) initializeConfig(ctx context.Context) error {
 			homeDir = "."
 		}
 		c.configInfo.EnvConfig = config.Config{
-			ProfileFilePath: filepath.Join(homeDir, ".config", "ng-drive", "profiles.json"),
-			RcloneFilePath:  filepath.Join(homeDir, ".config", "ng-drive", "rclone.conf"),
+			ProfileFilePath: filepath.Join(homeDir, ".config", "gn-drive", "profiles.json"),
+			RcloneFilePath:  filepath.Join(homeDir, ".config", "gn-drive", "rclone.conf"),
 		}
 		wd, _ := os.Getwd()
 		c.configInfo.WorkingDir = wd

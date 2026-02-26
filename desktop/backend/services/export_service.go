@@ -323,12 +323,12 @@ func (e *ExportService) SelectExportFile(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("application not initialized")
 	}
 
-	defaultName := fmt.Sprintf("ng-drive-backup-%s.nsd", time.Now().Format("2006-01-02"))
+	defaultName := fmt.Sprintf("gn-drive-backup-%s.nsd", time.Now().Format("2006-01-02"))
 
 	filePath, err := e.app.Dialog.SaveFile().
 		SetMessage("Export Backup").
 		SetFilename(defaultName).
-		AddFilter("NG Drive Backup", "*.nsd").
+		AddFilter("GN Drive Backup", "*.nsd").
 		AddFilter("All Files", "*.*").
 		PromptForSingleSelection()
 	if err != nil {

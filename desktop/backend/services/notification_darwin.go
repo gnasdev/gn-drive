@@ -20,9 +20,9 @@ func sendPlatformNotification(title, body string) error {
 		useNative = be.NativeNotificationAvailable()
 		if useNative {
 			be.InitNativeNotifications()
-			log.Println("NG Drive: Using native macOS notifications")
+			log.Println("GN Drive: Using native macOS notifications")
 		} else {
-			log.Println("NG Drive: No bundle ID (dev mode), using beeep notifications")
+			log.Println("GN Drive: No bundle ID (dev mode), using beeep notifications")
 		}
 	})
 

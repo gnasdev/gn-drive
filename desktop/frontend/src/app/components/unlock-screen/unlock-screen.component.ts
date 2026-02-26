@@ -23,7 +23,7 @@ import { AuthService, type LockoutStatus } from '../../services/auth.service';
       <div class="w-full max-w-sm p-8 bg-sys-bg border-2 border-sys-border shadow-neo-lg" style="--wails-draggable: no-drag">
         <!-- Logo & Title -->
         <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-sys-fg mb-1">NG Drive</h1>
+          <h1 class="text-2xl font-bold text-sys-fg mb-1">GN Drive</h1>
           <p class="text-sm text-sys-fg-muted">
             @if (isSetupMode) {
               Set a master password to protect your data

@@ -237,7 +237,7 @@ func (i *ImportService) SelectImportFile(ctx context.Context) (string, error) {
 
 	filePath, err := i.app.Dialog.OpenFile().
 		SetMessage("Select Backup File").
-		AddFilter("NG Drive Backup", "*.nsd").
+		AddFilter("GN Drive Backup", "*.nsd").
 		AddFilter("All Files", "*.*").
 		PromptForSingleSelection()
 	if err != nil {
