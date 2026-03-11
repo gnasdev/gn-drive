@@ -43,6 +43,7 @@ func (a *App) SyncWithTab(task string, profile models.Profile, tabId string) int
 
 	if a.oc == nil {
 		log.Printf("ERROR: Event channel is nil, skipping event send")
+		cancel()
 		return 0
 	}
 	a.oc <- j
