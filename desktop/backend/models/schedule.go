@@ -6,8 +6,8 @@ import "time"
 type ScheduleEntry struct {
 	Id          string     `json:"id"`
 	ProfileName string     `json:"profile_name"`
-	Action      string     `json:"action"`      // "pull", "push", "bi", "bi-resync", "copy", "move"
-	CronExpr    string     `json:"cron_expr"`   // cron expression e.g. "0 */6 * * *"
+	Action      string     `json:"action"`    // "pull", "push", "bi", "bi-resync", "copy", "move"
+	CronExpr    string     `json:"cron_expr"` // cron expression e.g. "0 */6 * * *"
 	Enabled     bool       `json:"enabled"`
 	LastRun     *time.Time `json:"last_run,omitempty"`
 	NextRun     *time.Time `json:"next_run,omitempty"`

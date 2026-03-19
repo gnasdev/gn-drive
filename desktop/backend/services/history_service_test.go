@@ -256,4 +256,3 @@ func TestHistoryService_Pagination(t *testing.T) {
 		t.Errorf("expected 0 entries for out-of-range offset, got %d", len(page4))
 	}
 }
-

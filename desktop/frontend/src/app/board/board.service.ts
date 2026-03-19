@@ -19,6 +19,7 @@ import {
     isBoardEvent,
     isSyncEvent,
     parseEvent,
+    SyncEvent,
     type BoardEvent,
 } from "../models/events.js";
 import { ErrorService } from "../services/error.service.js";
@@ -469,7 +470,7 @@ export class BoardService implements OnDestroy {
     }
 
     private handleSyncLogEvent(
-        event: import("../models/events.js").SyncEvent,
+        event: SyncEvent,
     ): void {
         const tabId = event.tabId;
         if (!tabId || !tabId.startsWith("board-")) return;

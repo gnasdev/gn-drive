@@ -22,7 +22,7 @@ type Operation struct {
 	TargetRemote string  `json:"target_remote"`
 	TargetPath   string  `json:"target_path"`
 	Action       string  `json:"action"`
-	SyncConfig   Profile `json:"sync_config"`  // JSON-serialized Profile with all rclone options
+	SyncConfig   Profile `json:"sync_config"` // JSON-serialized Profile with all rclone options
 	IsExpanded   bool    `json:"is_expanded"`
 	SortOrder    int     `json:"sort_order"`
 }

@@ -265,7 +265,11 @@ func (h *HistoryService) enforceHistoryCap() {
 }
 
 // scanHistoryRows scans rows into HistoryEntry slice
-func (h *HistoryService) scanHistoryRows(rows interface{ Next() bool; Scan(...interface{}) error; Err() error }) ([]models.HistoryEntry, error) {
+func (h *HistoryService) scanHistoryRows(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+	Err() error
+}) ([]models.HistoryEntry, error) {
 	var entries []models.HistoryEntry
 	for rows.Next() {
 		var e models.HistoryEntry

@@ -29,18 +29,18 @@ type ImportOptions struct {
 	OverwriteBoards  bool   `json:"overwrite_boards"`  // Overwrite existing boards with same name
 	OverwriteRemotes bool   `json:"overwrite_remotes"` // Overwrite existing remotes with same name
 	MergeMode        bool   `json:"merge_mode"`        // Add new items only, skip existing
-	Password         string `json:"password"`           // Password for encrypted backups
+	Password         string `json:"password"`          // Password for encrypted backups
 }
 
 // ImportPreview shows what will happen during import
 type ImportPreview struct {
 	Valid     bool                  `json:"valid"`
-	Encrypted bool                 `json:"encrypted"` // File is encrypted, needs password
-	Manifest  *ExportManifest      `json:"manifest,omitempty"`
+	Encrypted bool                  `json:"encrypted"` // File is encrypted, needs password
+	Manifest  *ExportManifest       `json:"manifest,omitempty"`
 	Boards    *ImportPreviewSection `json:"boards,omitempty"`
 	Remotes   *ImportPreviewSection `json:"remotes,omitempty"`
-	Warnings  []string             `json:"warnings"`
-	Errors    []string             `json:"errors"`
+	Warnings  []string              `json:"warnings"`
+	Errors    []string              `json:"errors"`
 }
 
 // ImportPreviewSection shows changes for a specific section

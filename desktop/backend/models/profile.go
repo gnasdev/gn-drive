@@ -12,15 +12,15 @@ type Profile struct {
 	CachePath     string   `json:"cache_path"`
 
 	// Filtering
-	MinSize          string `json:"min_size,omitempty"`            // rclone size suffix e.g. "100k", "10M", "1G"
-	MaxSize          string `json:"max_size,omitempty"`            // rclone size suffix
-	FilterFromFile   string `json:"filter_from_file,omitempty"`    // path to filter rules file (--filter-from)
-	ExcludeIfPresent string `json:"exclude_if_present,omitempty"`  // marker filename e.g. ".nosync"
-	UseRegex         bool   `json:"use_regex,omitempty"`           // use regex for include/exclude patterns
-	MaxAge           string `json:"max_age,omitempty"`             // --max-age e.g. "24h","7d"
-	MinAge           string `json:"min_age,omitempty"`             // --min-age e.g. "24h","7d"
-	MaxDepth         *int   `json:"max_depth,omitempty"`           // --max-depth (nil=unlimited)
-	DeleteExcluded   bool   `json:"delete_excluded,omitempty"`     // --delete-excluded
+	MinSize          string `json:"min_size,omitempty"`           // rclone size suffix e.g. "100k", "10M", "1G"
+	MaxSize          string `json:"max_size,omitempty"`           // rclone size suffix
+	FilterFromFile   string `json:"filter_from_file,omitempty"`   // path to filter rules file (--filter-from)
+	ExcludeIfPresent string `json:"exclude_if_present,omitempty"` // marker filename e.g. ".nosync"
+	UseRegex         bool   `json:"use_regex,omitempty"`          // use regex for include/exclude patterns
+	MaxAge           string `json:"max_age,omitempty"`            // --max-age e.g. "24h","7d"
+	MinAge           string `json:"min_age,omitempty"`            // --min-age e.g. "24h","7d"
+	MaxDepth         *int   `json:"max_depth,omitempty"`          // --max-depth (nil=unlimited)
+	DeleteExcluded   bool   `json:"delete_excluded,omitempty"`    // --delete-excluded
 
 	// Safety
 	MaxDelete           *int   `json:"max_delete,omitempty"`            // max files to delete per sync (nil=unlimited)
