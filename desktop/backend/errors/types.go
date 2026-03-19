@@ -22,21 +22,21 @@ const (
 	InvalidCredentials  ErrorCode = "INVALID_CREDENTIALS"
 
 	// Resource errors
-	NotFoundError    ErrorCode = "NOT_FOUND_ERROR"
-	ConflictError    ErrorCode = "CONFLICT_ERROR"
+	NotFoundError      ErrorCode = "NOT_FOUND_ERROR"
+	ConflictError      ErrorCode = "CONFLICT_ERROR"
 	AlreadyExistsError ErrorCode = "ALREADY_EXISTS_ERROR"
 
 	// System errors
-	InternalError     ErrorCode = "INTERNAL_ERROR"
-	DatabaseError     ErrorCode = "DATABASE_ERROR"
-	FileSystemError   ErrorCode = "FILESYSTEM_ERROR"
+	InternalError      ErrorCode = "INTERNAL_ERROR"
+	DatabaseError      ErrorCode = "DATABASE_ERROR"
+	FileSystemError    ErrorCode = "FILESYSTEM_ERROR"
 	ConfigurationError ErrorCode = "CONFIGURATION_ERROR"
 
 	// External service errors
 	ExternalServiceError ErrorCode = "EXTERNAL_SERVICE_ERROR"
-	RcloneError         ErrorCode = "RCLONE_ERROR"
-	NetworkError        ErrorCode = "NETWORK_ERROR"
-	TimeoutError        ErrorCode = "TIMEOUT_ERROR"
+	RcloneError          ErrorCode = "RCLONE_ERROR"
+	NetworkError         ErrorCode = "NETWORK_ERROR"
+	TimeoutError         ErrorCode = "TIMEOUT_ERROR"
 
 	// Business logic errors
 	BusinessLogicError ErrorCode = "BUSINESS_LOGIC_ERROR"
@@ -94,7 +94,7 @@ func NewAppErrorWithCause(code ErrorCode, message string, cause error) *AppError
 	if cause != nil {
 		details = cause.Error()
 	}
-	
+
 	return &AppError{
 		Code:      code,
 		Message:   message,

@@ -656,9 +656,9 @@ func migrateOperationsToSyncConfig(db *sql.DB) {
 	}
 
 	type oldOp struct {
-		id, flowId, sourceRemote, sourcePath, targetRemote, targetPath string
+		id, flowId, sourceRemote, sourcePath, targetRemote, targetPath      string
 		action, bandwidth, includedPaths, excludedPaths, conflictResolution string
-		parallel, dryRun, isExpanded, sortOrder                            int
+		parallel, dryRun, isExpanded, sortOrder                             int
 	}
 	var ops []oldOp
 	for rows.Next() {

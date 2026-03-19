@@ -60,9 +60,9 @@ func TestValidateRclonePath_LocalPath(t *testing.T) {
 		wantErr bool
 	}{
 		{"/home/user/documents", false},
-		{"/", true},       // Too short
-		{"", true},        // Empty
-		{"../etc", true},  // Path traversal
+		{"/", true},      // Too short
+		{"", true},       // Empty
+		{"../etc", true}, // Path traversal
 	}
 
 	for _, tt := range tests {
@@ -83,9 +83,9 @@ func TestValidateRclonePath_RemotePath(t *testing.T) {
 		{"gdrive:backup", false},
 		{"my-remote:path/to/files", false},
 		{"remote_name:folder", false},
-		{":path", true},           // Empty remote name
+		{":path", true},             // Empty remote name
 		{"invalid@name:path", true}, // Invalid characters in remote name
-		{"name", true},             // No colon separator
+		{"name", true},              // No colon separator
 	}
 
 	for _, tt := range tests {
@@ -148,8 +148,8 @@ func TestValidateRemoteName(t *testing.T) {
 		{"gdrive", false},
 		{"my-remote", false},
 		{"remote_123", false},
-		{"", true},              // Empty
-		{"invalid@name", true},  // Invalid character
+		{"", true},                // Empty
+		{"invalid@name", true},    // Invalid character
 		{"name with space", true}, // Space
 	}
 
@@ -197,11 +197,11 @@ func TestValidateDuration(t *testing.T) {
 		value   string
 		wantErr bool
 	}{
-		{"", false},       // Empty = not set
-		{"30s", false},    // Seconds
-		{"5m", false},     // Minutes
-		{"1h", false},     // Hours
-		{"1h30m", false},  // Combined
+		{"", false},         // Empty = not set
+		{"30s", false},      // Seconds
+		{"5m", false},       // Minutes
+		{"1h", false},       // Hours
+		{"1h30m", false},    // Combined
 		{"2h45m30s", false}, // Full format
 		{"invalid", true},   // Invalid
 		{"abc", true},       // Invalid
@@ -223,7 +223,7 @@ func TestValidateConflictResolution(t *testing.T) {
 		value   string
 		wantErr bool
 	}{
-		{"", false},        // Empty = default
+		{"", false}, // Empty = default
 		{"newer", false},
 		{"older", false},
 		{"larger", false},
@@ -336,11 +336,11 @@ func TestValidateRegexPatterns(t *testing.T) {
 		patterns []string
 		wantErr  bool
 	}{
-		{[]string{}, false},                         // Empty
-		{[]string{`.*\.txt$`}, false},               // Valid regex
-		{[]string{`^test`, `\d+`}, false},           // Multiple valid
-		{[]string{`[invalid`}, true},                // Invalid regex (unclosed bracket)
-		{[]string{`valid`, `[invalid`}, true},       // One invalid
+		{[]string{}, false},                   // Empty
+		{[]string{`.*\.txt$`}, false},         // Valid regex
+		{[]string{`^test`, `\d+`}, false},     // Multiple valid
+		{[]string{`[invalid`}, true},          // Invalid regex (unclosed bracket)
+		{[]string{`valid`, `[invalid`}, true}, // One invalid
 	}
 
 	for _, tt := range tests {
@@ -366,7 +366,7 @@ func TestValidateProfile_WithNewFields(t *testing.T) {
 		MaxSize:            "1G",
 		ConflictResolution: "newer",
 		MaxDelete:          intPtr(100),
-		MultiThreadStreams:  intPtr(4),
+		MultiThreadStreams: intPtr(4),
 		BufferSize:         "64M",
 		Retries:            intPtr(3),
 		LowLevelRetries:    intPtr(10),

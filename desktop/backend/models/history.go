@@ -6,8 +6,8 @@ import "time"
 type HistoryEntry struct {
 	Id               string    `json:"id"`
 	ProfileName      string    `json:"profile_name"`
-	Action           string    `json:"action"`           // "pull", "push", "bi", "bi-resync", "copy", "move", etc.
-	Status           string    `json:"status"`           // "completed", "failed", "cancelled"
+	Action           string    `json:"action"` // "pull", "push", "bi", "bi-resync", "copy", "move", etc.
+	Status           string    `json:"status"` // "completed", "failed", "cancelled"
 	StartTime        time.Time `json:"start_time"`
 	EndTime          time.Time `json:"end_time"`
 	Duration         string    `json:"duration"`

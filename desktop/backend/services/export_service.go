@@ -49,8 +49,8 @@ type ExportOptions struct {
 	IncludeBoards   bool   `json:"include_boards"`
 	IncludeRemotes  bool   `json:"include_remotes"`
 	IncludeSettings bool   `json:"include_settings"`
-	ExcludeTokens   bool   `json:"exclude_tokens"`    // Export remotes without sensitive tokens
-	EncryptPassword string `json:"encrypt_password"`   // If set, encrypt the export file
+	ExcludeTokens   bool   `json:"exclude_tokens"`   // Export remotes without sensitive tokens
+	EncryptPassword string `json:"encrypt_password"` // If set, encrypt the export file
 }
 
 // ExportManifest contains metadata about the export
