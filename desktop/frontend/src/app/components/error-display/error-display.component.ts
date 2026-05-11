@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subscription } from "rxjs";

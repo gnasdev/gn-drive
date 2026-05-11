@@ -1,5 +1,7 @@
 package dto
 
+// GN Drive note: Defines transport objects passed between backend commands and the frontend.
+
 import (
 	"encoding/json"
 	"time"

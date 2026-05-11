@@ -1,5 +1,7 @@
 package config
 
+// GN Drive note: Loads process and application configuration for the GN Drive backend.
+
 type Config struct {
 	DebugMode       bool   `mapstructure:"DEBUG_MODE"`
 	ProfileFilePath string `mapstructure:"PROFILE_FILE_PATH"`

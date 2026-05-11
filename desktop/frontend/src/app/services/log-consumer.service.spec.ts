@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { TestBed } from "@angular/core/testing";
 import { SyncEvent } from "../models/events";
 import { TabService } from "../tab.service";

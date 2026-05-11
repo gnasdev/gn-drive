@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { Injectable } from "@angular/core";
 import { LogFrontendMessage } from "@bindings/desktop/backend/app";
 import { FrontendLogEntry as BackendLogEntry } from "@bindings/desktop/backend/models/models";

@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the log service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -31,14 +33,14 @@ func NewLogService() *LogService {
 }
 
 // SetApp sets the application reference for events
-func (s *LogService) SetApp(app *application.App) {
+func (s *LogService) setApp(app *application.App) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.app = app
 }
 
 // SetEventBus sets the event bus for emitting events
-func (s *LogService) SetEventBus(eventBus *events.WailsEventBus) {
+func (s *LogService) setEventBus(eventBus *events.WailsEventBus) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.eventBus = eventBus

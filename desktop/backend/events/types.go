@@ -1,5 +1,7 @@
 package events
 
+// GN Drive note: Defines event plumbing used to publish backend state changes to the frontend.
+
 import "time"
 
 // EventType defines the type of event

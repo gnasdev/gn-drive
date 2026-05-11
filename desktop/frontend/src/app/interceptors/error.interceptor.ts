@@ -1,3 +1,4 @@
+/** GN Drive note: Intercepts frontend requests so backend errors are normalized for the UI. */
 import { Injectable, inject } from "@angular/core";
 import {
   HttpInterceptor,

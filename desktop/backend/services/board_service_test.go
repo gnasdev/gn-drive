@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the board service test service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/models"

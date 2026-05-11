@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { Component, computed, input, ChangeDetectionStrategy } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Card } from "primeng/card";

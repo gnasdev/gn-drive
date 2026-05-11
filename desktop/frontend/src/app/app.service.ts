@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for app. */
 import { Injectable, OnDestroy, inject } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 // Import models from the new v3 bindings

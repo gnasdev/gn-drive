@@ -1,5 +1,7 @@
 package utils
 
+// GN Drive note: Provides shared backend utility helpers for GN Drive runtime operations.
+
 import (
 	"context"
 	"desktop/backend/dto"

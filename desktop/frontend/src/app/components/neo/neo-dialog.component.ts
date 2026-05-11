@@ -1,3 +1,4 @@
+/** GN Drive note: Provides a reusable Neo-styled UI primitive for GN Drive screens. */
 import { Component, Input, Output, EventEmitter, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 

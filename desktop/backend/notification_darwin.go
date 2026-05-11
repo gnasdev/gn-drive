@@ -2,6 +2,8 @@
 
 package backend
 
+// GN Drive note: Supports the Go backend for notification darwin.
+
 /*
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa -framework UserNotifications
@@ -50,6 +52,24 @@ static void sendNotif(const char *title, const char *body) {
 		[nsBody release];
 	});
 }
+
+static int getNotifAuthStatus() {
+	__block NSInteger status = -1;
+	dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+
+	[[UNUserNotificationCenter currentNotificationCenter]
+		getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+			status = settings.authorizationStatus;
+			dispatch_semaphore_signal(sem);
+		}];
+
+	dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC);
+	if (dispatch_semaphore_wait(sem, timeout) != 0) {
+		return -2;
+	}
+
+	return (int)status;
+}
 */
 import "C"
 
@@ -81,4 +101,24 @@ func SendNativeNotification(title, body string) {
 	defer C.free(unsafe.Pointer(cBody))
 
 	C.sendNotif(cTitle, cBody)
+}
+
+// GetNativeNotificationAuthorizationStatus returns the macOS notification permission state.
+func GetNativeNotificationAuthorizationStatus() string {
+	switch int(C.getNotifAuthStatus()) {
+	case 0:
+		return "not_determined"
+	case 1:
+		return "denied"
+	case 2:
+		return "authorized"
+	case 3:
+		return "provisional"
+	case 4:
+		return "ephemeral"
+	case -2:
+		return "timeout"
+	default:
+		return "unknown"
+	}
 }

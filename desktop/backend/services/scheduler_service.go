@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the scheduler service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -38,7 +40,7 @@ func NewSchedulerService(app *application.App) *SchedulerService {
 }
 
 // SetApp sets the application reference for events
-func (s *SchedulerService) SetApp(app *application.App) {
+func (s *SchedulerService) setApp(app *application.App) {
 	s.app = app
 	if bus := GetSharedEventBus(); bus != nil {
 		s.eventBus = bus
@@ -48,7 +50,7 @@ func (s *SchedulerService) SetApp(app *application.App) {
 }
 
 // SetSyncService sets the sync service dependency for triggering syncs
-func (s *SchedulerService) SetSyncService(syncService *SyncService) {
+func (s *SchedulerService) setSyncService(syncService *SyncService) {
 	s.syncService = syncService
 }
 

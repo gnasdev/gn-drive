@@ -1,5 +1,7 @@
 package errors
 
+// GN Drive note: Centralizes backend error handling so failures reach the UI in a consistent shape.
+
 import (
 	"desktop/backend/models"
 	"fmt"

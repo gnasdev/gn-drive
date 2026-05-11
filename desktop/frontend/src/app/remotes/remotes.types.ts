@@ -1,3 +1,4 @@
+/** GN Drive note: Powers the remote configuration workflow in the GN Drive UI. */
 /**
  * Type definitions for the remotes component
  */

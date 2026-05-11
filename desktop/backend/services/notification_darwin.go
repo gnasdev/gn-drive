@@ -2,6 +2,8 @@
 
 package services
 
+// GN Drive note: Coordinates the notification darwin service behavior exposed to the desktop application.
+
 import (
 	be "desktop/backend"
 	"log"
@@ -32,4 +34,21 @@ func sendPlatformNotification(title, body string) error {
 	}
 
 	return beeep.Notify(title, body, "")
+}
+
+func getPlatformNotificationStatus() NotificationStatus {
+	if !be.NativeNotificationAvailable() {
+		return NotificationStatus{
+			NativeProvider:  "beeep",
+			NativeAvailable: false,
+			Permission:      "unmanaged",
+			Detail:          "macOS bundle identifier is missing; development mode uses beeep fallback notifications",
+		}
+	}
+
+	return NotificationStatus{
+		NativeProvider:  "usernotifications",
+		NativeAvailable: true,
+		Permission:      be.GetNativeNotificationAuthorizationStatus(),
+	}
 }

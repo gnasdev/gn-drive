@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a modal dialog used by the GN Drive desktop interface. */
 import { CommonModule, DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,

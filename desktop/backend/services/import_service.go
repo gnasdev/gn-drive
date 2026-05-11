@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the import service service behavior exposed to the desktop application.
+
 import (
 	"bytes"
 	"context"
@@ -80,7 +82,7 @@ func NewImportService(app *application.App) *ImportService {
 }
 
 // SetApp sets the application reference
-func (i *ImportService) SetApp(app *application.App) {
+func (i *ImportService) setApp(app *application.App) {
 	i.app = app
 }
 

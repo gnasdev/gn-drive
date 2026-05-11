@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { CommonModule } from "@angular/common";
 import {
     ChangeDetectionStrategy,

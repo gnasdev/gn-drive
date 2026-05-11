@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the board service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -76,7 +78,7 @@ func (b *BoardService) ClearExecutionLogs(ctx context.Context) {
 }
 
 // SetApp sets the application reference for events
-func (b *BoardService) SetApp(app *application.App) {
+func (b *BoardService) setApp(app *application.App) {
 	b.app = app
 	if bus := GetSharedEventBus(); bus != nil {
 		b.eventBus = bus
@@ -86,12 +88,12 @@ func (b *BoardService) SetApp(app *application.App) {
 }
 
 // SetSyncService sets the sync service dependency
-func (b *BoardService) SetSyncService(syncService *SyncService) {
+func (b *BoardService) setSyncService(syncService *SyncService) {
 	b.syncService = syncService
 }
 
 // SetNotificationService sets the notification service for desktop notifications
-func (b *BoardService) SetNotificationService(notificationService *NotificationService) {
+func (b *BoardService) setNotificationService(notificationService *NotificationService) {
 	b.notificationService = notificationService
 }
 
@@ -1273,7 +1275,7 @@ func (b *BoardService) emitBoardEvent(eventType events.EventType, boardId, edgeI
 
 // OnRemoteDeleted handles cleanup when a remote is deleted
 // Removes nodes referencing the deleted remote and any edges connected to them
-func (b *BoardService) OnRemoteDeleted(remoteName string) error {
+func (b *BoardService) onRemoteDeleted(remoteName string) error {
 	if err := b.ensureInitialized(); err != nil {
 		return err
 	}

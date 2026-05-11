@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the history service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -30,7 +32,7 @@ func NewHistoryService(app *application.App) *HistoryService {
 }
 
 // SetApp sets the application reference for events
-func (h *HistoryService) SetApp(app *application.App) {
+func (h *HistoryService) setApp(app *application.App) {
 	h.app = app
 	if bus := GetSharedEventBus(); bus != nil {
 		h.eventBus = bus

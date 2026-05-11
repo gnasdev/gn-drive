@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the visual flow board where users compose sync operations. */
 import * as models from "../../../wailsjs/desktop/backend/models/models.js";
 
 // Re-export generated types for convenience

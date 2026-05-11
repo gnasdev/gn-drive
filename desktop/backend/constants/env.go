@@ -1,5 +1,7 @@
 package constants
 
+// GN Drive note: Keeps backend constants in one place for platform and environment handling.
+
 type Environment int
 
 const (

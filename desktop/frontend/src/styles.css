@@ -1,3 +1,4 @@
+/* GN Drive note: Defines global frontend styles shared across the GN Drive application. */
 @import "tailwindcss";
 
 @config "../tailwind.config.js";

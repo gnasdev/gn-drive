@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for app. */
 import { ApplicationConfig, ErrorHandler, provideZonelessChangeDetection } from "@angular/core";
 import { provideHttpClient, HTTP_INTERCEPTORS } from "@angular/common/http";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";

@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the db service behavior exposed to the desktop application.
+
 import (
 	"database/sql"
 	"encoding/json"

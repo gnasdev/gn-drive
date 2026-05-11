@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines history data structures shared by backend services and Wails bindings.
+
 import "time"
 
 // HistoryEntry represents a record of a completed sync/operation

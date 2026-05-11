@@ -1,3 +1,4 @@
+/** GN Drive note: Renders reusable flow controls for the main sync workspace. */
 import { ChangeDetectorRef, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';

@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for app. */
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ConfirmDialog } from 'primeng/confirmdialog';

@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the operation service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	beConfig "desktop/backend/config"
@@ -48,7 +50,7 @@ func NewOperationService(app *application.App) *OperationService {
 }
 
 // SetApp sets the application reference for events
-func (o *OperationService) SetApp(app *application.App) {
+func (o *OperationService) setApp(app *application.App) {
 	o.app = app
 	if bus := GetSharedEventBus(); bus != nil {
 		o.eventBus = bus
@@ -58,7 +60,7 @@ func (o *OperationService) SetApp(app *application.App) {
 }
 
 // SetEnvConfig sets the environment configuration
-func (o *OperationService) SetEnvConfig(config beConfig.Config) {
+func (o *OperationService) setEnvConfig(config beConfig.Config) {
 	o.envConfig = config
 	// Initialize rclone global state once
 	if err := rclone.InitGlobal(config.DebugMode); err != nil {

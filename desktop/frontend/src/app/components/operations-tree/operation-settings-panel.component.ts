@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';

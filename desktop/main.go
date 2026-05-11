@@ -1,6 +1,9 @@
 package main
 
+// GN Drive note: Bootstraps Wails, registers backend services, and starts the GN Drive desktop app.
+
 import (
+	"context"
 	be "desktop/backend"
 	"desktop/backend/services"
 	"desktop/backend/utils"
@@ -28,7 +31,6 @@ var appIcon []byte
 func main() {
 	// Create service instances
 	appService := be.NewApp()
-	appService.SetVersionInfo(Version, Commit)
 	logService := services.NewLogService()
 	authService := services.NewAuthService(nil)
 	syncService := services.NewSyncService(nil)
@@ -74,26 +76,30 @@ func main() {
 	})
 
 	// Store the application reference in all services for events
-	appService.SetApp(app)
-	logService.SetApp(app)
-	authService.SetApp(app)
-	syncService.SetApp(app)
-	configService.SetApp(app)
-	remoteService.SetApp(app)
-	tabService.SetApp(app)
-	operationService.SetApp(app)
-	historyService.SetApp(app)
-	schedulerService.SetApp(app)
-	notificationService.SetApp(app)
-	cryptService.SetApp(app)
-	boardService.SetApp(app)
-	exportService.SetApp(app)
-	importService.SetApp(app)
-	flowService.SetApp(app)
+	be.ConfigureRuntime(appService, app, Version, Commit)
+	services.AttachApp(
+		app,
+		logService,
+		authService,
+		syncService,
+		configService,
+		remoteService,
+		tabService,
+		operationService,
+		historyService,
+		schedulerService,
+		notificationService,
+		cryptService,
+		boardService,
+		exportService,
+		importService,
+		flowService,
+	)
 
 	// Wire AuthService dependencies
-	authService.SetAppService(appService)
-	authService.SetNotificationService(notificationService)
+	services.ConfigureAuthService(authService, func(ctx context.Context) error {
+		return be.CompleteInitialization(appService, ctx)
+	}, notificationService)
 
 	// Load env config and wire to SyncService
 	envConfig := utils.LoadEnvConfigFromEnvStr(be.GetEmbeddedEnvConfigStr())
@@ -102,14 +108,11 @@ func main() {
 		envConfig.DebugMode = true
 		log.Println("[main] Debug mode enabled via NS_DRIVE_DEBUG env var")
 	}
-	syncService.SetEnvConfig(envConfig)
+	services.ConfigureSyncService(syncService, envConfig, logService, notificationService)
 
 	// Wire up service dependencies
-	schedulerService.SetSyncService(syncService)
-	boardService.SetSyncService(syncService)
-	boardService.SetNotificationService(notificationService)
-	syncService.SetLogService(logService)
-	syncService.SetNotificationService(notificationService)
+	services.ConfigureSchedulerService(schedulerService, syncService)
+	services.ConfigureBoardService(boardService, syncService, notificationService)
 
 	// Set singleton instances for cross-service access
 	services.SetBoardServiceInstance(boardService)
@@ -117,7 +120,7 @@ func main() {
 	services.SetTrayServiceInstance(trayService)
 
 	// Wire up tray service dependencies
-	trayService.SetApp(app)
+	services.AttachApp(app, trayService)
 	trayService.SetBoardService(boardService)
 	trayService.SetFlowService(flowService)
 
@@ -141,7 +144,8 @@ func main() {
 	// - Wait for password unlock, then initialize DB (if auth enabled)
 
 	// Read pre-unlock settings from auth.json for tray/startup behavior
-	preSettings := authService.GetPreUnlockSettings()
+	preSettings := services.GetPreUnlockSettings(authService)
+	services.ApplyPreUnlockSettings(notificationService, preSettings)
 
 	// Create the main window
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -154,7 +158,7 @@ func main() {
 	services.SetSharedEventBusWindow(window)
 
 	// Set EventBus on LogService after window is ready
-	logService.SetEventBus(services.GetSharedEventBus())
+	services.ConfigureLogService(logService, services.GetSharedEventBus())
 
 	// Set the window URL to load the frontend
 	window.SetURL("/")

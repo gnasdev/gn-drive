@@ -1,3 +1,4 @@
+# GN Drive note: Configures platform-specific build behavior for the GN Drive desktop bundle.
 dev_mode:
   root_path: .
   log_level: warn

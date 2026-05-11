@@ -1,3 +1,4 @@
+/** GN Drive note: Defines frontend types that mirror GN Drive runtime state. */
 // Event types matching backend events/types.go
 
 export type EventType =

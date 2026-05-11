@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the testmain test service behavior exposed to the desktop application.
+
 import (
 	"os"
 	"testing"

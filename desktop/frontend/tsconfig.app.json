@@ -6,5 +6,11 @@
     "types": [],
   },
   "files": ["src/main.ts"],
-  "include": ["src/**/*.d.ts"],
+  "include": [
+    "src/**/*.d.ts",
+    "bindings/**/models.ts",
+    "bindings/desktop/backend/app.ts",
+    "bindings/desktop/backend/services/*service.ts",
+    "bindings/github.com/wailsapp/wails/v3/internal/eventcreate.ts"
+  ],
 }

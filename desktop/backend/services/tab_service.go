@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the tab service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -53,7 +55,7 @@ func NewTabService(app *application.App) *TabService {
 }
 
 // SetApp sets the application reference for events
-func (t *TabService) SetApp(app *application.App) {
+func (t *TabService) setApp(app *application.App) {
 	t.app = app
 }
 

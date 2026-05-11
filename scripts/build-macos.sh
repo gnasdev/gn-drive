@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# GN Drive note: Automates a GN Drive maintenance or packaging workflow.
+
 # GN Drive macOS Production Build Script
 # Creates a signed .app bundle for macOS distribution
 
@@ -50,7 +52,7 @@ check_prerequisites() {
 
     # Check Go
     if ! command -v go &> /dev/null; then
-        log_error "Go is not installed. Please install Go 1.25+"
+        log_error "Go is not installed. Please install Go 1.26.3+"
         exit 1
     fi
     GO_VERSION=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
@@ -73,7 +75,7 @@ check_prerequisites() {
     # Check/Install wails3
     if ! command -v wails3 &> /dev/null; then
         log_warning "wails3 not found. Installing..."
-        go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
         export PATH="$PATH:$(go env GOPATH)/bin"
     fi
     WAILS_VERSION=$(wails3 version 2>/dev/null | head -1 || echo "unknown")

@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the log buffer test service behavior exposed to the desktop application.
+
 import (
 	"sync"
 	"testing"

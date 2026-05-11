@@ -1,5 +1,7 @@
 package validation
 
+// GN Drive note: Validates GN Drive inputs before they are persisted or used in sync operations.
+
 import (
 	"desktop/backend/models"
 	"fmt"

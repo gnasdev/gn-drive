@@ -1,5 +1,7 @@
 package backend
 
+// GN Drive note: Supports the Go backend for app.
+
 import (
 	"context"
 	"desktop/backend/errors"
@@ -56,13 +58,19 @@ func NewAppWithApplication(app *application.App) *App {
 	}
 }
 
-// SetApp sets the application reference for events
-func (a *App) SetApp(app *application.App) {
+// ConfigureRuntime wires runtime-only dependencies that must not be exposed as Wails methods.
+func ConfigureRuntime(a *App, app *application.App, version, commit string) {
+	a.setApp(app)
+	a.setVersionInfo(version, commit)
+}
+
+// setApp sets the application reference for events
+func (a *App) setApp(app *application.App) {
 	a.app = app
 }
 
-// SetVersionInfo sets the version and commit info from build-time ldflags
-func (a *App) SetVersionInfo(version, commit string) {
+// setVersionInfo sets the version and commit info from build-time ldflags
+func (a *App) setVersionInfo(version, commit string) {
 	a.appVersion = version
 	a.appCommit = commit
 }
@@ -122,9 +130,14 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 	return nil
 }
 
-// CompleteInitialization performs Phase 2 init: loads profiles, rclone config, and caches remotes.
+// CompleteInitialization performs Phase 2 init for the legacy App bridge.
+func CompleteInitialization(a *App, ctx context.Context) error {
+	return a.completeInitialization(ctx)
+}
+
+// completeInitialization loads profiles, rclone config, and caches remotes.
 // Called by AuthService after unlock (or immediately if no auth).
-func (a *App) CompleteInitialization(ctx context.Context) error {
+func (a *App) completeInitialization(ctx context.Context) error {
 	a.initMutex.Lock()
 	defer a.initMutex.Unlock()
 
@@ -160,7 +173,7 @@ func (a *App) initializeConfig() {
 	if a.initialized {
 		return
 	}
-	if err := a.CompleteInitialization(context.Background()); err != nil {
+	if err := a.completeInitialization(context.Background()); err != nil {
 		log.Printf("Warning: Failed to complete initialization: %v", err)
 	}
 }

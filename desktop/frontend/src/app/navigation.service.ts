@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for navigation. */
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 
