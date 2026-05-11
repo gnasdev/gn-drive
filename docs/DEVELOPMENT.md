@@ -47,25 +47,10 @@ cd ../..
 
 ## Development Mode
 
-Development requires running two separate processes.
-
-### Terminal 1: Frontend Dev Server
+Development is started through Wails, which starts the frontend dev server in the background and then runs the backend app.
 
 ```bash
-task dev:fe
-```
-
-Wait for:
-```
-✔ Building...
-Application bundle generation complete.
-  ➜  Local:   http://localhost:9245/
-```
-
-### Terminal 2: Wails Backend
-
-```bash
-task dev:be
+task dev
 ```
 
 The app window opens automatically when ready.
@@ -80,8 +65,7 @@ The app window opens automatically when ready.
 | Command | Description |
 |---------|-------------|
 | `task build` | Production build |
-| `task dev:fe` | Start frontend dev server |
-| `task dev:be` | Start Wails backend (requires frontend) |
+| `task dev` | Start Wails dev mode, including the frontend dev server |
 | `task lint` | Lint both frontend and backend |
 | `task lint:fe` | ESLint on frontend |
 | `task lint:be` | golangci-lint on backend |
@@ -171,7 +155,7 @@ npm test
 
 ### Backend Logs
 
-Backend logs appear in the terminal running `task dev:be`:
+Backend logs appear in the terminal running `task dev`:
 
 ```
 NOTICE: SyncService starting up...
@@ -187,7 +171,7 @@ Open browser DevTools (if using external browser) or check Wails dev console.
 
 ```bash
 # Check if frontend is running
-curl http://localhost:9245
+curl http://127.0.0.1:9245
 
 # Verify Go modules
 cd desktop && go mod verify
@@ -229,8 +213,8 @@ lsof -i :9245
 # Kill it
 kill -9 <PID>
 
-# Or use different port
-WAILS_VITE_PORT=9246 task dev:fe
+# Or use a different port for full Wails dev mode
+WAILS_VITE_PORT=9246 task dev
 ```
 
 ### Wails3 Not Found

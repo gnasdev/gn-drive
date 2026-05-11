@@ -65,22 +65,14 @@ tasks:
       - go build -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
 
-  dev:fe:
-    summary: Starts the frontend development server
-    dir: desktop/frontend
-    cmds:
-      - task: prepare:bindings
-      - echo "Starting frontend development server on port {{.VITE_PORT}}..."
-      - bun start --port {{.VITE_PORT}}
-
-  dev:be:
-    summary: Runs the application in development mode (run 'task dev:frontend' in another terminal first)
+  dev:
+    summary: Runs the application in development mode
     dir: desktop
     env:
       NS_DRIVE_DEBUG: "true"
     cmds:
       - echo "Starting Wails development mode (debug mode enabled)..."
-      - echo "Make sure frontend dev server is running on port {{.VITE_PORT}}"
+      - echo "Wails will start the frontend dev server on port {{.VITE_PORT}}"
       - task: prepare:embed-assets
       - "{{.WAILS3_BIN}} dev -config ./build/config.yml -port {{.VITE_PORT}}"
 

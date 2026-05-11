@@ -19,6 +19,9 @@ dev_mode:
       - "*.go"
   git_ignore: true
   executes:
+    - cmd: bun run start:wails
+      dir: frontend
+      type: background
     - cmd: go build -o bin/gn-drive
       type: blocking
     - cmd: ./bin/gn-drive
