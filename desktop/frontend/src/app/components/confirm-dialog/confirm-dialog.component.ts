@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { ButtonModule } from "primeng/button";

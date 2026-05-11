@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines board data structures shared by backend services and Wails bindings.
+
 import "time"
 
 // BoardNode represents a remote storage endpoint on the board canvas

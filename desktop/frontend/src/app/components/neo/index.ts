@@ -1,3 +1,4 @@
+/** GN Drive note: Provides a reusable Neo-styled UI primitive for GN Drive screens. */
 export * from './neo-button.component';
 export * from './neo-card.component';
 export * from './neo-input.component';

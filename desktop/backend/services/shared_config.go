@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the shared config service behavior exposed to the desktop application.
+
 import "sync"
 
 // SharedConfig holds common configuration computed once at startup

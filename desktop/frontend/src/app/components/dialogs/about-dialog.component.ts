@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a modal dialog used by the GN Drive desktop interface. */
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -9,6 +10,7 @@ import {
   OnInit,
   Output,
 } from '@angular/core';
+import { Browser } from '@wailsio/runtime';
 import { GetAppInfo } from '../../../../wailsjs/desktop/backend/app';
 import { NeoCardComponent } from '../neo/neo-card.component';
 import { NeoDialogComponent } from '../neo/neo-dialog.component';
@@ -24,6 +26,7 @@ interface EcosystemApp {
   name: string;
   description: string;
   url: string;
+  href: string;
   icon: string;
 }
 
@@ -78,7 +81,15 @@ interface EcosystemApp {
                 <div class="flex-1">
                   <p class="text-sm font-medium">{{ app.name }}</p>
                   <p class="text-xs text-sys-fg-muted">{{ app.description }}</p>
-                  <p class="text-xs text-sys-fg-muted font-mono">{{ app.url }}</p>
+                  <a
+                    [href]="app.href"
+                    (click)="openExternalLink($event, app.href)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-xs text-primary-400 hover:underline font-mono"
+                  >
+                    {{ app.url }}
+                  </a>
                 </div>
               </div>
             }
@@ -92,8 +103,24 @@ interface EcosystemApp {
             <h2 class="font-bold">Author</h2>
           </div>
           <div class="text-sm">
-            <p class="font-medium">gnas.dev</p>
-            <p class="text-xs text-sys-fg-muted font-mono">https://gnas.dev</p>
+            <a
+              href="https://gnas.dev"
+              (click)="openExternalLink($event, 'https://gnas.dev')"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-medium text-primary-400 hover:underline"
+            >
+              gnas.dev
+            </a>
+            <a
+              href="https://gnas.dev"
+              (click)="openExternalLink($event, 'https://gnas.dev')"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="block text-xs text-primary-400 hover:underline font-mono"
+            >
+              https://gnas.dev
+            </a>
           </div>
         </neo-card>
       </div>
@@ -110,21 +137,24 @@ export class AboutDialogComponent implements OnInit {
 
   ecosystemApps: EcosystemApp[] = [
     {
-      name: 'gn-shop',
+      name: 'GN Shop',
       description: 'E-commerce fashion store',
       url: 'shop.gnas.dev',
+      href: 'https://shop.gnas.dev',
       icon: 'pi pi-shopping-bag',
     },
     {
-      name: 'gn-engreel',
+      name: 'GN Engreel',
       description: 'Vocabulary learning app',
       url: 'engreel.gnas.dev',
+      href: 'https://engreel.gnas.dev',
       icon: 'pi pi-book',
     },
     {
-      name: 'gn-money',
+      name: 'GN Money',
       description: 'Personal finance manager',
       url: 'money.gnas.dev',
+      href: 'https://money.gnas.dev',
       icon: 'pi pi-wallet',
     },
   ];
@@ -136,5 +166,12 @@ export class AboutDialogComponent implements OnInit {
     } catch (err) {
       console.error('Failed to load app info:', err);
     }
+  }
+
+  openExternalLink(event: MouseEvent, url: string): void {
+    event.preventDefault();
+    Browser.OpenURL(url).catch((err) => {
+      console.error('Failed to open external link:', err);
+    });
   }
 }

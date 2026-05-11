@@ -1,5 +1,7 @@
 package rclone
 
+// GN Drive note: Wraps rclone operations behavior behind backend-friendly helpers.
+
 import (
 	"context"
 	"desktop/backend/dto"

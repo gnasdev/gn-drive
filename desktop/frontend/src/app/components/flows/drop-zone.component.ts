@@ -1,3 +1,4 @@
+/** GN Drive note: Renders reusable flow controls for the main sync workspace. */
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 

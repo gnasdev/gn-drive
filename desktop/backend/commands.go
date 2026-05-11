@@ -1,5 +1,7 @@
 package backend
 
+// GN Drive note: Supports the Go backend for commands.
+
 import (
 	"context"
 	"desktop/backend/dto"

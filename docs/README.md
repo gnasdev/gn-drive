@@ -28,7 +28,7 @@ Welcome to the GN Drive documentation. This directory contains detailed technica
 
 ## Technology Stack
 
-- **Backend**: Go 1.25 + Wails v3
+- **Backend**: Go 1.26.3 + Wails v3.0.0-alpha.89
 - **Frontend**: Angular 21 + Tailwind CSS
 - **Cloud Sync**: rclone integration
 - **Build**: Taskfile

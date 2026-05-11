@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the remote service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -38,7 +40,7 @@ func NewRemoteService(app *application.App) *RemoteService {
 }
 
 // SetApp sets the application reference for events
-func (r *RemoteService) SetApp(app *application.App) {
+func (r *RemoteService) setApp(app *application.App) {
 	r.app = app
 	// Use shared EventBus or create new one
 	if bus := GetSharedEventBus(); bus != nil {
@@ -237,14 +239,14 @@ func (r *RemoteService) DeleteRemote(ctx context.Context, name string) error {
 
 	// Cleanup boards that reference this remote
 	if boardService := GetBoardService(); boardService != nil {
-		if err := boardService.OnRemoteDeleted(name); err != nil {
+		if err := boardService.onRemoteDeleted(name); err != nil {
 			log.Printf("Warning: failed to cleanup boards after remote deletion: %v", err)
 		}
 	}
 
 	// Cleanup flows that reference this remote
 	if flowService := GetFlowService(); flowService != nil {
-		if err := flowService.OnRemoteDeleted(context.Background(), name); err != nil {
+		if err := flowService.onRemoteDeleted(context.Background(), name); err != nil {
 			log.Printf("Warning: failed to cleanup flows after remote deletion: %v", err)
 		}
 	}

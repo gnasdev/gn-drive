@@ -1,18 +1,57 @@
+# GN Drive note: Defines task shortcuts for building, testing, and running GN Drive workflows.
 version: "3"
 
 vars:
   APP_NAME: "gn-drive"
   BIN_DIR: "bin"
   VITE_PORT: "{{.WAILS_VITE_PORT | default 9245}}"
+  WAILS3_BIN: "$(go env GOPATH)/bin/wails3"
   VERSION: '{{.VERSION | default "dev"}}'
   COMMIT: '{{.COMMIT | default "unknown"}}'
 
 tasks:
+  install:
+    summary: Installs backend and frontend dependencies
+    cmds:
+      - task: install:be
+      - task: install:fe
+      - task: prepare:bindings
+      - task: prepare:embed-assets
+
+  install:be:
+    summary: Installs backend dependencies
+    dir: desktop
+    cmds:
+      - go mod download
+      - go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
+
+  install:fe:
+    summary: Installs frontend dependencies
+    dir: desktop/frontend
+    cmds:
+      - bun install
+
+  prepare:embed-assets:
+    internal: true
+    summary: Creates the minimal frontend dist required by Go embed during dev
+    dir: desktop
+    cmds:
+      - mkdir -p frontend/dist/browser
+      - test -f frontend/dist/browser/index.html || printf '<!doctype html><html><head><meta charset="utf-8"><title>GN Drive</title></head><body><app-root></app-root></body></html>\n' > frontend/dist/browser/index.html
+
+  prepare:bindings:
+    internal: true
+    summary: Generates Wails bindings and exposes the legacy wailsjs import path
+    dir: desktop
+    cmds:
+      - "{{.WAILS3_BIN}} generate bindings -ts"
+      - ln -sfn bindings frontend/wailsjs
+
   build:
     summary: Builds the application for production
     dir: desktop
     cmds:
-      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
+      - task: prepare:bindings
       - cd frontend && bun install --frozen-lockfile && bun run build
       - go build -trimpath -ldflags="-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
@@ -21,7 +60,7 @@ tasks:
     summary: Builds the application for development (with debug info)
     dir: desktop
     cmds:
-      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
+      - task: prepare:bindings
       - cd frontend && bun install && bun run build
       - go build -o {{.BIN_DIR}}/{{.APP_NAME}}
       - mv {{.BIN_DIR}}/{{.APP_NAME}} ../{{.APP_NAME}}
@@ -30,6 +69,7 @@ tasks:
     summary: Starts the frontend development server
     dir: desktop/frontend
     cmds:
+      - task: prepare:bindings
       - echo "Starting frontend development server on port {{.VITE_PORT}}..."
       - bun start --port {{.VITE_PORT}}
 
@@ -41,7 +81,8 @@ tasks:
     cmds:
       - echo "Starting Wails development mode (debug mode enabled)..."
       - echo "Make sure frontend dev server is running on port {{.VITE_PORT}}"
-      - '{{env "GOPATH"}}/bin/wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}'
+      - task: prepare:embed-assets
+      - "{{.WAILS3_BIN}} dev -config ./build/config.yml -port {{.VITE_PORT}}"
 
   lint:fe:
     summary: Runs ESLint on the frontend code
@@ -110,7 +151,7 @@ tasks:
     dir: desktop
     cmds:
       - echo "Generating bindings..."
-      - '{{env "GOPATH"}}/bin/wails3 generate bindings -ts'
+      - task: prepare:bindings
       - echo "Building frontend..."
       - cd frontend && bun install --frozen-lockfile && bun run build
       - echo "Building backend..."

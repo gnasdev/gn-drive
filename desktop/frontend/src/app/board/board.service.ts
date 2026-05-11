@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the visual flow board where users compose sync operations. */
 import { inject, Injectable, OnDestroy } from "@angular/core";
 import { Events } from "@wailsio/runtime";
 import { BehaviorSubject, Subject, Subscription } from "rxjs";

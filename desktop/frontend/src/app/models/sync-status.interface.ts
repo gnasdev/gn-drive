@@ -1,3 +1,4 @@
+/** GN Drive note: Defines frontend types that mirror GN Drive runtime state. */
 export interface FileTransferInfo {
   name: string;
   size: number;

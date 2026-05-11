@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the visual flow board where users compose sync operations. */
 import { CommonModule } from "@angular/common";
 import {
     ChangeDetectionStrategy,

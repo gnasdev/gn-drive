@@ -1,3 +1,4 @@
+/** GN Drive note: Defines frontend types that mirror GN Drive runtime state. */
 import { SyncStatus } from './sync-status.interface';
 
 /**

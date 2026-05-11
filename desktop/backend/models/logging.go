@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines logging data structures shared by backend services and Wails bindings.
+
 import (
 	"encoding/json"
 	"time"

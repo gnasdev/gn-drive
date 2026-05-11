@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the crypt service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/events"
@@ -39,7 +41,7 @@ func NewCryptService(app *application.App) *CryptService {
 }
 
 // SetApp sets the application reference for events
-func (c *CryptService) SetApp(app *application.App) {
+func (c *CryptService) setApp(app *application.App) {
 	c.app = app
 	if bus := GetSharedEventBus(); bus != nil {
 		c.eventBus = bus

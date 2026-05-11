@@ -1,3 +1,4 @@
+/** GN Drive note: Powers the remote configuration workflow in the GN Drive UI. */
 import { CommonModule } from "@angular/common";
 import {
   ChangeDetectionStrategy,

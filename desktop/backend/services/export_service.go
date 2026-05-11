@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the export service service behavior exposed to the desktop application.
+
 import (
 	"bytes"
 	"compress/gzip"
@@ -86,7 +88,7 @@ func NewExportService(app *application.App) *ExportService {
 }
 
 // SetApp sets the application reference
-func (e *ExportService) SetApp(app *application.App) {
+func (e *ExportService) setApp(app *application.App) {
 	e.app = app
 }
 

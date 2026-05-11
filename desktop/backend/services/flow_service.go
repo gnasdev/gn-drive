@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the flow service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/models"
@@ -43,7 +45,7 @@ func NewFlowService(app *application.App) *FlowService {
 }
 
 // SetApp sets the application reference
-func (s *FlowService) SetApp(app *application.App) {
+func (s *FlowService) setApp(app *application.App) {
 	s.app = app
 }
 
@@ -248,7 +250,7 @@ func (s *FlowService) SaveFlows(ctx context.Context, flows []models.Flow) error 
 }
 
 // OnRemoteDeleted cleans up operations referencing a deleted remote
-func (s *FlowService) OnRemoteDeleted(ctx context.Context, remoteName string) error {
+func (s *FlowService) onRemoteDeleted(ctx context.Context, remoteName string) error {
 	if err := s.ensureInitialized(); err != nil {
 		return err
 	}

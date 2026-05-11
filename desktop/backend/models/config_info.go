@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines config info data structures shared by backend services and Wails bindings.
+
 import (
 	"desktop/backend/config"
 	"desktop/backend/utils"

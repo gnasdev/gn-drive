@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { inject, Injectable, OnDestroy } from '@angular/core';
 import { Events } from '@wailsio/runtime';
 import { BehaviorSubject, Subject, Subscription } from 'rxjs';

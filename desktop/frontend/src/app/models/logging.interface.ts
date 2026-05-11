@@ -1,3 +1,4 @@
+/** GN Drive note: Defines frontend types that mirror GN Drive runtime state. */
 export enum LogLevel {
   DEBUG = 'DEBUG',
   INFO = 'INFO',

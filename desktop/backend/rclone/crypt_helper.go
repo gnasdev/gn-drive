@@ -1,5 +1,7 @@
 package rclone
 
+// GN Drive note: Wraps rclone crypt helper behavior behind backend-friendly helpers.
+
 import (
 	"context"
 	"desktop/backend/models"

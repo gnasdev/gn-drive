@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the sync service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	beConfig "desktop/backend/config"
@@ -134,7 +136,7 @@ func NewSyncService(app *application.App) *SyncService {
 }
 
 // SetApp sets the application reference for events
-func (s *SyncService) SetApp(app *application.App) {
+func (s *SyncService) setApp(app *application.App) {
 	s.app = app
 	// Initialize EventBus with the app
 	s.eventBus = events.NewEventBus(app)
@@ -142,7 +144,7 @@ func (s *SyncService) SetApp(app *application.App) {
 }
 
 // SetEnvConfig sets the environment configuration (needed for rclone init)
-func (s *SyncService) SetEnvConfig(config beConfig.Config) {
+func (s *SyncService) setEnvConfig(config beConfig.Config) {
 	s.envConfig = config
 	// Initialize rclone global state once
 	if err := rclone.InitGlobal(config.DebugMode); err != nil {
@@ -154,12 +156,12 @@ func (s *SyncService) SetEnvConfig(config beConfig.Config) {
 }
 
 // SetLogService sets the log service for reliable log delivery
-func (s *SyncService) SetLogService(logService *LogService) {
+func (s *SyncService) setLogService(logService *LogService) {
 	s.logService = logService
 }
 
 // SetNotificationService sets the notification service for desktop notifications
-func (s *SyncService) SetNotificationService(notificationService *NotificationService) {
+func (s *SyncService) setNotificationService(notificationService *NotificationService) {
 	s.notificationService = notificationService
 }
 

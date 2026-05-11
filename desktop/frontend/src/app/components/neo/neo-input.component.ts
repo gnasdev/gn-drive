@@ -1,3 +1,4 @@
+/** GN Drive note: Provides a reusable Neo-styled UI primitive for GN Drive screens. */
 import { Component, Input, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';

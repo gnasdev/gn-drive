@@ -19,7 +19,7 @@ Desktop application for cloud storage synchronization powered by [rclone](https:
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Go 1.25 + Wails v3 |
+| Backend | Go 1.26.3 + Wails v3.0.0-alpha.89 |
 | Frontend | Angular 21 + Tailwind CSS + PrimeNG 21 |
 | Database | SQLite |
 | Cloud Sync | rclone v1.73.0 |

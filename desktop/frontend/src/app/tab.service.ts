@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for tab. */
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { Action } from "./app.service";

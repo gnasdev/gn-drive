@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines file entry data structures shared by backend services and Wails bindings.
+
 // FileEntry represents a file or directory in a remote listing
 type FileEntry struct {
 	Path     string `json:"path"`

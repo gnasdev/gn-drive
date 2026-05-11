@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the tray service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"fmt"
@@ -47,7 +49,7 @@ func NewTrayService(iconData []byte) *TrayService {
 }
 
 // SetApp sets the application reference
-func (t *TrayService) SetApp(app *application.App) {
+func (t *TrayService) setApp(app *application.App) {
 	t.app = app
 }
 

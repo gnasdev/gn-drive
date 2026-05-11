@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { inject, Injectable, OnDestroy } from "@angular/core";
 import { GetLogsSince } from "../../../wailsjs/desktop/backend/services/logservice";
 import { LogEntry } from "../../../wailsjs/desktop/backend/services/models";

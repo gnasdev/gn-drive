@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines schedule data structures shared by backend services and Wails bindings.
+
 import "time"
 
 // ScheduleEntry represents a scheduled sync operation

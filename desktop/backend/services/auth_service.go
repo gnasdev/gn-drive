@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the auth service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"crypto/aes"
@@ -70,7 +72,7 @@ type AuthEvent struct {
 // AuthService manages password-based unlock, encryption, and rate limiting
 type AuthService struct {
 	app                 *application.App
-	appService          interface{ CompleteInitialization(context.Context) error }
+	appInitializer      func(context.Context) error
 	notificationService *NotificationService
 	mutex               sync.RWMutex
 	unlocked            bool
@@ -87,17 +89,17 @@ func NewAuthService(app *application.App) *AuthService {
 }
 
 // SetApp sets the application reference
-func (a *AuthService) SetApp(app *application.App) {
+func (a *AuthService) setApp(app *application.App) {
 	a.app = app
 }
 
-// SetAppService sets the App service reference for deferred initialization
-func (a *AuthService) SetAppService(appService interface{ CompleteInitialization(context.Context) error }) {
-	a.appService = appService
+// setAppInitializer sets the callback for deferred app initialization.
+func (a *AuthService) setAppInitializer(appInitializer func(context.Context) error) {
+	a.appInitializer = appInitializer
 }
 
 // SetNotificationService sets the notification service reference
-func (a *AuthService) SetNotificationService(ns *NotificationService) {
+func (a *AuthService) setNotificationService(ns *NotificationService) {
 	a.notificationService = ns
 }
 
@@ -126,7 +128,7 @@ func (a *AuthService) ServiceStartup(ctx context.Context, options application.Se
 	a.authData = authData
 
 	// Register settings syncer so tray/startup settings get saved to auth.json
-	SetAuthSettingsSyncer(a.SyncAppSettings)
+	SetAuthSettingsSyncer(a.syncAppSettings)
 
 	// Crash recovery: clean up inconsistent state from interrupted encrypt/decrypt
 	a.recoverFromCrash(cfg)
@@ -208,14 +210,33 @@ func (a *AuthService) GetLockoutStatus(ctx context.Context) LockoutStatus {
 	return status
 }
 
-// GetPreUnlockSettings returns app settings from auth.json (available before unlock)
-func (a *AuthService) GetPreUnlockSettings() AppSettings {
+// getPreUnlockSettings returns app settings from auth.json before unlock.
+func (a *AuthService) getPreUnlockSettings() AppSettings {
 	a.mutex.RLock()
-	defer a.mutex.RUnlock()
+	if a.authData != nil {
+		defer a.mutex.RUnlock()
+		return a.authData.AppSettings
+	}
+	a.mutex.RUnlock()
+
+	cfg := GetSharedConfig()
+	if cfg == nil {
+		return defaultAppSettings()
+	}
+
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	if a.authData != nil {
 		return a.authData.AppSettings
 	}
-	return AppSettings{}
+
+	a.authFilePath = filepath.Join(cfg.ConfigDir, "auth.json")
+	authData, err := a.loadAuthData()
+	if err != nil || authData == nil {
+		return defaultAppSettings()
+	}
+	a.authData = authData
+	return authData.AppSettings
 }
 
 // SetupPassword sets up password authentication for the first time.
@@ -468,7 +489,7 @@ func (a *AuthService) ChangePassword(ctx context.Context, oldPassword, newPasswo
 		return fmt.Errorf("failed to re-initialize database after password change, please re-unlock: %w", err)
 	}
 	if a.notificationService != nil {
-		a.notificationService.LoadSettings()
+		a.notificationService.loadSettings()
 	}
 
 	// Zero old key, set new
@@ -516,7 +537,7 @@ func (a *AuthService) RemovePassword(ctx context.Context, password string) error
 }
 
 // SyncAppSettings updates app_settings in auth.json (called when settings change)
-func (a *AuthService) SyncAppSettings(settings AppSettings) {
+func (a *AuthService) syncAppSettings(settings AppSettings) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -579,12 +600,12 @@ func (a *AuthService) initializeApp(ctx context.Context) error {
 
 	// Load settings from DB
 	if a.notificationService != nil {
-		a.notificationService.LoadSettings()
+		a.notificationService.loadSettings()
 	}
 
 	// Complete App service initialization (rclone config, etc.)
-	if a.appService != nil {
-		if err := a.appService.CompleteInitialization(ctx); err != nil {
+	if a.appInitializer != nil {
+		if err := a.appInitializer(ctx); err != nil {
 			return fmt.Errorf("failed to complete app initialization: %w", err)
 		}
 	}

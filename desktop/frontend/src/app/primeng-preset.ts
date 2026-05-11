@@ -1,3 +1,4 @@
+/** GN Drive note: Supports the Angular frontend for primeng preset. */
 import { definePreset } from "@primeuix/themes";
 import Aura from "@primeuix/themes/aura";
 

@@ -1,3 +1,4 @@
+/** GN Drive note: Renders and manages GN Drive application settings. */
 import { CommonModule } from "@angular/common";
 import {
     ChangeDetectionStrategy,

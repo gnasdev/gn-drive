@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a modal dialog used by the GN Drive desktop interface. */
 import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';

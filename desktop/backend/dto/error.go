@@ -1,5 +1,7 @@
 package dto
 
+// GN Drive note: Defines transport objects passed between backend commands and the frontend.
+
 type AppError struct {
 	Message string `json:"message"`
 }

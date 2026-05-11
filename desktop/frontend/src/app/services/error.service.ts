@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { Injectable, inject } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 import { LoggingService } from "./logging.service";

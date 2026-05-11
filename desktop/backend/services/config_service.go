@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the config service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"desktop/backend/config"
@@ -35,7 +37,7 @@ func NewConfigService(app *application.App) *ConfigService {
 }
 
 // SetApp sets the application reference for events
-func (c *ConfigService) SetApp(app *application.App) {
+func (c *ConfigService) setApp(app *application.App) {
 	c.app = app
 	// Use shared EventBus or create new one
 	if bus := GetSharedEventBus(); bus != nil {

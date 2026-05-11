@@ -1,3 +1,4 @@
+/** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
 import { ErrorHandler, Injectable, inject } from "@angular/core";
 import { ErrorService } from "./error.service";
 import { LoggingService } from "./logging.service";

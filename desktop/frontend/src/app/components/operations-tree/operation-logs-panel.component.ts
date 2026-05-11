@@ -1,3 +1,4 @@
+/** GN Drive note: Renders a reusable GN Drive interface component. */
 import { Component, computed, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SyncStatus, FileTransferInfo } from '../../models/sync-status.interface';

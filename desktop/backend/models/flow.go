@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines flow data structures shared by backend services and Wails bindings.
+
 // Flow represents a sync workflow containing sequential operations
 type Flow struct {
 	Id              string      `json:"id"`

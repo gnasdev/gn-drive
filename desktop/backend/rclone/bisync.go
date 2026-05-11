@@ -1,5 +1,7 @@
 package rclone
 
+// GN Drive note: Wraps rclone bisync behavior behind backend-friendly helpers.
+
 import (
 	"context"
 	"crypto/sha256"

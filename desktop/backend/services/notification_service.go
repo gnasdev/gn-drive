@@ -1,5 +1,7 @@
 package services
 
+// GN Drive note: Coordinates the notification service service behavior exposed to the desktop application.
+
 import (
 	"context"
 	"log"
@@ -19,6 +21,15 @@ type AppSettings struct {
 	MinimizeToTrayOnStartup bool `json:"minimize_to_tray_on_startup"`
 }
 
+// NotificationStatus describes app and platform notification availability.
+type NotificationStatus struct {
+	Enabled         bool   `json:"enabled"`
+	NativeProvider  string `json:"native_provider"`
+	NativeAvailable bool   `json:"native_available"`
+	Permission      string `json:"permission"`
+	Detail          string `json:"detail,omitempty"`
+}
+
 // NotificationService handles desktop notifications and app settings persistence
 type NotificationService struct {
 	app      *application.App
@@ -29,17 +40,27 @@ type NotificationService struct {
 // NewNotificationService creates a new notification service
 func NewNotificationService(app *application.App) *NotificationService {
 	return &NotificationService{
-		app: app,
-		settings: AppSettings{
-			NotificationsEnabled: true,
-			DebugMode:            false,
-		},
+		app:      app,
+		settings: defaultAppSettings(),
 	}
 }
 
-// SetApp sets the application reference
-func (n *NotificationService) SetApp(app *application.App) {
+func defaultAppSettings() AppSettings {
+	return AppSettings{
+		NotificationsEnabled: true,
+		DebugMode:            false,
+	}
+}
+
+// setApp sets the application reference
+func (n *NotificationService) setApp(app *application.App) {
 	n.app = app
+}
+
+func (n *NotificationService) applyPreUnlockSettings(settings AppSettings) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+	n.settings = settings
 }
 
 // ServiceName returns the name of the service
@@ -48,9 +69,9 @@ func (n *NotificationService) ServiceName() string {
 }
 
 // ServiceStartup is called when the service starts.
-// Note: LoadSettings() is NOT called here because when auth is enabled,
+// Note: loadSettings() is NOT called here because when auth is enabled,
 // the DB is encrypted and not available yet. AuthService.initializeApp()
-// will call LoadSettings() after decryption.
+// will call loadSettings() after decryption.
 func (n *NotificationService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	log.Printf("NotificationService starting up...")
 	return nil
@@ -131,6 +152,17 @@ func (n *NotificationService) GetSettings(ctx context.Context) AppSettings {
 	return n.settings
 }
 
+// GetNotificationStatus returns app-level and platform notification state.
+func (n *NotificationService) GetNotificationStatus(ctx context.Context) NotificationStatus {
+	n.mutex.RLock()
+	enabled := n.settings.NotificationsEnabled
+	n.mutex.RUnlock()
+
+	status := getPlatformNotificationStatus()
+	status.Enabled = enabled
+	return status
+}
+
 // SetStartAtLogin enables or disables starting the app at login
 func (n *NotificationService) SetStartAtLogin(ctx context.Context, enabled bool) error {
 	// Get executable path
@@ -188,8 +220,8 @@ func (n *NotificationService) IsMinimizeToTrayOnStartup(ctx context.Context) boo
 	return n.settings.MinimizeToTrayOnStartup
 }
 
-// LoadSettings loads settings from the database. Exported for early loading in main.go.
-func (n *NotificationService) LoadSettings() {
+// loadSettings loads settings from the database.
+func (n *NotificationService) loadSettings() {
 	db, err := GetSharedDB()
 	if err != nil {
 		log.Printf("Warning: Could not get database for settings: %v", err)

@@ -1,5 +1,7 @@
 package models
 
+// GN Drive note: Defines profile data structures shared by backend services and Wails bindings.
+
 type Profile struct {
 	Name          string   `json:"name"`
 	From          string   `json:"from"`

@@ -1,5 +1,7 @@
 package delta
 
+// GN Drive note: Tracks local file-system deltas for sync workflows that need change awareness.
+
 import (
 	"time"
 

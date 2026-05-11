@@ -1,5 +1,7 @@
 package backend
 
+// GN Drive note: Supports the Go backend for platform darwin.
+
 /*
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa

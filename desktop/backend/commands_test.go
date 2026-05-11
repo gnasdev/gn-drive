@@ -1,5 +1,7 @@
 package backend
 
+// GN Drive note: Supports the Go backend for commands test.
+
 import (
 	"desktop/backend/models"
 	"encoding/json"

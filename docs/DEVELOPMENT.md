@@ -8,17 +8,17 @@ This guide covers setting up your development environment and common development
 
 | Tool | Version | Installation |
 |------|---------|--------------|
-| Go | 1.25+ | https://golang.org/dl/ |
+| Go | 1.26.3+ | https://golang.org/dl/ |
 | Node.js | 18+ (v24 recommended) | https://nodejs.org/ |
 | npm | Latest | Comes with Node.js |
 | Taskfile | Latest | https://taskfile.dev/ |
-| Wails v3 | Latest | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
+| Wails v3 | v3.0.0-alpha.89 | `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89` |
 
 ### Verify Installation
 
 ```bash
 # Check Go
-go version  # Should show 1.25+
+go version  # Should show 1.26.3+
 
 # Check Node.js
 node --version  # Should show v18+
@@ -41,7 +41,7 @@ cd gn-drive
 cd desktop && go mod tidy
 
 # Install frontend dependencies
-cd frontend && npm install --legacy-peer-deps
+cd frontend && bun install
 cd ../..
 ```
 
@@ -236,18 +236,18 @@ WAILS_VITE_PORT=9246 task dev:fe
 ### Wails3 Not Found
 
 ```bash
-# Install Wails v3
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+# Install the pinned Wails v3 CLI
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
 
 # Update PATH
 export PATH="$PATH:$(go env GOPATH)/bin"
 ```
 
-### npm Dependency Errors
+### Frontend Dependency Errors
 
 ```bash
-# Use legacy peer deps flag
-cd desktop/frontend && npm install --legacy-peer-deps
+# Reinstall Bun dependencies from the lockfile
+cd desktop/frontend && bun install --frozen-lockfile
 ```
 
 ### Changes Not Reflecting

@@ -1,5 +1,7 @@
 package rclone
 
+// GN Drive note: Wraps rclone providers test behavior behind backend-friendly helpers.
+
 import (
 	"context"
 	"testing"
