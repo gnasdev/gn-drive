@@ -137,3 +137,8 @@ func (b *WailsEventBus) EmitCryptEvent(event *CryptEvent) error {
 func (b *WailsEventBus) EmitBoardEvent(event *BoardEvent) error {
 	return b.Emit(event)
 }
+
+// EmitStateEvent is a convenience method for backend-owned state events.
+func (b *WailsEventBus) EmitStateEvent(event *StateEvent) error {
+	return b.Emit(event)
+}

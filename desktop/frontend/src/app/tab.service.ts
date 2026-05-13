@@ -253,7 +253,29 @@ export class TabService {
                 statusEvent.action && isValidSyncAction(statusEvent.action)
                     ? statusEvent.action
                     : currentStatus.action,
+            transfers: statusEvent.transfers ?? currentStatus.transfers,
         };
+
+        if (
+            tab.syncStatus &&
+            !statusEvent.transfers &&
+            currentStatus.status === updatedStatus.status &&
+            currentStatus.progress === updatedStatus.progress &&
+            currentStatus.speed === updatedStatus.speed &&
+            currentStatus.eta === updatedStatus.eta &&
+            currentStatus.files_transferred ===
+                updatedStatus.files_transferred &&
+            currentStatus.total_files === updatedStatus.total_files &&
+            currentStatus.bytes_transferred ===
+                updatedStatus.bytes_transferred &&
+            currentStatus.total_bytes === updatedStatus.total_bytes &&
+            currentStatus.errors === updatedStatus.errors &&
+            currentStatus.checks === updatedStatus.checks &&
+            currentStatus.deletes === updatedStatus.deletes &&
+            currentStatus.renames === updatedStatus.renames
+        ) {
+            return;
+        }
 
         this.updateTab(tabId, { syncStatus: updatedStatus });
     }

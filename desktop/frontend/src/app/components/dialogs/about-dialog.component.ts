@@ -1,5 +1,5 @@
 /** GN Drive note: Renders a modal dialog used by the GN Drive desktop interface. */
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -7,11 +7,21 @@ import {
   EventEmitter,
   inject,
   Input,
+  OnDestroy,
   OnInit,
   Output,
 } from '@angular/core';
-import { Browser } from '@wailsio/runtime';
+import { MessageService } from 'primeng/api';
+import { Browser, Events } from '@wailsio/runtime';
 import { GetAppInfo } from '../../../../wailsjs/desktop/backend/app';
+import { UpdateInfo, UpdateStatus } from '../../../../wailsjs/desktop/backend/services/models';
+import {
+  CheckForUpdates,
+  DownloadLatestUpdate,
+  GetUpdateStatus,
+  InstallDownloadedUpdate,
+} from '../../../../wailsjs/desktop/backend/services/updateservice';
+import { NeoButtonComponent } from '../neo/neo-button.component';
 import { NeoCardComponent } from '../neo/neo-card.component';
 import { NeoDialogComponent } from '../neo/neo-dialog.component';
 
@@ -22,18 +32,10 @@ interface AppInfo {
   description: string;
 }
 
-interface EcosystemApp {
-  name: string;
-  description: string;
-  url: string;
-  href: string;
-  icon: string;
-}
-
 @Component({
   selector: 'app-about-dialog',
   standalone: true,
-  imports: [CommonModule, NeoDialogComponent, NeoCardComponent],
+  imports: [CommonModule, DatePipe, NeoDialogComponent, NeoButtonComponent, NeoCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <neo-dialog
@@ -68,28 +70,98 @@ interface EcosystemApp {
           </div>
         </neo-card>
 
-        <!-- NS Ecosystem -->
+        <!-- Updates -->
         <neo-card>
           <div class="flex items-center gap-2 mb-3">
-            <i class="pi pi-th-large"></i>
-            <h2 class="font-bold">NS Ecosystem</h2>
+            <i class="pi pi-refresh"></i>
+            <h2 class="font-bold">Updates</h2>
           </div>
           <div class="space-y-3">
-            @for (app of ecosystemApps; track app.name) {
-              <div class="flex items-start gap-3">
-                <i [class]="app.icon + ' text-lg mt-0.5'"></i>
-                <div class="flex-1">
-                  <p class="text-sm font-medium">{{ app.name }}</p>
-                  <p class="text-xs text-sys-fg-muted">{{ app.description }}</p>
-                  <a
-                    [href]="app.href"
-                    (click)="openExternalLink($event, app.href)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-xs text-primary-400 hover:underline font-mono"
-                  >
-                    {{ app.url }}
-                  </a>
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">App Version</p>
+                <p class="text-xs text-sys-fg-muted font-mono">
+                  v{{ updateInfo?.current_version || updateStatus?.current_version || appInfo?.version || 'dev' }}
+                </p>
+                @if (updateInfo?.unsupported) {
+                  <p class="text-xs text-sys-status-warning mt-1">{{ updateInfo!.reason }}</p>
+                } @else if (updateInfo?.has_update) {
+                  <p class="text-xs text-sys-status-success mt-1">
+                    v{{ updateInfo!.latest_version }} available
+                  </p>
+                } @else if (updateInfo && !updateInfo.has_update && !updateInfo.unsupported) {
+                  <p class="text-xs text-sys-fg-muted mt-1">Up to date</p>
+                }
+              </div>
+              <div class="flex flex-wrap justify-end gap-2">
+                <neo-button
+                  variant="secondary"
+                  size="sm"
+                  [loading]="isCheckingUpdate"
+                  [disabled]="isDownloadingUpdate || isInstallingUpdate"
+                  (onClick)="checkForUpdates()"
+                >
+                  Check
+                </neo-button>
+                @if (updateInfo?.release_url) {
+                  <neo-button variant="secondary" size="sm" (onClick)="openReleaseNotes()">
+                    Notes
+                  </neo-button>
+                }
+              </div>
+            </div>
+
+            @if (updateStatus?.phase === 'downloading') {
+              <div class="space-y-1">
+                <div class="h-2 border-2 border-sys-border bg-sys-bg-secondary">
+                  <div
+                    class="h-full bg-sys-accent-primary"
+                    [style.width.%]="updateProgressPercent"
+                  ></div>
+                </div>
+                <p class="text-xs text-sys-fg-muted">
+                  {{ formatBytes(updateStatus!.downloaded_bytes) }} / {{ formatBytes(updateStatus!.total_bytes) }}
+                </p>
+              </div>
+            }
+
+            @if (updateStatus?.error) {
+              <div class="p-3 bg-sys-accent-danger/20 border-2 border-sys-border text-sm">
+                {{ updateStatus!.error }}
+              </div>
+            }
+
+            @if (updateInfo?.has_update && !updateInfo?.unsupported) {
+              <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium truncate">{{ updateInfo!.asset_name }}</p>
+                  <p class="text-xs text-sys-fg-muted">
+                    {{ formatBytes(updateInfo!.asset_size) }}
+                    @if (updateInfo!.published_at) {
+                      &middot; {{ updateInfo!.published_at | date:'mediumDate' }}
+                    }
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  @if (updateStatus?.phase !== 'downloaded') {
+                    <neo-button
+                      size="sm"
+                      [loading]="isDownloadingUpdate"
+                      [disabled]="isCheckingUpdate || isInstallingUpdate"
+                      (onClick)="downloadUpdate()"
+                    >
+                      Download
+                    </neo-button>
+                  } @else {
+                    <neo-button
+                      size="sm"
+                      [loading]="isInstallingUpdate"
+                      [disabled]="isCheckingUpdate || isDownloadingUpdate"
+                      (onClick)="installUpdate()"
+                    >
+                      Install
+                    </neo-button>
+                  }
                 </div>
               </div>
             }
@@ -103,15 +175,7 @@ interface EcosystemApp {
             <h2 class="font-bold">Author</h2>
           </div>
           <div class="text-sm">
-            <a
-              href="https://gnas.dev"
-              (click)="openExternalLink($event, 'https://gnas.dev')"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-medium text-primary-400 hover:underline"
-            >
-              gnas.dev
-            </a>
+            <p class="font-medium">gnas.dev</p>
             <a
               href="https://gnas.dev"
               (click)="openExternalLink($event, 'https://gnas.dev')"
@@ -127,39 +191,24 @@ interface EcosystemApp {
     </neo-dialog>
   `,
 })
-export class AboutDialogComponent implements OnInit {
+export class AboutDialogComponent implements OnInit, OnDestroy {
   @Input() visible = false;
   @Output() visibleChange = new EventEmitter<boolean>();
 
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly messageService = inject(MessageService);
+  private updateEventCleanup: (() => void) | undefined;
 
   appInfo: AppInfo | null = null;
-
-  ecosystemApps: EcosystemApp[] = [
-    {
-      name: 'GN Shop',
-      description: 'E-commerce fashion store',
-      url: 'shop.gnas.dev',
-      href: 'https://shop.gnas.dev',
-      icon: 'pi pi-shopping-bag',
-    },
-    {
-      name: 'GN Engreel',
-      description: 'Vocabulary learning app',
-      url: 'engreel.gnas.dev',
-      href: 'https://engreel.gnas.dev',
-      icon: 'pi pi-book',
-    },
-    {
-      name: 'GN Money',
-      description: 'Personal finance manager',
-      url: 'money.gnas.dev',
-      href: 'https://money.gnas.dev',
-      icon: 'pi pi-wallet',
-    },
-  ];
+  updateInfo: UpdateInfo | null = null;
+  updateStatus: UpdateStatus | null = null;
+  isCheckingUpdate = false;
+  isDownloadingUpdate = false;
+  isInstallingUpdate = false;
 
   async ngOnInit(): Promise<void> {
+    this.listenForUpdateEvents();
+    await this.loadUpdateStatus();
     try {
       this.appInfo = await GetAppInfo();
       this.cdr.markForCheck();
@@ -168,10 +217,156 @@ export class AboutDialogComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.updateEventCleanup?.();
+  }
+
   openExternalLink(event: MouseEvent, url: string): void {
     event.preventDefault();
     Browser.OpenURL(url).catch((err) => {
       console.error('Failed to open external link:', err);
     });
+  }
+
+  private listenForUpdateEvents(): void {
+    this.updateEventCleanup = Events.On('tofe', (event) => {
+      const parsed = this.parseBackendEvent(event.data);
+      if (parsed?.type !== 'update:status') {
+        return;
+      }
+      this.updateStatus = UpdateStatus.createFrom(parsed.data);
+      this.isDownloadingUpdate = this.updateStatus.phase === 'downloading';
+      this.isInstallingUpdate = this.updateStatus.phase === 'installing';
+      this.cdr.markForCheck();
+    });
+  }
+
+  private parseBackendEvent(rawData: unknown): { type?: string; data?: unknown } | null {
+    if (!rawData) return null;
+    try {
+      return typeof rawData === 'string' ? JSON.parse(rawData) : rawData as { type?: string; data?: unknown };
+    } catch {
+      return null;
+    }
+  }
+
+  private async loadUpdateStatus(): Promise<void> {
+    try {
+      this.updateStatus = await GetUpdateStatus();
+      this.cdr.markForCheck();
+    } catch (err) {
+      console.error('Failed to load update status:', err);
+    }
+  }
+
+  get updateProgressPercent(): number {
+    if (!this.updateStatus?.total_bytes) return 0;
+    return Math.min(100, Math.round((this.updateStatus.downloaded_bytes / this.updateStatus.total_bytes) * 100));
+  }
+
+  async checkForUpdates(): Promise<void> {
+    this.isCheckingUpdate = true;
+    this.cdr.markForCheck();
+    try {
+      this.updateInfo = await CheckForUpdates();
+      if (this.updateInfo.unsupported) {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Update Check',
+          detail: this.updateInfo.reason || 'This build cannot be self-updated',
+        });
+      } else if (this.updateInfo.has_update) {
+        this.messageService.add({
+          severity: 'info',
+          summary: 'Update Available',
+          detail: `Version ${this.updateInfo.latest_version} is ready to download`,
+        });
+      } else {
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Up to Date',
+          detail: 'You are running the latest version',
+        });
+      }
+    } catch (err) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Update Check Failed',
+        detail: this.extractErrorMessage(err),
+      });
+    } finally {
+      this.isCheckingUpdate = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async downloadUpdate(): Promise<void> {
+    this.isDownloadingUpdate = true;
+    this.cdr.markForCheck();
+    try {
+      this.updateStatus = await DownloadLatestUpdate();
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Update Downloaded',
+        detail: 'Ready to install and restart',
+      });
+    } catch (err) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Download Failed',
+        detail: this.extractErrorMessage(err),
+      });
+    } finally {
+      this.isDownloadingUpdate = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async installUpdate(): Promise<void> {
+    this.isInstallingUpdate = true;
+    this.cdr.markForCheck();
+    try {
+      await InstallDownloadedUpdate();
+    } catch (err) {
+      this.isInstallingUpdate = false;
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Install Failed',
+        detail: this.extractErrorMessage(err),
+      });
+      this.cdr.markForCheck();
+    }
+  }
+
+  openReleaseNotes(): void {
+    if (!this.updateInfo?.release_url) return;
+    Browser.OpenURL(this.updateInfo.release_url).catch((err) => {
+      console.error('Failed to open release notes:', err);
+    });
+  }
+
+  formatBytes(bytes: number | undefined): string {
+    if (!bytes || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  }
+
+  private extractErrorMessage(err: unknown): string {
+    if (!err) return 'An unknown error occurred';
+    const raw = String(err);
+    try {
+      const jsonStr = raw.replace(/^Error:\s*/, '');
+      const parsed = JSON.parse(jsonStr);
+      if (parsed?.message) return parsed.message;
+    } catch {
+      if (raw.startsWith('Error: ')) return raw.slice(7);
+    }
+    return raw;
   }
 }

@@ -233,12 +233,24 @@ func CopyFilterOpt(ctx context.Context) filter.Options {
 	return opt
 }
 
+// ApplyProfileParallelism maps the profile's user-facing parallelism knob
+// through the provider-aware resolver policy.
+func ApplyProfileParallelism(ctx context.Context, profile models.Profile) {
+	ApplyResolverPolicy(ctx, profile)
+}
+
 // ApplyProfileOptions maps Profile fields to rclone's fs.ConfigInfo and filter.Options.
 // It applies filtering, safety, and performance settings from the profile to the context.
 // Returns the updated context with new filter configuration.
 func ApplyProfileOptions(ctx context.Context, profile models.Profile) (context.Context, error) {
 	fsConfig := fs.GetConfig(ctx)
 	filterOpt := CopyFilterOpt(ctx)
+
+	// For scoped profiles, avoid forcing recursive full-tree listing. Let rclone
+	// walk paths incrementally so include/depth filters can reduce resolving work.
+	if len(profile.IncludedPaths) > 0 || profile.MaxDepth != nil {
+		fsConfig.UseListR = false
+	}
 
 	// Filtering: min/max size
 	if profile.MinSize != "" {

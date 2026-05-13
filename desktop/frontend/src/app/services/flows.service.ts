@@ -31,6 +31,17 @@ import {
   type SyncConfig,
 } from '../models/flow.model.js';
 
+interface ActiveFlowExecution {
+  operationIndex: number;
+  tempBoardId: string | null;
+  activeTabId: string | null;
+}
+
+interface SyncStatusTarget {
+  flowId: string;
+  operationId: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -44,9 +55,8 @@ export class FlowsService implements OnDestroy {
   });
 
   // Active execution tracking
-  private executingFlowId: string | null = null;
-  private executingOperationIndex = -1;
-  private tempBoardId: string | null = null;
+  private activeFlowExecutions = new Map<string, ActiveFlowExecution>();
+  private syncStatusTargets = new Map<string, SyncStatusTarget>();
 
   private eventCleanup: (() => void) | undefined;
   private trayEventCleanup: (() => void) | undefined;
@@ -54,8 +64,7 @@ export class FlowsService implements OnDestroy {
   private autoSaveTrigger$ = new Subject<void>();
 
   // Board completion tracking (event-driven instead of polling)
-  private boardCompletionResolve: ((status: string) => void) | null = null;
-  private boardCompletionBoardId: string | null = null;
+  private boardCompletionResolvers = new Map<string, (status: string) => void>();
 
   constructor() {
     this.eventCleanup = Events.On('tofe', (event) => {
@@ -391,8 +400,11 @@ export class FlowsService implements OnDestroy {
       return;
     }
 
-    this.executingFlowId = flowId;
-    this.executingOperationIndex = 0;
+    this.activeFlowExecutions.set(flowId, {
+      operationIndex: 0,
+      tempBoardId: null,
+      activeTabId: null,
+    });
     this.updateFlow(flowId, { status: 'running' });
 
     // Clear sync status and set to pending
@@ -404,12 +416,15 @@ export class FlowsService implements OnDestroy {
     this.updateFlowOperations(flowId, clearedOps);
 
     try {
+      let hadRecoverableFileFailures = false;
+
       // Execute each operation sequentially
       for (let i = 0; i < flow.operations.length; i++) {
         // Check if flow was stopped/cancelled
-        if (this.executingFlowId !== flowId) break;
+        const execution = this.activeFlowExecutions.get(flowId);
+        if (!execution) break;
 
-        this.executingOperationIndex = i;
+        execution.operationIndex = i;
         const operation = this.getFlow(flowId)?.operations[i];
         if (!operation) {
           console.warn(`[FlowsService] executeFlow: operation[${i}] not found after state update`);
@@ -421,15 +436,24 @@ export class FlowsService implements OnDestroy {
         // Mark current operation as running
         this.updateOperation(flowId, operation.id, { status: 'running' });
 
-        const boardStatus = await this.executeSingleOperation(flowId, operation);
+        const boardStatus = await this.executeSingleOperation(flowId, operation, i);
 
         console.log(`[FlowsService] executeFlow: operation[${i}] result=${boardStatus}`);
 
         // Check if flow was stopped during execution
-        if (this.executingFlowId !== flowId) break;
+        if (!this.activeFlowExecutions.has(flowId)) break;
 
         // Use board status from backend as source of truth
         if (boardStatus === 'failed') {
+          const latestOperation = this.getOperation(flowId, operation.id);
+          if (this.hasFileLevelFailures(latestOperation?.syncStatus)) {
+            // A failed file is a recoverable operation result for flow
+            // sequencing: record it on the operation, then continue the flow.
+            hadRecoverableFileFailures = true;
+            this.updateOperation(flowId, operation.id, { status: 'failed' });
+            continue;
+          }
+
           this.updateOperation(flowId, operation.id, { status: 'failed' });
           this.updateFlow(flowId, { status: 'failed' });
           break;
@@ -438,22 +462,31 @@ export class FlowsService implements OnDestroy {
           this.updateFlow(flowId, { status: 'cancelled' });
           break;
         } else {
-          this.updateOperation(flowId, operation.id, { status: 'completed' });
+          const latestOperation = this.getOperation(flowId, operation.id);
+          if (this.hasFileLevelFailures(latestOperation?.syncStatus)) {
+            hadRecoverableFileFailures = true;
+            this.updateOperation(flowId, operation.id, { status: 'failed' });
+          } else {
+            this.updateOperation(flowId, operation.id, { status: 'completed' });
+          }
         }
       }
 
-      // Mark flow as completed if all operations succeeded
+      // Mark the flow terminal state after every runnable operation had a turn.
       const finalFlow = this.getFlow(flowId);
       if (finalFlow?.status === 'running') {
-        this.updateFlow(flowId, { status: 'completed' });
+        this.updateFlow(flowId, { status: hadRecoverableFileFailures ? 'failed' : 'completed' });
       }
     } catch (err) {
       console.error(`[FlowsService] executeFlow error:`, err);
       this.updateFlow(flowId, { status: 'failed' });
       this.errorService.handleApiError(err, 'Flow execution failed');
     } finally {
-      this.executingFlowId = null;
-      this.executingOperationIndex = -1;
+      const execution = this.activeFlowExecutions.get(flowId);
+      if (execution?.activeTabId) {
+        this.syncStatusTargets.delete(execution.activeTabId);
+      }
+      this.activeFlowExecutions.delete(flowId);
     }
   }
 
@@ -461,14 +494,17 @@ export class FlowsService implements OnDestroy {
    * Stop executing a flow
    */
   async stopFlow(flowId: string): Promise<void> {
+    const execution = this.activeFlowExecutions.get(flowId);
+    const tempBoardId = execution?.tempBoardId;
+
     // Immediately resolve any pending board completion wait so executeFlow unblocks
-    if (this.boardCompletionResolve) {
-      this.boardCompletionResolve('cancelled');
+    if (tempBoardId) {
+      this.boardCompletionResolvers.get(tempBoardId)?.('cancelled');
     }
 
-    if (this.tempBoardId) {
+    if (tempBoardId) {
       try {
-        await StopBoardExecution(this.tempBoardId);
+        await StopBoardExecution(tempBoardId);
       } catch (err) {
         this.errorService.handleApiError(err, 'Failed to stop execution');
       }
@@ -477,26 +513,27 @@ export class FlowsService implements OnDestroy {
     // Mark flow and current operation as cancelled
     const flow = this.getFlow(flowId);
     if (flow) {
+      const operationIndex = execution?.operationIndex ?? -1;
       const ops = flow.operations.map((op, idx) => ({
         ...op,
         status:
-          idx === this.executingOperationIndex
+          idx === operationIndex
             ? 'cancelled'
-            : idx < this.executingOperationIndex
+            : idx < operationIndex
               ? op.status
               : ('idle' as const),
       }));
 
       // Mark in-progress transfers as failed in the cancelled operation's syncStatus
-      const cancelledOp = flow.operations[this.executingOperationIndex];
+      const cancelledOp = flow.operations[operationIndex];
       if (cancelledOp?.syncStatus?.transfers) {
         const updatedTransfers = cancelledOp.syncStatus.transfers.map(t =>
           t.status === 'transferring' || t.status === 'checking'
             ? { ...t, status: 'failed' as const, error: 'Cancelled' }
             : t
         );
-        ops[this.executingOperationIndex] = {
-          ...ops[this.executingOperationIndex],
+        ops[operationIndex] = {
+          ...ops[operationIndex],
           syncStatus: { ...cancelledOp.syncStatus, status: 'stopped' as const, transfers: updatedTransfers },
         };
       }
@@ -505,15 +542,26 @@ export class FlowsService implements OnDestroy {
       this.updateFlow(flowId, { status: 'cancelled' });
     }
 
-    this.executingFlowId = null;
-    this.executingOperationIndex = -1;
-    await this.cleanupTempBoard();
+    if (execution?.activeTabId) {
+      this.syncStatusTargets.delete(execution.activeTabId);
+    }
+    this.activeFlowExecutions.delete(flowId);
+    await this.cleanupTempBoard(flowId, tempBoardId ?? undefined);
   }
 
   // ============ Private Methods ============
 
   private getFlow(flowId: string): Flow | undefined {
     return this.flows.find((f) => f.id === flowId);
+  }
+
+  private getOperation(flowId: string, operationId: string): Operation | undefined {
+    return this.getFlow(flowId)?.operations.find((op) => op.id === operationId);
+  }
+
+  private hasFileLevelFailures(status?: SyncStatus): boolean {
+    if (!status) return false;
+    return (status.errors ?? 0) > 0 || !!status.transfers?.some((file) => file.status === 'failed');
   }
 
   private updateFlowOperations(flowId: string, operations: Operation[]): void {
@@ -529,10 +577,20 @@ export class FlowsService implements OnDestroy {
     this.autoSaveTrigger$.next();
   }
 
-  private async executeSingleOperation(flowId: string, operation: Operation): Promise<string> {
+  private async executeSingleOperation(flowId: string, operation: Operation, operationIndex: number): Promise<string> {
     // Create a temporary board for this single operation
     const board = this.operationToBoard(operation);
-    this.tempBoardId = board.id;
+    const edgeId = board.edges?.[0]?.id;
+    const tabId = edgeId ? `${board.id}-${edgeId}` : null;
+    const execution = this.activeFlowExecutions.get(flowId);
+    if (execution) {
+      execution.operationIndex = operationIndex;
+      execution.tempBoardId = board.id;
+      execution.activeTabId = tabId;
+    }
+    if (tabId) {
+      this.syncStatusTargets.set(tabId, { flowId, operationId: operation.id });
+    }
 
     console.log(`[FlowsService] executeSingleOperation: boardId=${board.id} source=${operation.sourceRemote}:${operation.sourcePath} target=${operation.targetRemote}:${operation.targetPath} action=${operation.syncConfig.action}`);
 
@@ -554,7 +612,7 @@ export class FlowsService implements OnDestroy {
       throw err;
     } finally {
       // Clean up this operation's temp board immediately
-      await this.cleanupTempBoard();
+      await this.cleanupTempBoard(flowId, board.id);
     }
   }
 
@@ -568,14 +626,12 @@ export class FlowsService implements OnDestroy {
         if (resolved) return;
         resolved = true;
         if (fallbackInterval) clearInterval(fallbackInterval);
-        this.boardCompletionResolve = null;
-        this.boardCompletionBoardId = null;
+        this.boardCompletionResolvers.delete(boardId);
         console.log(`[FlowsService] Board ${boardId} completed with status: ${status}`);
         resolve(status);
       };
 
-      this.boardCompletionBoardId = boardId;
-      this.boardCompletionResolve = doResolve;
+      this.boardCompletionResolvers.set(boardId, doResolve);
 
       // Fallback: poll GetBoardExecutionStatus in case the event is missed
       fallbackInterval = setInterval(async () => {
@@ -603,21 +659,22 @@ export class FlowsService implements OnDestroy {
   }
 
   private handleBoardCompletionEvent(event: BoardEvent): void {
-    console.log(`[FlowsService] handleBoardCompletionEvent: type=${event.type} boardId=${event.boardId} waiting=${this.boardCompletionBoardId}`);
-    if (!this.boardCompletionBoardId || event.boardId !== this.boardCompletionBoardId) return;
+    const resolve = this.boardCompletionResolvers.get(event.boardId);
+    console.log(`[FlowsService] handleBoardCompletionEvent: type=${event.type} boardId=${event.boardId} waiting=${!!resolve}`);
+    if (!resolve) return;
 
     switch (event.type) {
       case 'board:execution:completed':
         console.log(`[FlowsService] Board execution completed event received`);
-        this.boardCompletionResolve?.('completed');
+        resolve('completed');
         break;
       case 'board:execution:failed':
         console.log(`[FlowsService] Board execution failed event received`);
-        this.boardCompletionResolve?.('failed');
+        resolve('failed');
         break;
       case 'board:execution:cancelled':
         console.log(`[FlowsService] Board execution cancelled event received`);
-        this.boardCompletionResolve?.('cancelled');
+        resolve('cancelled');
         break;
     }
   }
@@ -788,14 +845,24 @@ export class FlowsService implements OnDestroy {
     return sc;
   }
 
-  private async cleanupTempBoard(): Promise<void> {
-    if (this.tempBoardId) {
-      try {
-        await DeleteBoard(this.tempBoardId);
-      } catch {
-        // Ignore cleanup errors
-      }
-      this.tempBoardId = null;
+  private async cleanupTempBoard(flowId: string, boardId?: string): Promise<void> {
+    const execution = this.activeFlowExecutions.get(flowId);
+    const targetBoardId = boardId ?? execution?.tempBoardId;
+    if (!targetBoardId) return;
+
+    try {
+      await DeleteBoard(targetBoardId);
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    this.boardCompletionResolvers.delete(targetBoardId);
+    if (execution?.activeTabId) {
+      this.syncStatusTargets.delete(execution.activeTabId);
+    }
+    if (execution?.tempBoardId === targetBoardId) {
+      execution.tempBoardId = null;
+      execution.activeTabId = null;
     }
   }
 
@@ -823,41 +890,94 @@ export class FlowsService implements OnDestroy {
   }
 
   private handleSyncStatusEvent(event: SyncStatusEvent): void {
-    if (!this.executingFlowId) return;
+    if (!event.tab_id) return;
 
-    const flow = this.getFlow(this.executingFlowId);
-    const operation = flow?.operations[this.executingOperationIndex];
-    if (!operation) return;
+    const target = this.syncStatusTargets.get(event.tab_id);
+    if (!target) return;
+
+    const flow = this.getFlow(target.flowId);
+    const operation = flow?.operations.find((op) => op.id === target.operationId);
+    if (!flow || !operation) {
+      this.syncStatusTargets.delete(event.tab_id);
+      return;
+    }
+
+    const currentStatus = operation.syncStatus;
+
+    const defaultStatus: SyncStatus = {
+      command: 'sync_status',
+      status: 'running',
+      progress: 0,
+      speed: '0 B/s',
+      eta: '--',
+      files_transferred: 0,
+      total_files: 0,
+      bytes_transferred: 0,
+      total_bytes: 0,
+      current_file: '',
+      errors: 0,
+      checks: 0,
+      total_checks: 0,
+      deletes: 0,
+      renames: 0,
+      timestamp: new Date().toISOString(),
+      elapsed_time: '0s',
+      action: 'push',
+    };
+    const baseStatus = currentStatus ?? defaultStatus;
 
     // Build SyncStatus from event
     const syncStatus: SyncStatus = {
-      command: event.command || 'sync_status',
-      pid: event.pid,
+      ...baseStatus,
+      command: event.command || baseStatus.command,
+      pid: event.pid ?? baseStatus.pid,
       tab_id: event.tab_id,
-      status: (['running', 'completed', 'error', 'stopped'].includes(event.status || '') ? event.status : 'running') as SyncStatus['status'],
-      progress: event.progress || 0,
-      speed: event.speed || '0 B/s',
-      eta: event.eta || '--',
-      files_transferred: event.files_transferred || 0,
-      total_files: event.total_files || 0,
-      bytes_transferred: event.bytes_transferred || 0,
-      total_bytes: event.total_bytes || 0,
-      current_file: event.current_file || '',
-      errors: event.errors || 0,
-      checks: event.checks || 0,
-      total_checks: event.total_checks || 0,
-      deletes: event.deletes || 0,
-      renames: event.renames || 0,
-      timestamp: event.timestamp || new Date().toISOString(),
-      elapsed_time: event.elapsed_time || '0s',
-      action: (['pull', 'push', 'bi', 'bi-resync'].includes(event.action || '') ? event.action : 'push') as SyncStatus['action'],
-      transfers: event.transfers,
+      status: (['running', 'completed', 'error', 'stopped'].includes(event.status || '') ? event.status : baseStatus.status) as SyncStatus['status'],
+      progress: event.progress ?? baseStatus.progress,
+      speed: event.speed || baseStatus.speed,
+      eta: event.eta || baseStatus.eta,
+      files_transferred: event.files_transferred ?? baseStatus.files_transferred,
+      total_files: event.total_files ?? baseStatus.total_files,
+      bytes_transferred: event.bytes_transferred ?? baseStatus.bytes_transferred,
+      total_bytes: event.total_bytes ?? baseStatus.total_bytes,
+      current_file: event.current_file || baseStatus.current_file,
+      errors: event.errors ?? baseStatus.errors,
+      checks: event.checks ?? baseStatus.checks,
+      total_checks: event.total_checks ?? baseStatus.total_checks,
+      deletes: event.deletes ?? baseStatus.deletes,
+      renames: event.renames ?? baseStatus.renames,
+      timestamp: event.timestamp || baseStatus.timestamp,
+      elapsed_time: event.elapsed_time || baseStatus.elapsed_time,
+      action: (['pull', 'push', 'bi', 'bi-resync'].includes(event.action || '') ? event.action : baseStatus.action) as SyncStatus['action'],
+      log_messages: event.log_messages ?? baseStatus.log_messages,
+      transfers: event.transfers ?? baseStatus.transfers,
     };
 
+    if (
+      currentStatus &&
+      !event.transfers &&
+      !event.log_messages?.length &&
+      currentStatus.status === syncStatus.status &&
+      currentStatus.progress === syncStatus.progress &&
+      currentStatus.speed === syncStatus.speed &&
+      currentStatus.eta === syncStatus.eta &&
+      currentStatus.files_transferred === syncStatus.files_transferred &&
+      currentStatus.total_files === syncStatus.total_files &&
+      currentStatus.bytes_transferred === syncStatus.bytes_transferred &&
+      currentStatus.total_bytes === syncStatus.total_bytes &&
+      currentStatus.errors === syncStatus.errors &&
+      currentStatus.checks === syncStatus.checks &&
+      currentStatus.total_checks === syncStatus.total_checks &&
+      currentStatus.deletes === syncStatus.deletes &&
+      currentStatus.renames === syncStatus.renames
+    ) {
+      return;
+    }
+
     // Immutable update: set syncStatus
-    this.updateFlowOperations(this.executingFlowId,
-      flow!.operations.map((op, idx) =>
-        idx === this.executingOperationIndex
+    this.updateFlowOperations(target.flowId,
+      flow.operations.map((op) =>
+        op.id === target.operationId
           ? { ...op, syncStatus }
           : op
       )

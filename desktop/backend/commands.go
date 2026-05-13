@@ -226,6 +226,8 @@ func (a *App) GetRemotes() []fsConfig.Remote {
 }
 
 func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
+	remoteType = normalizeRemoteType(remoteType)
+
 	ctx := context.Background()
 
 	// Validate remote name
@@ -249,6 +251,15 @@ func (a *App) AddRemote(remoteName string, remoteType string, remoteConfig map[s
 	return err
 }
 
+func normalizeRemoteType(remoteType string) string {
+	switch strings.ToLower(remoteType) {
+	case "gphotos":
+		return "googlephotos"
+	default:
+		return remoteType
+	}
+}
+
 func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
 
 	// Prepare configuration parameters
@@ -261,7 +272,7 @@ func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType 
 
 	// For OAuth providers, we need to handle the authentication flow
 	switch remoteType {
-	case "drive", "dropbox", "onedrive", "box", "yandex", "gphotos":
+	case "drive", "dropbox", "onedrive", "box", "yandex", "googlephotos":
 		// These providers require OAuth authentication
 		// Use auto config for desktop applications
 		configParams["config_is_local"] = "true"
@@ -324,6 +335,8 @@ func (a *App) OpenICloudSetup(remoteName string) *dto.AppError {
 }
 
 func (a *App) GetOAuthURL(remoteType string) (string, *dto.AppError) {
+	remoteType = normalizeRemoteType(remoteType)
+
 	// Return the OAuth authorization URL for the given remote type
 	// This can be used to open the browser for authentication
 	switch remoteType {
@@ -353,7 +366,7 @@ func (a *App) ReauthRemote(remoteName string) *dto.AppError {
 	found := false
 	for _, r := range remotes {
 		if r.Name == remoteName {
-			remoteType = r.Type
+	remoteType = normalizeRemoteType(remoteType)
 			found = true
 			break
 		}

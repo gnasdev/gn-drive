@@ -6,6 +6,8 @@ import (
 	"context"
 	"desktop/backend/dto"
 	"fmt"
+	"log"
+	"time"
 
 	beConfig "desktop/backend/config"
 	"desktop/backend/models"
@@ -19,100 +21,134 @@ import (
 
 // Copy performs a one-way copy from source to destination (no deleting destination files).
 func Copy(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
+	totalStart := time.Now()
 	fsConfig := fs.GetConfig(ctx)
-	fsConfig.Transfers = profile.Parallel
-	fsConfig.Checkers = profile.Parallel * 2
+	ApplyProfileParallelism(ctx, profile)
 
+	phaseStart := time.Now()
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[copy-perf] source fs resolved in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	dstFs, err := fs.NewFs(ctx, profile.To)
 	if utils.HandleError(err, "Failed to initialize destination filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[copy-perf] destination fs resolved in %s", time.Since(phaseStart))
 
 	ctx = applyFiltersAndBandwidth(ctx, fsConfig, profile)
 
+	phaseStart = time.Now()
 	ctx, err = ApplyProfileOptions(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
+	log.Printf("[copy-perf] profile options applied in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}
+	log.Printf("[copy-perf] rclone config reloaded in %s", time.Since(phaseStart))
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
+	phaseStart = time.Now()
+	err = utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.CopyDir(ctx, dstFs, srcFs, false), "Copy failed", nil, nil)
 	})
+	log.Printf("[copy-perf] rclone copy execution finished in %s; total=%s", time.Since(phaseStart), time.Since(totalStart))
+	return err
 }
 
 // Move performs a copy then deletes files from the source.
 func Move(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
+	totalStart := time.Now()
 	fsConfig := fs.GetConfig(ctx)
-	fsConfig.Transfers = profile.Parallel
-	fsConfig.Checkers = profile.Parallel * 2
+	ApplyProfileParallelism(ctx, profile)
 
+	phaseStart := time.Now()
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[move-perf] source fs resolved in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	dstFs, err := fs.NewFs(ctx, profile.To)
 	if utils.HandleError(err, "Failed to initialize destination filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[move-perf] destination fs resolved in %s", time.Since(phaseStart))
 
 	ctx = applyFiltersAndBandwidth(ctx, fsConfig, profile)
 
+	phaseStart = time.Now()
 	ctx, err = ApplyProfileOptions(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
+	log.Printf("[move-perf] profile options applied in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}
+	log.Printf("[move-perf] rclone config reloaded in %s", time.Since(phaseStart))
 
-	return utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
+	phaseStart = time.Now()
+	err = utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.MoveDir(ctx, dstFs, srcFs, false, false), "Move failed", nil, nil)
 	})
+	log.Printf("[move-perf] rclone move execution finished in %s; total=%s", time.Since(phaseStart), time.Since(totalStart))
+	return err
 }
 
 // Check compares source and destination and reports differences.
 func Check(ctx context.Context, config beConfig.Config, profile models.Profile, outStatus chan *dto.SyncStatusDTO) error {
+	totalStart := time.Now()
 	fsConfig := fs.GetConfig(ctx)
-	fsConfig.Checkers = profile.Parallel
+	ApplyProfileParallelism(ctx, profile)
 
+	phaseStart := time.Now()
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[check-perf] source fs resolved in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	dstFs, err := fs.NewFs(ctx, profile.To)
 	if utils.HandleError(err, "Failed to initialize destination filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[check-perf] destination fs resolved in %s", time.Since(phaseStart))
 
 	ctx = applyFiltersAndBandwidth(ctx, fsConfig, profile)
 
+	phaseStart = time.Now()
 	ctx, err = ApplyProfileOptions(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
+	log.Printf("[check-perf] profile options applied in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}
+	log.Printf("[check-perf] rclone config reloaded in %s", time.Since(phaseStart))
 
-	return utils.RunRcloneWithRetryAndStats(ctx, false, false, outStatus, func() error {
+	phaseStart = time.Now()
+	err = utils.RunRcloneWithRetryAndStats(ctx, false, false, outStatus, func() error {
 		return utils.HandleError(operations.Check(ctx, &operations.CheckOpt{
 			Fsrc: srcFs,
 			Fdst: dstFs,
 		}), "Check failed", nil, nil)
 	})
+	log.Printf("[check-perf] rclone check execution finished in %s; total=%s", time.Since(phaseStart), time.Since(totalStart))
+	return err
 }
 
 // ListFiles lists files at the given remote path and returns FileEntry items.

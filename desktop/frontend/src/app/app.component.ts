@@ -9,11 +9,14 @@ import { ErrorDisplayComponent } from './components/error-display/error-display.
 import { TopbarComponent } from './components/topbar/topbar.component.js';
 import { FlowsContainerComponent } from './components/flows/flows-container.component.js';
 import { SettingsDialogComponent } from './components/dialogs/settings-dialog.component.js';
+import { PasswordProtectionDialogComponent } from './components/dialogs/password-protection-dialog.component.js';
 import { AboutDialogComponent } from './components/dialogs/about-dialog.component.js';
 import { UnlockScreenComponent } from './components/unlock-screen/unlock-screen.component.js';
 import { ConsoleLoggerService } from './services/console-logger.service.js';
 import { LoggingService } from './services/logging.service.js';
 import { AuthService } from './services/auth.service.js';
+import { FlowsService } from './services/flows.service.js';
+import { BoardService } from './board/board.service.js';
 
 @Component({
   selector: 'app-root',
@@ -23,6 +26,7 @@ import { AuthService } from './services/auth.service.js';
     TopbarComponent,
     FlowsContainerComponent,
     SettingsDialogComponent,
+    PasswordProtectionDialogComponent,
     AboutDialogComponent,
     ErrorDisplayComponent,
     UnlockScreenComponent,
@@ -39,12 +43,15 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly loggingService = inject(LoggingService);
   private readonly consoleLoggerService = inject(ConsoleLoggerService);
+  private readonly flowsService = inject(FlowsService);
+  private readonly boardService = inject(BoardService);
 
   private subscriptions = new Subscription();
   private isInitialized = false;
   private appInitialized = false;
 
   showSettingsDialog = false;
+  showPasswordProtectionDialog = false;
   showAboutDialog = false;
   isLocked = true;
   isLoading = true;
@@ -102,6 +109,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  openPasswordProtection(): void {
+    this.showPasswordProtectionDialog = true;
+    this.cdr.markForCheck();
+  }
+
   onUnlocked(): void {
     // Auth events will handle the state change via subscription
   }
@@ -117,7 +129,18 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private initializeApp(): void {
     this.appInitialized = true;
-    this.appService.initialize();
+    void this.loadFrontendStateFromBackend();
+  }
+
+  private async loadFrontendStateFromBackend(): Promise<void> {
+    // A frontend reload loses in-memory stores and missed events, so hydrate
+    // every primary store from backend snapshots before relying on patches.
+    await this.appService.initialize();
+    await Promise.all([
+      this.flowsService.loadFlows(),
+      this.boardService.loadBoards(),
+    ]);
+    this.cdr.markForCheck();
   }
 
   private initializeLogging(): void {

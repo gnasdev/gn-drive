@@ -10,8 +10,6 @@ import { Events } from "@wailsio/runtime";
 import {
     AddRemote,
     DeleteRemote,
-    GetConfigInfo,
-    GetRemotes,
     ReauthRemote,
     StopAddingRemote,
     StopCommand,
@@ -39,6 +37,7 @@ import {
 } from "./models/sync-status.interface";
 import { ErrorService } from "./services/error.service";
 import { LogConsumerService } from "./services/log-consumer.service";
+import { BackendStateStore } from "./services/backend-state.store";
 import { TabService } from "./tab.service";
 
 // Legacy interface kept for backward compatibility
@@ -64,21 +63,21 @@ export class AppService implements OnDestroy {
     private tabService = inject(TabService);
     private errorService = inject(ErrorService);
     private logConsumerService = inject(LogConsumerService);
+    private backendStateStore = inject(BackendStateStore);
     readonly currentId$ = new BehaviorSubject<number>(0);
     readonly currentAction$ = new BehaviorSubject<Action | undefined>(
         undefined,
     );
     readonly data$ = new BehaviorSubject<string[]>([]);
-    readonly configInfo$: BehaviorSubject<models.ConfigInfo>;
-    readonly remotes$ = new BehaviorSubject<config.Remote[]>([]);
+    readonly configInfo$: BehaviorSubject<models.ConfigInfo> =
+        this.backendStateStore.configInfo$;
+    readonly remotes$: BehaviorSubject<config.Remote[]> =
+        this.backendStateStore.remotes$;
     readonly syncStatus$ = new BehaviorSubject<SyncStatus | null>(null);
 
     private eventCleanup: (() => void) | undefined;
 
     constructor() {
-        const configInfo = new models.ConfigInfo();
-        configInfo.profiles = [];
-        this.configInfo$ = new BehaviorSubject<models.ConfigInfo>(configInfo);
         // Store cleanup function for event listener
         this.eventCleanup = Events.On("tofe", (event) => {
             const rawData = event.data;
@@ -122,9 +121,13 @@ export class AppService implements OnDestroy {
      * Initialize data loading from backend.
      * Call this after first paint to avoid blocking the initial render.
      */
-    initialize(): void {
-        this.getConfigInfo();
-        this.getRemotes();
+    async initialize(): Promise<void> {
+        try {
+            await this.backendStateStore.refresh();
+        } catch (error) {
+            console.error("AppService initialize error:", error);
+            this.errorService.handleApiError(error, "initialize_state");
+        }
     }
 
     ngOnDestroy() {
@@ -176,7 +179,29 @@ export class AppService implements OnDestroy {
                 statusEvent.action && isValidSyncAction(statusEvent.action)
                     ? statusEvent.action
                     : currentStatus.action,
+            transfers: statusEvent.transfers ?? currentStatus.transfers,
         };
+
+        if (
+            this.syncStatus$.value &&
+            !statusEvent.transfers &&
+            currentStatus.status === updatedStatus.status &&
+            currentStatus.progress === updatedStatus.progress &&
+            currentStatus.speed === updatedStatus.speed &&
+            currentStatus.eta === updatedStatus.eta &&
+            currentStatus.files_transferred ===
+                updatedStatus.files_transferred &&
+            currentStatus.total_files === updatedStatus.total_files &&
+            currentStatus.bytes_transferred ===
+                updatedStatus.bytes_transferred &&
+            currentStatus.total_bytes === updatedStatus.total_bytes &&
+            currentStatus.errors === updatedStatus.errors &&
+            currentStatus.checks === updatedStatus.checks &&
+            currentStatus.deletes === updatedStatus.deletes &&
+            currentStatus.renames === updatedStatus.renames
+        ) {
+            return;
+        }
 
         this.syncStatus$.next(updatedStatus);
     }
@@ -468,9 +493,7 @@ export class AppService implements OnDestroy {
 
     async getConfigInfo() {
         try {
-            const configInfo = await GetConfigInfo();
-            configInfo.profiles = configInfo.profiles ?? [];
-            this.configInfo$.next(configInfo);
+            await this.backendStateStore.refresh();
         } catch (e) {
             console.error("AppService getConfigInfo error:", e);
             this.errorService.handleApiError(e, "get_config_info");
@@ -479,8 +502,7 @@ export class AppService implements OnDestroy {
 
     async getRemotes(): Promise<void> {
         try {
-            const remotes = await GetRemotes();
-            this.remotes$.next(remotes ?? []);
+            await this.backendStateStore.refresh();
         } catch (error) {
             console.error("Error getting remotes:", error);
             this.errorService.handleApiError(error, "get_remotes");
@@ -552,7 +574,7 @@ export class AppService implements OnDestroy {
         profile.to = "";
         profile.included_paths = [];
         profile.excluded_paths = [];
-        profile.parallel = 16; // Default value
+        profile.parallel = 8; // Default value
         profile.bandwidth = 5; // Default value
 
         // Create new ConfigInfo instance to avoid mutation

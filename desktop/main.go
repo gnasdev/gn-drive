@@ -47,6 +47,8 @@ func main() {
 	importService := services.NewImportService(nil)
 	flowService := services.NewFlowService(nil)
 	trayService := services.NewTrayService(appIcon)
+	updateService := services.NewUpdateService(nil, Version)
+	stateService := services.NewStateService(nil, appService)
 
 	// Create application with all services registered
 	app := application.New(application.Options{
@@ -72,6 +74,8 @@ func main() {
 			application.NewService(exportService),
 			application.NewService(importService),
 			application.NewService(flowService),
+			application.NewService(updateService),
+			application.NewService(stateService),
 		},
 	})
 
@@ -94,6 +98,8 @@ func main() {
 		exportService,
 		importService,
 		flowService,
+		updateService,
+		stateService,
 	)
 
 	// Wire AuthService dependencies

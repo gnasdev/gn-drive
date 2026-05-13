@@ -66,6 +66,10 @@ const (
 	BoardExecutionCompleted EventType = "board:execution:completed"
 	BoardExecutionFailed    EventType = "board:execution:failed"
 	BoardExecutionCancelled EventType = "board:execution:cancelled"
+
+	// State Events
+	StateSnapshot EventType = "state:snapshot"
+	StatePatch    EventType = "state:patch"
 )
 
 // BaseEvent represents the base structure for all events
@@ -73,6 +77,14 @@ type BaseEvent struct {
 	Type      EventType   `json:"type"`
 	Timestamp time.Time   `json:"timestamp"`
 	Data      interface{} `json:"data"`
+}
+
+// StateEvent represents backend-owned application state snapshots or patches.
+type StateEvent struct {
+	BaseEvent
+	SeqNo     uint64 `json:"seqNo"`
+	Slice     string `json:"slice,omitempty"`
+	Operation string `json:"operation,omitempty"`
 }
 
 // SyncEvent represents sync operation events
@@ -207,6 +219,20 @@ func NewErrorEvent(code, message, details, tabId string) *ErrorEvent {
 		Message: message,
 		Details: details,
 		TabId:   tabId,
+	}
+}
+
+// NewStateEvent creates a state snapshot or patch event.
+func NewStateEvent(eventType EventType, seqNo uint64, slice, operation string, data interface{}) *StateEvent {
+	return &StateEvent{
+		BaseEvent: BaseEvent{
+			Type:      eventType,
+			Timestamp: time.Now(),
+			Data:      data,
+		},
+		SeqNo:     seqNo,
+		Slice:     slice,
+		Operation: operation,
 	}
 }
 

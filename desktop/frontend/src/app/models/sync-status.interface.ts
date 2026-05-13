@@ -30,6 +30,7 @@ export interface SyncStatus {
   timestamp: string;
   elapsed_time: string;
   action: "pull" | "push" | "bi" | "bi-resync";
+  log_messages?: string[];
   transfers?: FileTransferInfo[];
   delta_mode?: boolean;
   delta_skipped?: boolean;
@@ -56,6 +57,7 @@ export interface SyncStatusEvent {
   timestamp?: string;
   elapsed_time?: string;
   action?: string;
+  log_messages?: string[];
   transfers?: FileTransferInfo[];
   delta_mode?: boolean;
   delta_skipped?: boolean;

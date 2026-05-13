@@ -9,7 +9,7 @@ type Profile struct {
 	IncludedPaths []string `json:"included_paths"`
 	ExcludedPaths []string `json:"excluded_paths"`
 	Bandwidth     int      `json:"bandwidth" default:"5M"`
-	Parallel      int      `json:"parallel" default:"16"`
+	Parallel      int      `json:"parallel" default:"8"`
 	BackupPath    string   `json:"backup_path"`
 	CachePath     string   `json:"cache_path"`
 
