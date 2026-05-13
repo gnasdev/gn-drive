@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rclone/rclone/cmd/bisync"
 	"github.com/rclone/rclone/fs"
@@ -22,6 +23,7 @@ import (
 )
 
 func BiSync(ctx context.Context, config config.Config, profile models.Profile, resync bool, outStatus chan *dto.SyncStatusDTO, deltaSvc *delta.DeltaService) error {
+	totalStart := time.Now()
 	var err error
 
 	// Initialize the config
@@ -76,6 +78,7 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 	if profile.DryRun {
 		opt.DryRun = true
 	}
+	ApplyResolverPolicy(ctx, profile)
 
 	// Handle resync
 	if resync {
@@ -144,15 +147,19 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		}
 	}
 
+	phaseStart := time.Now()
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[bisync-perf] source fs resolved in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	dstFs, err := fs.NewFs(ctx, profile.To)
 	if utils.HandleError(err, "Failed to initialize destination filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[bisync-perf] destination fs resolved in %s", time.Since(phaseStart))
 
 	// Set up filter rules (prefix with {{regexp:}} if UseRegex is enabled)
 	filterOpt := CopyFilterOpt(ctx)
@@ -184,21 +191,19 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		}
 	}
 
-	// Set parallel transfers and checkers (skip if 0 to preserve rclone defaults)
-	if profile.Parallel > 0 {
-		fsConfig.Transfers = profile.Parallel
-		fsConfig.Checkers = profile.Parallel * 2
-	}
-
+	phaseStart = time.Now()
 	// Apply advanced profile options (filtering, safety, performance)
 	ctx, err = ApplyProfileOptions(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
+	log.Printf("[bisync-perf] profile options applied in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}
+	log.Printf("[bisync-perf] rclone config reloaded in %s", time.Since(phaseStart))
 
 	// Delta sync: check if we can skip bisync entirely (not for resync)
 	srcKey := remoteKey(profile.From)
@@ -214,15 +219,19 @@ func BiSync(ctx context.Context, config config.Config, profile models.Profile, r
 		}
 	}
 
+	phaseStart = time.Now()
 	syncErr := utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(bisync.Bisync(ctx, dstFs, srcFs, opt), "Sync failed", nil, nil)
 	})
+	log.Printf("[bisync-perf] rclone bisync execution finished in %s; total=%s", time.Since(phaseStart), time.Since(totalStart))
 
 	// Commit delta state after bisync
 	if deltaSvc != nil && syncErr == nil {
+		phaseStart = time.Now()
 		// After bisync (or resync), establish baseline and start watchers
 		_ = deltaSvc.CommitFullSync(srcFs, srcKey)
 		_ = deltaSvc.CommitFullSync(dstFs, dstKey)
+		log.Printf("[bisync-perf] delta finalization finished in %s", time.Since(phaseStart))
 	}
 
 	return syncErr

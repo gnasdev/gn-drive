@@ -38,6 +38,13 @@ import { AuthService } from '../../services/auth.service';
         <neo-button
           variant="ghost"
           size="sm"
+          (onClick)="passwordProtectionClick.emit()"
+        >
+          <i class="pi pi-shield text-lg"></i>
+        </neo-button>
+        <neo-button
+          variant="ghost"
+          size="sm"
           (onClick)="settingsClick.emit()"
         >
           <i class="pi pi-cog text-lg"></i>
@@ -51,6 +58,7 @@ export class TopbarComponent {
 
   @Output() settingsClick = new EventEmitter<void>();
   @Output() aboutClick = new EventEmitter<void>();
+  @Output() passwordProtectionClick = new EventEmitter<void>();
 
   locking = false;
 

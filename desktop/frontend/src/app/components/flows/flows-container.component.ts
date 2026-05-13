@@ -1,5 +1,5 @@
 /** GN Drive note: Renders reusable flow controls for the main sync workspace. */
-import { ChangeDetectorRef, Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { FlowsService } from '../../services/flows.service';
@@ -14,6 +14,7 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
 @Component({
   selector: 'app-flows-container',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     FlowCardComponent,
@@ -24,9 +25,10 @@ import { NeoButtonComponent } from '../neo/neo-button.component';
   template: `
     <div class="flex flex-col h-full bg-sys-bg-secondary">
       <!-- Flows List -->
-      <div class="flex-1 overflow-auto p-4 space-y-6">
+      <div class="flex-1 overflow-auto p-4 md:p-5 space-y-5">
         @for (flow of flows; track flow.id; let i = $index) {
           <app-flow-card
+            class="block"
             [flow]="flow"
             [flowIndex]="i + 1"
             [isDragging]="isDragging"

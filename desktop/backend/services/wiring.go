@@ -45,6 +45,10 @@ func AttachApp(app *application.App, targets ...interface{}) {
 			service.setApp(app)
 		case *TrayService:
 			service.setApp(app)
+		case *UpdateService:
+			service.setApp(app)
+		case *StateService:
+			service.setApp(app)
 		}
 	}
 }

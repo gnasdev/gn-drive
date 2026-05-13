@@ -35,27 +35,29 @@ import (
 )
 
 func Sync(ctx context.Context, config beConfig.Config, task string, profile models.Profile, outStatus chan *dto.SyncStatusDTO, deltaSvc *delta.DeltaService) error {
+	totalStart := time.Now()
 	// Initialize the config
 	fsConfig := fs.GetConfig(ctx)
-	if profile.Parallel > 0 {
-		fsConfig.Transfers = profile.Parallel
-		fsConfig.Checkers = profile.Parallel * 2
-	}
 
 	switch task {
 	case "pull":
 		profile.From, profile.To = profile.To, profile.From
 	}
+	ApplyResolverPolicy(ctx, profile)
 
+	phaseStart := time.Now()
 	srcFs, err := fs.NewFs(ctx, profile.From)
 	if utils.HandleError(err, "Failed to initialize source filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[sync-perf] source fs resolved in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	dstFs, err := fs.NewFs(ctx, profile.To)
 	if utils.HandleError(err, "Failed to initialize destination filesystem", nil, nil) != nil {
 		return err
 	}
+	log.Printf("[sync-perf] destination fs resolved in %s", time.Since(phaseStart))
 
 	// Set bandwidth limit
 	if profile.Bandwidth > 0 {
@@ -87,15 +89,19 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		return err
 	}
 
+	phaseStart = time.Now()
 	// Apply advanced profile options (filtering, safety, performance)
 	ctx, err = ApplyProfileOptions(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to apply profile options: %w", err)
 	}
+	log.Printf("[sync-perf] profile options applied in %s", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	if err := fsConfig.Reload(ctx); err != nil {
 		return err
 	}
+	log.Printf("[sync-perf] rclone config reloaded in %s", time.Since(phaseStart))
 
 	// Delta sync: check if we can skip or scope the sync
 	srcKey := remoteKey(profile.From)
@@ -126,12 +132,15 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		}
 	}
 
+	phaseStart = time.Now()
 	syncErr := utils.RunRcloneWithRetryAndStats(ctx, true, false, outStatus, func() error {
 		return utils.HandleError(fssync.Sync(ctx, dstFs, srcFs, false), "Sync failed", nil, nil)
 	})
+	log.Printf("[sync-perf] rclone sync execution finished in %s; total=%s", time.Since(phaseStart), time.Since(totalStart))
 
 	// Commit delta state after sync
 	if deltaSvc != nil {
+		phaseStart = time.Now()
 		if syncErr == nil {
 			if usedDelta {
 				_ = deltaSvc.CommitDelta(srcKey)
@@ -149,6 +158,7 @@ func Sync(ctx context.Context, config beConfig.Config, task string, profile mode
 		}
 		// On error without delta: watcher continues collecting changes.
 		// Next sync will get a fresh changeset or fall back to full sync.
+		log.Printf("[sync-perf] delta finalization finished in %s", time.Since(phaseStart))
 	}
 
 	return syncErr

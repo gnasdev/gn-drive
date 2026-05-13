@@ -20,9 +20,14 @@ import (
 
 const (
 	// interval between progress status emissions
-	defaultProgressInterval = 500 * time.Millisecond
+	defaultProgressInterval = time.Second
 	// maximum log messages per status DTO to prevent unbounded growth
 	maxLogMessagesPerStatus = 50
+	// maximum completed/failed transfer rows per status DTO. Aggregate counters
+	// still come from rclone stats; this cap only protects the Wails payload.
+	maxCompletedTransfersPerStatus = 100
+	maxCompletedChecksPerStatus    = 50
+	fileListProgressInterval       = 3 * time.Second
 )
 
 // extractLogContent strips rclone log prefixes (stats group + timestamp + level)
@@ -113,10 +118,34 @@ func formatDuration(d time.Duration) string {
 	}
 }
 
+func shouldEmitStatus(previous, current *dto.SyncStatusDTO, includeTransfers bool) bool {
+	if previous == nil || current == nil {
+		return true
+	}
+	if includeTransfers || len(current.LogMessages) > 0 {
+		return true
+	}
+	if previous.Status != current.Status ||
+		previous.Errors != current.Errors ||
+		previous.BytesTransferred != current.BytesTransferred ||
+		previous.FilesTransferred != current.FilesTransferred ||
+		previous.Checks != current.Checks ||
+		previous.Deletes != current.Deletes ||
+		previous.Renames != current.Renames {
+		return true
+	}
+
+	progressDelta := current.Progress - previous.Progress
+	if progressDelta < 0 {
+		progressDelta = -progressDelta
+	}
+	return progressDelta >= 0.2
+}
+
 // createStatusFromStats builds a SyncStatusDTO from rclone accounting stats.
 // Identity fields (Id, TabId, Action) are NOT set — the service layer sets them.
 // Returns the status DTO and the set of currently-checking file names (for accumulation tracking).
-func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages []string) (*dto.SyncStatusDTO, map[string]struct{}) {
+func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages []string, includeTransfers bool) (*dto.SyncStatusDTO, map[string]struct{}) {
 	stats := accounting.Stats(ctx)
 
 	syncStatus := &dto.SyncStatusDTO{
@@ -128,9 +157,18 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 	// Track currently-checking file names for the caller's accumulation logic
 	currentlyChecking := make(map[string]struct{})
 
-	// Use RemoteStats for accurate totals, speed, ETA, and per-file transfer info
-	remoteStats, err := stats.RemoteStats(false)
-	if err == nil {
+	// Lightweight ticks avoid RemoteStats because it also prepares per-file
+	// structures that are expensive during large resolving/checking phases.
+	if !includeTransfers {
+		syncStatus.FilesTransferred = stats.GetTransfers()
+		syncStatus.BytesTransferred = stats.GetBytes()
+		syncStatus.Errors = int(stats.GetErrors())
+		syncStatus.Checks = stats.GetChecks()
+		syncStatus.Deletes = stats.GetDeletes()
+		if elapsed := time.Since(startTime); elapsed.Seconds() > 0 {
+			syncStatus.Speed = formatSpeed(float64(syncStatus.BytesTransferred) / elapsed.Seconds())
+		}
+	} else if remoteStats, err := stats.RemoteStats(false); err == nil {
 		// Totals from calculateTransferStats
 		if v, ok := remoteStats["totalTransfers"]; ok {
 			if n, ok := v.(int64); ok {
@@ -194,68 +232,75 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 			}
 		}
 
-		// Build per-file transfer list
-		var transfers []dto.FileTransferInfo
+		if includeTransfers {
+			// Build per-file transfer list
+			var transfers []dto.FileTransferInfo
 
-		// In-progress transfers
-		if v, ok := remoteStats["transferring"]; ok && v != nil {
-			if trList, ok := v.([]rc.Params); ok {
-				for _, tr := range trList {
-					fi := dto.FileTransferInfo{Status: "transferring"}
-					if name, ok := tr["name"].(string); ok {
-						fi.Name = name
+			// In-progress transfers
+			if v, ok := remoteStats["transferring"]; ok && v != nil {
+				if trList, ok := v.([]rc.Params); ok {
+					for _, tr := range trList {
+						fi := dto.FileTransferInfo{Status: "transferring"}
+						if name, ok := tr["name"].(string); ok {
+							fi.Name = name
+						}
+						if size, ok := tr["size"].(int64); ok {
+							fi.Size = size
+						}
+						if bytes, ok := tr["bytes"].(int64); ok {
+							fi.Bytes = bytes
+						}
+						if pct, ok := tr["percentage"].(int); ok {
+							fi.Progress = float64(pct)
+						}
+						if speed, ok := tr["speed"].(float64); ok {
+							fi.Speed = speed
+						}
+						transfers = append(transfers, fi)
 					}
-					if size, ok := tr["size"].(int64); ok {
-						fi.Size = size
-					}
-					if bytes, ok := tr["bytes"].(int64); ok {
-						fi.Bytes = bytes
-					}
-					if pct, ok := tr["percentage"].(int); ok {
-						fi.Progress = float64(pct)
-					}
-					if speed, ok := tr["speed"].(float64); ok {
-						fi.Speed = speed
-					}
-					transfers = append(transfers, fi)
 				}
 			}
-		}
 
-		// In-progress checks — also collect names for accumulation tracking
-		if v, ok := remoteStats["checking"]; ok && v != nil {
-			if checkList, ok := v.([]string); ok {
-				for _, name := range checkList {
-					currentlyChecking[name] = struct{}{}
-					transfers = append(transfers, dto.FileTransferInfo{
-						Name:   name,
-						Status: "checking",
-					})
+			// In-progress checks — also collect names for accumulation tracking
+			if v, ok := remoteStats["checking"]; ok && v != nil {
+				if checkList, ok := v.([]string); ok {
+					for _, name := range checkList {
+						currentlyChecking[name] = struct{}{}
+						transfers = append(transfers, dto.FileTransferInfo{
+							Name:   name,
+							Status: "checking",
+						})
+					}
 				}
 			}
-		}
 
-		// Completed/failed transfers
-		for _, tr := range stats.Transferred() {
-			fi := dto.FileTransferInfo{
-				Name:  tr.Name,
-				Size:  tr.Size,
-				Bytes: tr.Bytes,
+			// Completed/failed transfers. stats.Transferred() grows throughout the
+			// operation, so only ship the recent tail on file-list ticks.
+			transferred := stats.Transferred()
+			if len(transferred) > maxCompletedTransfersPerStatus {
+				transferred = transferred[len(transferred)-maxCompletedTransfersPerStatus:]
 			}
-			if tr.Error != nil {
-				fi.Status = "failed"
-				fi.Error = tr.Error.Error()
-			} else if tr.Checked {
-				fi.Status = "checked"
-				fi.Progress = 100
-			} else {
-				fi.Status = "completed"
-				fi.Progress = 100
+			for _, tr := range transferred {
+				fi := dto.FileTransferInfo{
+					Name:  tr.Name,
+					Size:  tr.Size,
+					Bytes: tr.Bytes,
+				}
+				if tr.Error != nil {
+					fi.Status = "failed"
+					fi.Error = tr.Error.Error()
+				} else if tr.Checked {
+					fi.Status = "checked"
+					fi.Progress = 100
+				} else {
+					fi.Status = "completed"
+					fi.Progress = 100
+				}
+				transfers = append(transfers, fi)
 			}
-			transfers = append(transfers, fi)
-		}
 
-		syncStatus.Transfers = transfers
+			syncStatus.Transfers = transfers
+		}
 	} else {
 		// Fallback to basic stats if RemoteStats fails
 		syncStatus.FilesTransferred = stats.GetTransfers()
@@ -292,24 +337,6 @@ func createStatusFromStats(ctx context.Context, startTime time.Time, logMessages
 		syncStatus.Status = "completed"
 	} else {
 		syncStatus.Status = "running"
-	}
-
-	// Derive error/check counts from the actual transfer list so displayed
-	// counts match the items shown (rclone's raw counters can diverge due to
-	// retries, transient errors, and internal list caps).
-	if len(syncStatus.Transfers) > 0 {
-		var errCount int
-		var checkCount int64
-		for _, ft := range syncStatus.Transfers {
-			switch ft.Status {
-			case "failed":
-				errCount++
-			case "checked", "checking":
-				checkCount++
-			}
-		}
-		syncStatus.Errors = errCount
-		syncStatus.Checks = checkCount
 	}
 
 	// Attach accumulated log messages (capped to prevent unbounded growth)
@@ -403,46 +430,73 @@ func startProgress(ctx context.Context, outStatus chan *dto.SyncStatusDTO) func(
 
 		// Accumulate completed checks by tracking the checking set across ticks.
 		// Files that leave remoteStats["checking"] between ticks are "done checking".
-		const maxCompletedChecks = 100
 		prevChecking := make(map[string]struct{})
 		var completedChecks []dto.FileTransferInfo
+		var lastFileListAt time.Time
+		var lastRichStatus *dto.SyncStatusDTO
+		var lastSentStatus *dto.SyncStatusDTO
 
 		for {
 			select {
 			case <-ticker.C:
 				if !isClosed.Load() {
 					msgs := drainLogs()
-					status, curChecking := createStatusFromStats(ctx, startTime, msgs)
+					includeTransfers := lastFileListAt.IsZero() || time.Since(lastFileListAt) >= fileListProgressInterval
+					status, curChecking := createStatusFromStats(ctx, startTime, msgs, includeTransfers)
 
-					// Detect files that left the checking set → completed check
-					for name := range prevChecking {
-						if _, ok := curChecking[name]; !ok {
-							completedChecks = append(completedChecks, dto.FileTransferInfo{
-								Name:     name,
-								Status:   "checked",
-								Progress: 100,
-							})
+					if includeTransfers {
+						lastFileListAt = time.Now()
+						lastRichStatus = status
+
+						// Detect files that left the checking set → completed check
+						for name := range prevChecking {
+							if _, ok := curChecking[name]; !ok {
+								completedChecks = append(completedChecks, dto.FileTransferInfo{
+									Name:     name,
+									Status:   "checked",
+									Progress: 100,
+								})
+							}
+						}
+						prevChecking = curChecking
+
+						// Bound the accumulator
+						if len(completedChecks) > maxCompletedChecksPerStatus {
+							completedChecks = completedChecks[len(completedChecks)-maxCompletedChecksPerStatus:]
+						}
+
+						// Inject accumulated completed checks (skip duplicates already in list)
+						existingNames := make(map[string]struct{}, len(status.Transfers))
+						for _, ft := range status.Transfers {
+							existingNames[ft.Name] = struct{}{}
+						}
+						for _, cc := range completedChecks {
+							if _, exists := existingNames[cc.Name]; !exists {
+								status.Transfers = append(status.Transfers, cc)
+							}
+						}
+					} else if lastRichStatus != nil {
+						status.TotalFiles = lastRichStatus.TotalFiles
+						status.TotalBytes = lastRichStatus.TotalBytes
+						status.TotalChecks = lastRichStatus.TotalChecks
+						if status.ETA == "" {
+							status.ETA = lastRichStatus.ETA
+						}
+						if status.TotalBytes > 0 {
+							status.Progress = float64(status.BytesTransferred) / float64(status.TotalBytes) * 100
+						} else if status.TotalFiles > 0 {
+							status.Progress = float64(status.FilesTransferred) / float64(status.TotalFiles) * 100
+						} else if status.TotalChecks > 0 {
+							status.Progress = float64(status.Checks) / float64(status.TotalChecks) * 100
+						}
+						if status.Errors == 0 && status.Progress >= 100.0 {
+							status.Status = "completed"
 						}
 					}
-					prevChecking = curChecking
 
-					// Bound the accumulator
-					if len(completedChecks) > maxCompletedChecks {
-						completedChecks = completedChecks[len(completedChecks)-maxCompletedChecks:]
+					if shouldEmitStatus(lastSentStatus, status, includeTransfers) && safeSend(status) {
+						lastSentStatus = status
 					}
-
-					// Inject accumulated completed checks (skip duplicates already in list)
-					existingNames := make(map[string]struct{}, len(status.Transfers))
-					for _, ft := range status.Transfers {
-						existingNames[ft.Name] = struct{}{}
-					}
-					for _, cc := range completedChecks {
-						if _, exists := existingNames[cc.Name]; !exists {
-							status.Transfers = append(status.Transfers, cc)
-						}
-					}
-
-					safeSend(status)
 				}
 			case <-stopCh:
 				return
@@ -464,7 +518,7 @@ func startProgress(ctx context.Context, outStatus chan *dto.SyncStatusDTO) func(
 		// 5. Emit one final DTO with any remaining accumulated messages
 		remaining := drainLogs()
 		if len(remaining) > 0 {
-			finalStatus, _ := createStatusFromStats(ctx, startTime, remaining)
+			finalStatus, _ := createStatusFromStats(ctx, startTime, remaining, true)
 			// Direct send (non-blocking) — channel might be full
 			select {
 			case outStatus <- finalStatus:

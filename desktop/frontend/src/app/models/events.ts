@@ -32,6 +32,9 @@ export type EventType =
     | "board:execution:completed"
     | "board:execution:failed"
     | "board:execution:cancelled"
+    // Backend-owned state events
+    | "state:snapshot"
+    | "state:patch"
     // Legacy command types
     | "command_started"
     | "command_stoped"
@@ -109,6 +112,14 @@ export interface BoardEvent extends BaseEvent {
     message?: string;
 }
 
+// Backend-owned state event structure
+export interface StateEvent extends BaseEvent {
+    type: "state:snapshot" | "state:patch";
+    seqNo: number;
+    slice?: string;
+    operation?: string;
+}
+
 // Legacy command DTO (for backward compatibility)
 export interface CommandDTO {
     command: string;
@@ -126,6 +137,7 @@ export type AppEvent =
     | TabEvent
     | ErrorEvent
     | BoardEvent
+    | StateEvent
     | CommandDTO;
 
 // Type guards
@@ -179,6 +191,15 @@ export function isBoardEvent(event: unknown): event is BoardEvent {
     return (
         typeof e["type"] === "string" &&
         (e["type"] as string).startsWith("board:")
+    );
+}
+
+export function isStateEvent(event: unknown): event is StateEvent {
+    if (typeof event !== "object" || event === null) return false;
+    const e = event as Record<string, unknown>;
+    return (
+        typeof e["type"] === "string" &&
+        (e["type"] as string).startsWith("state:")
     );
 }
 

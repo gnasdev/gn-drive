@@ -174,3 +174,9 @@ body {
   background: rgba(0, 43, 54, 0.6) !important;
   backdrop-filter: blur(4px);
 }
+
+/* GN Drive shell: remove visible layout borders from the mounted app UI. */
+app-root,
+app-root * {
+  border-width: 0 !important;
+}
