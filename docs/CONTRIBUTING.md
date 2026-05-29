@@ -131,7 +131,7 @@ go test ./backend/validation/...
 
 ```bash
 cd desktop/frontend
-npm test
+bun run test --watch=false --browsers=ChromeHeadless
 ```
 
 ### Manual Testing

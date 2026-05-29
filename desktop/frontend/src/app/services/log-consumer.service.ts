@@ -1,12 +1,27 @@
 /** GN Drive note: Adapts backend bindings and browser APIs into frontend application services. */
-import { inject, Injectable, OnDestroy } from "@angular/core";
-import { GetLogsSince } from "../../../wailsjs/desktop/backend/services/logservice";
-import { LogEntry } from "../../../wailsjs/desktop/backend/services/models";
+import { inject, Injectable, InjectionToken, OnDestroy } from "@angular/core";
 import { SyncEvent } from "../models/events";
 import { TabService } from "../tab.service";
 
 // Maximum number of output lines to keep per tab
 const MAX_OUTPUT_LINES = 1000;
+
+export interface BackendLogEntry {
+    seqNo?: number;
+    message?: string;
+}
+
+export interface LogServiceClient {
+    getLogsSince(
+        tabId: string,
+        afterSeqNo: number,
+    ): PromiseLike<BackendLogEntry[]>;
+}
+
+// Keep generated Wails bindings behind DI so Karma tests can use a mock client.
+export const LOG_SERVICE_CLIENT = new InjectionToken<LogServiceClient>(
+    "LOG_SERVICE_CLIENT",
+);
 
 @Injectable({
     providedIn: "root",
@@ -14,6 +29,7 @@ const MAX_OUTPUT_LINES = 1000;
 export class LogConsumerService implements OnDestroy {
     // Use inject() instead of constructor injection
     private tabService = inject(TabService);
+    private logServiceClient = inject(LOG_SERVICE_CLIENT);
 
     // Track last received sequence number per tab
     private lastSeqNo = new Map<string, number>();
@@ -91,14 +107,18 @@ export class LogConsumerService implements OnDestroy {
         this.isPolling.set(tabId, true);
 
         try {
-            const logs = await GetLogsSince(tabId, afterSeqNo);
+            const logs = await this.logServiceClient.getLogsSince(
+                tabId,
+                afterSeqNo,
+            );
             if (!logs || logs.length === 0) {
                 return;
             }
 
             // Sort logs by sequence number
             logs.sort(
-                (a: LogEntry, b: LogEntry) => (a.seqNo || 0) - (b.seqNo || 0),
+                (a: BackendLogEntry, b: BackendLogEntry) =>
+                    (a.seqNo || 0) - (b.seqNo || 0),
             );
 
             // Process each log entry

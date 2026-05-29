@@ -12,14 +12,14 @@ tasks:
     summary: Install frontend dependencies
     dir: frontend
     cmds:
-      - yarn install
+      - bun install --frozen-lockfile
 
   # Build frontend
   build:frontend:
     summary: Build the frontend
     dir: frontend
     cmds:
-      - yarn build
+      - bun run build
     deps:
       - install:frontend:deps
 

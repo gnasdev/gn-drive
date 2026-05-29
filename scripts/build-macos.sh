@@ -20,6 +20,7 @@ APP_DISPLAY_NAME="GN Drive"
 BUNDLE_ID="com.gndrive.app"
 VERSION="${VERSION:-1.0.0}"
 COPYRIGHT="Copyright $(date +%Y)"
+PINNED_WAILS_VERSION="v3.0.0-alpha.96"
 
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,17 +67,22 @@ check_prerequisites() {
     NODE_VERSION=$(node --version)
     log_info "Node.js version: $NODE_VERSION"
 
-    # Check npm
-    if ! command -v npm &> /dev/null; then
-        log_error "npm is not installed. Please install npm"
+    # Check Bun
+    if ! command -v bun &> /dev/null; then
+        log_error "Bun is not installed. Please install Bun"
         exit 1
     fi
+    BUN_VERSION=$(bun --version)
+    log_info "Bun version: $BUN_VERSION"
 
-    # Check/Install wails3
+    # Check/install the pinned Wails CLI so packaging matches CI and go.mod.
     if ! command -v wails3 &> /dev/null; then
         log_warning "wails3 not found. Installing..."
-        go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
+        go install github.com/wailsapp/wails/v3/cmd/wails3@"$PINNED_WAILS_VERSION"
         export PATH="$PATH:$(go env GOPATH)/bin"
+    elif ! wails3 version 2>/dev/null | grep -q "$PINNED_WAILS_VERSION"; then
+        log_warning "wails3 is not $PINNED_WAILS_VERSION. Installing pinned version..."
+        go install github.com/wailsapp/wails/v3/cmd/wails3@"$PINNED_WAILS_VERSION"
     fi
     WAILS_VERSION=$(wails3 version 2>/dev/null | head -1 || echo "unknown")
     log_info "Wails version: $WAILS_VERSION"
@@ -111,11 +117,11 @@ build_frontend() {
     log_info "Building frontend..."
     cd "$FRONTEND_DIR"
 
-    # Install dependencies
-    npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
+    # Install dependencies from the canonical Bun lockfile.
+    bun install --frozen-lockfile
 
     # Build production
-    npm run build
+    bun run build
 
     log_success "Frontend built"
 }

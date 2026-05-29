@@ -102,7 +102,11 @@ Delete a remote and associated profiles.
 
 #### `ReauthRemote(name string) AppError | null`
 
-Re-authenticate a remote (refresh OAuth token).
+Re-authenticate a remote (refresh OAuth token). The backend preserves the existing rclone provider type when reconnecting; `gphotos` is normalized to `googlephotos`. iCloud Drive uses rclone's terminal reconnect flow instead of the OAuth flow:
+
+```bash
+rclone config reconnect <remote>:
+```
 
 ---
 

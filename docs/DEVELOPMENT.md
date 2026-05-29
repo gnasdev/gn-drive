@@ -10,9 +10,9 @@ This guide covers setting up your development environment and common development
 |------|---------|--------------|
 | Go | 1.26.3+ | https://golang.org/dl/ |
 | Node.js | 18+ (v24 recommended) | https://nodejs.org/ |
-| npm | Latest | Comes with Node.js |
+| Bun | Latest | https://bun.sh/ |
 | Taskfile | Latest | https://taskfile.dev/ |
-| Wails v3 | v3.0.0-alpha.89 | `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89` |
+| Wails v3 | v3.0.0-alpha.96 | `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96` |
 
 ### Verify Installation
 
@@ -22,6 +22,9 @@ go version  # Should show 1.26.3+
 
 # Check Node.js
 node --version  # Should show v18+
+
+# Check Bun
+bun --version
 
 # Check Wails v3
 wails3 version
@@ -148,7 +151,7 @@ go test ./backend/services/...
 
 ```bash
 cd desktop/frontend
-npm test
+bun run test --watch=false --browsers=ChromeHeadless
 ```
 
 ## Debugging
@@ -177,7 +180,7 @@ curl http://127.0.0.1:9245
 cd desktop && go mod verify
 
 # Clean rebuild
-cd desktop/frontend && rm -rf node_modules dist && npm install --legacy-peer-deps
+cd desktop/frontend && rm -rf node_modules dist && bun install --frozen-lockfile
 cd desktop && go clean -cache
 ```
 
@@ -221,7 +224,7 @@ WAILS_VITE_PORT=9246 task dev
 
 ```bash
 # Install the pinned Wails v3 CLI
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96
 
 # Update PATH
 export PATH="$PATH:$(go env GOPATH)/bin"

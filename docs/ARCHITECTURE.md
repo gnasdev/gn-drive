@@ -9,11 +9,11 @@ GN Drive is a desktop application for cloud storage synchronization with a moder
 | Component | Version | Description |
 |-----------|---------|-------------|
 | Go | 1.26.3 | Backend runtime |
-| Wails | v3.0.0-alpha.89 | Desktop app framework |
-| Angular | 21.2 | Frontend framework |
-| rclone | v1.73.0 | Cloud sync engine |
-| TypeScript | 5.9 | Frontend type system |
-| Tailwind CSS | 3.4 | UI styling |
+| Wails | v3.0.0-alpha.96 | Desktop app framework |
+| Angular | 21.2.15 | Frontend framework |
+| rclone | v1.74.2 | Cloud sync engine |
+| TypeScript | 5.9.3 | Frontend type system |
+| Tailwind/PostCSS | 4.3 | UI styling |
 
 ## Architecture Principles
 
