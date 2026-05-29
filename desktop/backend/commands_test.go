@@ -8,7 +8,52 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	fsConfig "github.com/rclone/rclone/fs/config"
 )
+
+func TestRemoteTypeForReauth(t *testing.T) {
+	remotes := []fsConfig.Remote{
+		{Name: "photos", Type: "gphotos"},
+		{Name: "icloud", Type: "iclouddrive"},
+		{Name: "drive", Type: "drive"},
+	}
+
+	tests := []struct {
+		name       string
+		remoteName string
+		wantType   string
+		wantFound  bool
+	}{
+		{
+			name:       "normalizes google photos alias",
+			remoteName: "photos",
+			wantType:   "googlephotos",
+			wantFound:  true,
+		},
+		{
+			name:       "keeps icloud type for manual reconnect",
+			remoteName: "icloud",
+			wantType:   "iclouddrive",
+			wantFound:  true,
+		},
+		{
+			name:       "returns false for missing remote",
+			remoteName: "missing",
+			wantType:   "",
+			wantFound:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotType, gotFound := remoteTypeForReauth(remotes, tt.remoteName)
+			if gotType != tt.wantType || gotFound != tt.wantFound {
+				t.Fatalf("remoteTypeForReauth() = (%q, %v), want (%q, %v)", gotType, gotFound, tt.wantType, tt.wantFound)
+			}
+		})
+	}
+}
 
 func TestDeleteRemote_CascadeDeleteProfiles(t *testing.T) {
 	// Create a temporary directory for test files

@@ -1,6 +1,6 @@
 # GN Drive Frontend
 
-Angular 21 frontend for GN Drive with Tailwind CSS styling.
+Angular 21.2 frontend for GN Drive with Tailwind/PostCSS styling.
 
 ## Structure
 
@@ -151,25 +151,25 @@ Dark mode supported via `dark:` prefix classes.
 ### Start Dev Server
 
 ```bash
-npm start -- --port 9245
+bun run start -- --port 9245
 ```
 
 ### Build
 
 ```bash
-npm run build
+bun run build
 ```
 
 ### Lint
 
 ```bash
-npm run lint
+bun run lint
 ```
 
 ### Test
 
 ```bash
-npm test
+bun run test --watch=false --browsers=ChromeHeadless
 ```
 
 ## Adding Components
@@ -185,7 +185,7 @@ Follow patterns:
 
 ## Dependencies
 
-- Angular 21
-- Tailwind CSS
+- Angular 21.2
+- Tailwind/PostCSS 4
 - RxJS
 - @wailsio/runtime (Wails integration)

@@ -37,11 +37,11 @@ describe("RemoteTypes", () => {
 
             expect(gPhotosOption).toBeDefined();
             expect(gPhotosOption?.label).toBe("Google Photos");
-            expect(gPhotosOption?.icon).toBe("photo_library");
+            expect(gPhotosOption?.icon).toBe("googlephotos");
 
             expect(iCloudOption).toBeDefined();
             expect(iCloudOption?.label).toBe("iCloud Drive");
-            expect(iCloudOption?.icon).toBe("cloud_upload");
+            expect(iCloudOption?.icon).toBe("icloud");
         });
 
         it("should have unique values", () => {

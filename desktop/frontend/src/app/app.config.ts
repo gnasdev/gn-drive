@@ -7,6 +7,7 @@ import { MessageService, ConfirmationService } from "primeng/api";
 import { GlobalErrorHandler } from "./services/global-error-handler.service";
 import { ErrorInterceptor } from "./interceptors/error.interceptor";
 import NsDrivePreset from "./primeng-preset";
+import { provideWailsLogServiceClient } from "./services/wails-log-service-client";
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,6 +25,7 @@ export const appConfig: ApplicationConfig = {
     }),
     MessageService,
     ConfirmationService,
+    provideWailsLogServiceClient(),
     {
       provide: HTTP_INTERCEPTORS,
       useClass: ErrorInterceptor,

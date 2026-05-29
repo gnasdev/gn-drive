@@ -260,6 +260,15 @@ func normalizeRemoteType(remoteType string) string {
 	}
 }
 
+func remoteTypeForReauth(remotes []fsConfig.Remote, remoteName string) (string, bool) {
+	for _, r := range remotes {
+		if r.Name == remoteName {
+			return normalizeRemoteType(r.Type), true
+		}
+	}
+	return "", false
+}
+
 func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType string, remoteConfig map[string]string) *dto.AppError {
 
 	// Prepare configuration parameters
@@ -305,8 +314,8 @@ func (a *App) addOAuthRemote(ctx context.Context, remoteName string, remoteType 
 }
 
 func (a *App) addICloudRemote(ctx context.Context, remoteName string, remoteConfig map[string]string) *dto.AppError {
-	// iCloud Drive requires interactive setup with Apple ID, password, and 2FA
-	// For now, we'll return an error with instructions for manual setup
+	// iCloud Drive still needs rclone's interactive SRP + 2FA setup.
+	// GN Drive returns terminal instructions instead of handling Apple credentials in-app.
 	errorMsg := fmt.Sprintf(`iCloud Drive setup requires interactive configuration.
 
 Please use the following steps to set up your iCloud remote:
@@ -323,7 +332,10 @@ Please use the following steps to set up your iCloud remote:
 
 After setup, restart GN Drive to see your iCloud remote.
 
-Note: Advanced Data Protection must be disabled in iCloud settings.`, remoteName)
+Notes:
+- App-specific passwords are not accepted.
+- Advanced Data Protection is supported by rclone when "Access iCloud Data on the Web" is enabled and any trusted-device approval prompt is completed.
+- If the trust token expires, reconnect with: rclone config reconnect %s:`, remoteName, remoteName)
 
 	return dto.NewAppError(errors.New(errorMsg))
 }
@@ -360,17 +372,9 @@ func (a *App) ReauthRemote(remoteName string) *dto.AppError {
 		a.initializeConfig()
 	}
 
-	// Find current remote to get its type
-	remotes := fsConfig.GetRemotes()
-	var remoteType string
-	found := false
-	for _, r := range remotes {
-		if r.Name == remoteName {
-	remoteType = normalizeRemoteType(remoteType)
-			found = true
-			break
-		}
-	}
+	// Re-authentication must preserve the existing provider type; passing an
+	// empty type would make rclone try to recreate the remote with invalid config.
+	remoteType, found := remoteTypeForReauth(fsConfig.GetRemotes(), remoteName)
 	if !found {
 		return dto.NewAppError(fmt.Errorf("remote %q not found", remoteName))
 	}

@@ -2,7 +2,11 @@
 import { TestBed } from "@angular/core/testing";
 import { SyncEvent } from "../models/events";
 import { TabService } from "../tab.service";
-import { LogConsumerService } from "./log-consumer.service";
+import {
+    LOG_SERVICE_CLIENT,
+    LogConsumerService,
+    LogServiceClient,
+} from "./log-consumer.service";
 
 describe("LogConsumerService", () => {
     let service: LogConsumerService;
@@ -10,7 +14,16 @@ describe("LogConsumerService", () => {
 
     beforeEach(() => {
         TestBed.configureTestingModule({
-            providers: [LogConsumerService, TabService],
+            providers: [
+                LogConsumerService,
+                TabService,
+                {
+                    provide: LOG_SERVICE_CLIENT,
+                    useValue: {
+                        getLogsSince: () => Promise.resolve([]),
+                    } satisfies LogServiceClient,
+                },
+            ],
         });
 
         service = TestBed.inject(LogConsumerService);

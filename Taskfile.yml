@@ -23,7 +23,7 @@ tasks:
     dir: desktop
     cmds:
       - go mod download
-      - go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.89
+      - go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.96
 
   install:fe:
     summary: Installs frontend dependencies
