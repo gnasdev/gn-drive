@@ -2,6 +2,43 @@
 
 All notable changes to GN Drive will be documented in this file.
 
+## [v1.0.0] - 2026-06-09
+
+### Major: Web stack GA — Wails deprecated
+
+- **Single-process CLI + Vue 3 web UI** is the only supported runtime. The Wails v3 desktop app (Angular 21) has been removed.
+- One binary, one process, one port. Sync engine, HTTP API, and Vue SPA share the process. No IPC, no JSON-RPC, no separate daemon.
+- Loopback-only binding (`127.0.0.1`) with auto-port. CORS restricted to `localhost` and `127.0.0.1`.
+- 10 CLI subcommands: `run`, `service`, `sync`, `board`, `profile`, `remote`, `self-update`, `version`, `doctor`, `completion`.
+- HTTP API at `/api/v1` (45+ endpoints) with chi router + SSE event stream.
+- 11 Vue 3 routes: Unlock, Dashboard, Profiles, Remotes, Operations, Boards, Flows, Schedules, History, Service, Settings.
+- Service mode (opt-in): `gn-drive service install` registers with systemd (Linux) / launchd (macOS) / SCM (Windows). `service.health` heartbeat file written every 5s.
+- Cross-platform: Linux, macOS, Windows. Builds produce a single `~12MB` binary with embedded frontend.
+
+### Migration from v0.3.x
+
+- Existing `~/.config/gn-drive/` data is loadable without migration: `auth.json`, `rclone.conf`, `gn-drive.db` schema are unchanged.
+- Just install the new binary: `go install github.com/gnasdev/gn-drive/cmd/gn-drive@latest` and run `gn-drive run`.
+- If you had the Wails desktop app installed, uninstall it manually (the binary is no longer built).
+
+### Developer migration
+
+- `go.mod` is at the root (was at `desktop/`). Run `go build ./cmd/gn-drive`.
+- Frontend in `frontend/` (was at `desktop/frontend/`). Run `pnpm install` then `task build:fe` (or `task build` for the full pipeline).
+- See `docs/specs/planning/refactor-gn-drive-web-stack.md` for the full plan and rationale.
+
+## [v0.4.0-alpha] - 2026-06-09
+
+### Refactor
+
+- **Web stack alpha** — Single-process CLI + Vue 3 frontend (Phase 1+2 of `docs/specs/planning/refactor-gn-drive-web-stack.md`).
+  - New `cmd/gn-drive/` CLI with `cobra` (10 subcommands: run, service, sync, board, profile, remote, self-update, version, doctor, completion).
+  - `internal/{config, ports, instance, eventbus, logging, auth, store, rclone, syncengine, app}` packages with constructor-based dependency injection (no package-level singletons).
+  - SQLite store with 7 repositories (settings, profile, schedule, history, board, flow, delta) and 47-column profile schema (matches Wails format for cross-compat).
+  - Argon2id + AES-256-GCM auth with rate limit, crash recovery, and `--unlock-stdin` for service mode.
+  - rclone shell-out wrapper (`exec.Command("rclone", ...)`) — no rclone Go library dependency.
+- **Cleanup** — Removed orphaned Wails build artifacts (`gn-drive`, `gn-drive.app/`, `scripts/build-macos.sh`, `desktop/frontend/`, `desktop/Taskfile.yml`, empty `internal/config/config.go` placeholder). Updated `README.md` and `.gitignore` to reflect the web stack. Legacy Wails desktop app retained in `desktop/` until Phase 7.
+
 ## [v0.3.0] - 2026-02-12
 
 ### Features

@@ -1,10 +1,15 @@
 .task
-bin
-frontend/dist
-frontend/node_modules
-build/linux/appimage/build
-build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 *.log
 .config
+
+# Web stack build artifacts
 /gn-drive
-/gn-drive.app
+/gn-drive-dev
+/bin/
+
+# Frontend
+/frontend/dist
+/frontend/node_modules
+
+# Internal embedded frontend
+/internal/webui/dist
