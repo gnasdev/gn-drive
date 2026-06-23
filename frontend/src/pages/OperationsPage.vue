@@ -59,7 +59,7 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
           <div class="task-name">{{ t.name }} <span class="badge">{{ t.action }}</span></div>
           <div class="task-meta">
             <span :class="['status', t.status]">{{ t.status }}</span>
-            <span v-if="t.bytes" class="mono small">{{ t.bytes }} B</span>
+            <span v-if="t.transferred" class="mono small">{{ t.transferred }} B</span>
           </div>
         </div>
       </div>
@@ -71,7 +71,7 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
         <input v-model="remoteInput" placeholder="remote:/path" @keydown.enter="doBrowse" />
         <button class="primary" @click="doBrowse" :disabled="store.busy">{{ store.busy ? 'Loading…' : 'Browse' }}</button>
       </div>
-      <div v-if="store.error?.value" class="banner err">{{ store.error.value }}</div>
+      <div v-if="store.error" class="banner err">{{ store.error }}</div>
       <p class="row-help">
         Note: file browser requires the backend's <code>/api/v1/operations/fs</code> endpoint
         to be implemented. Currently returns 501 in Phase 3.

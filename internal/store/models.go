@@ -51,7 +51,7 @@ type Profile struct {
 	OrderBy            string `json:"order_by,omitempty"`
 	RetriesSleep       string `json:"retries_sleep,omitempty"`
 	TpsLimit           *float64 `json:"tps_limit,omitempty"`
-	ConnTimeout        string `json:"io_timeout,omitempty"`
+	ConnTimeout        string `json:"conn_timeout,omitempty"`
 	IoTimeout          string `json:"io_timeout,omitempty"`
 
 	// Comparison

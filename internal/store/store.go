@@ -410,6 +410,51 @@ func (r BoardRepo) Get(ctx context.Context, id string) (*Board, error) {
 	return &b, nil
 }
 
+// LoadGraph returns the board with its nodes and edges populated. Used for
+// DAG execution and the web UI canvas.
+func (r BoardRepo) LoadGraph(ctx context.Context, id string) (*Board, error) {
+	b, err := r.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	b.Nodes = []BoardNode{}
+	b.Edges = []BoardEdge{}
+
+	nrows, err := r.s.db.QueryContext(ctx,
+		`SELECT id, remote_name, path, label, x, y
+		 FROM board_nodes WHERE board_id = ? ORDER BY id`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer nrows.Close()
+	for nrows.Next() {
+		var n BoardNode
+		if err := nrows.Scan(&n.ID, &n.RemoteName, &n.Path, &n.Label, &n.X, &n.Y); err != nil {
+			return nil, err
+		}
+		b.Nodes = append(b.Nodes, n)
+	}
+	if err := nrows.Err(); err != nil {
+		return nil, err
+	}
+
+	erows, err := r.s.db.QueryContext(ctx,
+		`SELECT id, source_id, target_id, action, sync_config
+		 FROM board_edges WHERE board_id = ? ORDER BY id`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer erows.Close()
+	for erows.Next() {
+		var e BoardEdge
+		if err := erows.Scan(&e.ID, &e.SourceID, &e.TargetID, &e.Action, &e.SyncConfig); err != nil {
+			return nil, err
+		}
+		b.Edges = append(b.Edges, e)
+	}
+	return b, erows.Err()
+}
+
 func (r BoardRepo) Save(ctx context.Context, b *Board) error {
 	_, err := r.s.db.ExecContext(ctx,
 		`INSERT INTO boards (id, name, description, schedule_enabled, cron_expr, updated_at)

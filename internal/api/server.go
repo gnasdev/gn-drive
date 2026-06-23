@@ -284,30 +284,57 @@ func clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// sessionStore is process-local; valid for the lifetime of the process.
-var (
-	sessionStore = make(map[string]struct{})
-	sessionMu    sync.RWMutex
-)
+// SessionStore is an in-memory, process-local session token registry.
+// Valid for the lifetime of the process; cleared on shutdown. Token format
+// is opaque to the caller — produced by crypto/rand in generateToken.
+type SessionStore struct {
+	mu     sync.RWMutex
+	tokens map[string]struct{}
+}
 
-func sessionValid(t string) bool {
-	sessionMu.RLock()
-	_, ok := sessionStore[t]
-	sessionMu.RUnlock()
+// NewSessionStore creates a new empty SessionStore.
+func NewSessionStore() *SessionStore {
+	return &SessionStore{tokens: make(map[string]struct{})}
+}
+
+// Add registers a token. Duplicate adds are idempotent.
+func (s *SessionStore) Add(token string) {
+	s.mu.Lock()
+	s.tokens[token] = struct{}{}
+	s.mu.Unlock()
+}
+
+// Valid reports whether the token is currently registered.
+func (s *SessionStore) Valid(token string) bool {
+	s.mu.RLock()
+	_, ok := s.tokens[token]
+	s.mu.RUnlock()
 	return ok
 }
 
-func sessionAdd(t string) {
-	sessionMu.Lock()
-	sessionStore[t] = struct{}{}
-	sessionMu.Unlock()
+// Delete removes a token. Missing-token deletes are no-ops.
+func (s *SessionStore) Delete(token string) {
+	s.mu.Lock()
+	delete(s.tokens, token)
+	s.mu.Unlock()
 }
 
-func sessionDelete(t string) {
-	sessionMu.Lock()
-	delete(sessionStore, t)
-	sessionMu.Unlock()
+// Count returns the number of registered tokens (for tests/diagnostics).
+func (s *SessionStore) Count() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.tokens)
 }
+
+// sessionStore is the process-wide SessionStore used by the HTTP handlers.
+// It is replaced with a fresh instance in tests; production code should
+// always go through this var so cookies minted by one handler are visible
+// to another.
+var sessionStore = NewSessionStore()
+
+func sessionValid(t string) bool   { return sessionStore.Valid(t) }
+func sessionAdd(t string)          { sessionStore.Add(t) }
+func sessionDelete(t string)       { sessionStore.Delete(t) }
 
 // silence unused
 var _ = context.Background

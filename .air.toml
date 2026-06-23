@@ -1,0 +1,49 @@
+# .air.toml — Go hot-reload config for `task dev`.
+# Docs: https://github.com/cosmtrek/air
+
+[build]
+  # Build command. We use `go build` into a tmp binary that air then runs.
+  cmd = "go build -trimpath -o ./tmp/gn-drive ./cmd/gn-drive"
+  # Binary that air invokes after each build. Use entrypoint (preferred
+  # over the deprecated `bin` field). Path is relative to project root.
+  entrypoint = ["./tmp/gn-drive"]
+  # Delay before triggering a new build (ms). Vite --watch rebuilds happen
+  # frequently; 800ms keeps the Go side from restarting mid-Vue-build.
+  delay = 800
+  # Stop running the previous binary cleanly on rebuild.
+  stop_on_error = true
+
+[log]
+  # Show only air's own output; the binary's stdout/stderr already flows
+  # through to the terminal via the `bin` directive above.
+  time = false
+
+[color]
+  app = "cyan"
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  # Show the full command air is about to run.
+  show_command = true
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true
+
+[exclude]
+  # Don't watch frontend or build output — Vite rebuilds the dist/ and
+  # air picks up the change via the file watcher; air only needs to
+  # restart the Go server when .go files change OR when the dist/ was
+  # re-bundled.
+  regex_dirs = [
+    "frontend/node_modules",
+    "frontend/dist",
+    "internal/webui/dist",
+    "tmp",
+    "bin",
+    ".git",
+    "scripts",
+  ]

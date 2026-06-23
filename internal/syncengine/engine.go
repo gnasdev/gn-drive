@@ -24,15 +24,16 @@ var ErrNotRunning = errors.New("syncengine: engine is not running")
 
 // Engine manages scheduled sync tasks and active task lifecycle.
 type Engine struct {
-    log     *slog.Logger
-    bus     *eventbus.Bus
-    store   *store.Store
-    rclone  *rclone.Client
-    cron    *cron.Cron
-    cronMu  sync.Mutex
-    active  sync.Map // taskID -> *Task
-    ctx     context.Context
-    cancel  context.CancelFunc
+    log      *slog.Logger
+    bus      *eventbus.Bus
+    store    *store.Store
+    rclone   *rclone.Client
+    cron     *cron.Cron
+    cronMu   sync.Mutex
+    schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
+    active   sync.Map                // taskID -> *Task
+    ctx      context.Context
+    cancel   context.CancelFunc
 }
 
 // Deps holds the engine's dependencies.
@@ -63,6 +64,7 @@ func (e *Engine) Start(ctx context.Context) error {
     }
     e.ctx, e.cancel = context.WithCancel(ctx)
     e.cron = cron.New(cron.WithSeconds())
+    e.schedule = make(map[string]cron.EntryID)
 
     if e.store != nil {
         e.loadSchedules()
@@ -89,6 +91,8 @@ func (e *Engine) Stop(ctx context.Context) error {
         return true
     })
     e.active = sync.Map{}
+    e.schedule = nil
+    e.cron = nil
     e.ctx = nil
     e.cancel = nil
     e.log.Info("syncengine: stopped")
@@ -136,34 +140,28 @@ func (e *Engine) StopSync(ctx context.Context, taskID string) error {
     return errors.New("syncengine: task not found")
 }
 
-// ActiveTasks returns all currently running tasks (snapshots).
-func (e *Engine) ActiveTasks(ctx context.Context) ([]Task, error) {
-    var tasks []Task
+// ActiveTasks returns snapshots of all currently running tasks. The
+// returned slices are decoupled from the live Task instances: callers
+// can iterate, marshal, and modify the snapshots without holding the
+// engine's mutex.
+func (e *Engine) ActiveTasks(ctx context.Context) ([]TaskSnapshot, error) {
+    var tasks []TaskSnapshot
     e.active.Range(func(_, v any) bool {
         t, ok := v.(*Task)
         if !ok {
             return true
         }
-        snap := Task{
-            ID:     t.ID,
-            Name:   t.Name,
-            Action: t.Action,
-            Status: t.Status,
-        }
-        t.Mu.Lock()
-        snap.Stats = t.Stats
-        snap.StartedAt = t.StartedAt
-        snap.EndedAt = t.EndedAt
-        t.Mu.Unlock()
-        tasks = append(tasks, snap)
+        tasks = append(tasks, t.Snapshot())
         return true
     })
     return tasks, nil
 }
 
-// RegisterSchedule adds or updates a cron job for a schedule.
+// RegisterSchedule adds or updates a cron job for a schedule. If a job
+// for this schedule ID already exists, it is removed and re-registered
+// with the new cron expression (or skipped when disabled).
 func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
-    if sch == nil || !sch.Enabled || sch.Cron == "" {
+    if sch == nil {
         return
     }
     e.cronMu.Lock()
@@ -171,7 +169,13 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
     if e.cron == nil {
         return
     }
-    _, err := e.cron.AddFunc(sch.Cron, func() {
+    // Always drop any prior entry for this schedule ID so re-registration
+    // with a new cron expression replaces the old one cleanly.
+    e.removeLocked(sch.ID)
+    if !sch.Enabled || sch.Cron == "" {
+        return
+    }
+    id, err := e.cron.AddFunc(sch.Cron, func() {
         e.log.Info("cron: triggering", "schedule", sch.ID, "profile", sch.ProfileName)
         e.bus.Publish(eventbus.TopicScheduleTriggered, eventbus.ScheduleTriggeredEvent{
             ScheduleID: sch.ID,
@@ -184,11 +188,30 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
         e.log.Warn("cron: add func failed", "schedule", sch.ID, "err", err)
         return
     }
+    e.schedule[sch.ID] = id
     e.log.Info("cron: registered", "schedule", sch.ID, "cron", sch.Cron)
 }
 
-// UnregisterSchedule is a stub — cron/v3 doesn't expose direct removal.
-func (e *Engine) UnregisterSchedule(id string) {}
+// UnregisterSchedule removes the cron entry for the given schedule ID.
+// Safe to call before Start (no-op) and when no entry exists (no-op).
+func (e *Engine) UnregisterSchedule(id string) {
+    e.cronMu.Lock()
+    defer e.cronMu.Unlock()
+    e.removeLocked(id)
+}
+
+// removeLocked is the unsynchronized helper. Caller must hold e.cronMu.
+func (e *Engine) removeLocked(id string) {
+    entryID, ok := e.schedule[id]
+    if !ok {
+        return
+    }
+    if e.cron != nil {
+        e.cron.Remove(entryID)
+    }
+    delete(e.schedule, id)
+    e.log.Info("cron: unregistered", "schedule", id)
+}
 
 func (e *Engine) loadSchedules() {
     ctx := context.Background()

@@ -23,7 +23,7 @@ async function submit() {
   }
   try {
     if (mode.value === 'setup') {
-      await auth.setup(password.value)
+      await auth.doSetup(password.value)
     } else {
       await auth.unlock(password.value)
     }
