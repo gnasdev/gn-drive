@@ -6,6 +6,7 @@ export interface Profile {
   name: string
   from: string
   to: string
+  direction?: 'pull' | 'push' | 'bi' | 'bi-resync' | string
   included_paths?: string[] | null
   excluded_paths?: string[] | null
   bandwidth: number

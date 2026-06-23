@@ -38,9 +38,9 @@ export function useApi(): UseApi {
   return {
     loading,
     error,
-    get: (path) => wrap(() => rawApi.get<T>(path)),
-    post: (path, body) => wrap(() => rawApi.post<T>(path, body)),
-    put: (path, body) => wrap(() => rawApi.put<T>(path, body)),
-    del: (path) => wrap(() => rawApi.delete<T>(path)),
+    get: <T = unknown>(path: string) => wrap<T>(() => rawApi.get<T>(path)),
+    post: <T = unknown>(path: string, body?: unknown) => wrap<T>(() => rawApi.post<T>(path, body)),
+    put: <T = unknown>(path: string, body?: unknown) => wrap<T>(() => rawApi.put<T>(path, body)),
+    del: <T = unknown>(path: string) => wrap<T>(() => rawApi.delete<T>(path)),
   }
 }

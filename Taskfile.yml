@@ -67,7 +67,7 @@ tasks:
     summary: Build Go backend binary
     dir: .
     cmds:
-      - go build -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - go build -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}} ./cmd/gn-drive
       - echo "Built {{.BIN_DIR}}/{{.APP_NAME}} (Version={{.VERSION}} Commit={{.COMMIT}})"
 
   build:be:dev:
@@ -94,12 +94,22 @@ tasks:
       - go run ./cmd/gn-drive run --no-browser
 
   run:dev:
-    summary: Run in dev mode (Vue HMR + Go backend)
+    summary: Run dev mode — Vue rebuild on change + Go hot reload (air) in parallel; Go serves Vue dist via SPA route
     dir: .
-    env:
-      GN_DRIVE_DEV: "true"
     cmds:
-      - go run ./cmd/gn-drive run --dev
+      - scripts/dev.sh
+
+  run:dev:fe:
+    summary: Run only the Vue watcher (no Go). Rebuilds internal/webui/dist/ on every change. Use with `go run ./cmd/gn-drive run --no-browser` in another terminal.
+    dir: frontend
+    cmds:
+      - pnpm run build:watch
+
+  run:dev:be:
+    summary: Run only the Go hot reload watcher (air). Pick up .go changes and internal/webui/dist/ rebuilds.
+    dir: .
+    cmds:
+      - "${GOPATH:-$HOME/go}/bin/air"
 
   run:fe:
     summary: Run Vite HMR dev server (frontend only, for hot reload)

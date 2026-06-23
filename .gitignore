@@ -13,3 +13,7 @@
 
 # Internal embedded frontend
 /internal/webui/dist
+
+# air (Go hot reload) build output
+/tmp/
+frontend/tsconfig.tsbuildinfo

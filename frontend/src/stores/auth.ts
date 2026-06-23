@@ -19,7 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
   const setup = ref(false)
   const unlocked = ref(false)
   const version = ref('dev')
-  const lockout = ref<AppStatus['lockout']>(null)
+  const lockout = ref<AppStatus['lockout'] | null>(null)
   const busy = ref(false)
   const error = ref<string | null>(null)
 
@@ -37,7 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function setup_(password: string) {
+  async function doSetup(password: string) {
     busy.value = true
     error.value = null
     try {
@@ -92,7 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     canAccess,
     fetchStatus,
-    setup: setup_,
+    doSetup,
     unlock,
     lock,
   }

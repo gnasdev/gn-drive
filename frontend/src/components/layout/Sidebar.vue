@@ -74,7 +74,7 @@ const groups = computed(() => {
     </nav>
 
     <div class="footer">
-      <span class="version">v{{ $store ? '' : '' }}</span>
+      <span class="version">v1.0.0</span>
     </div>
   </aside>
 </template>
