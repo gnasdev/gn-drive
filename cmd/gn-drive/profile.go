@@ -42,35 +42,40 @@ func newProfileListCmd() *cobra.Command {
 		Short: "List all profiles",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			profiles, err := a.Store.Profiles().List(ctx)
-			if err != nil {
-				return err
-			}
-			if len(profiles) == 0 {
-				fmt.Println("No profiles configured. Use 'gn-drive profile add' or 'gn-drive run' to manage via UI.")
-				return nil
-			}
-
-			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tFROM\tTO\tPARALLEL\tBANDWIDTH\tDRY-RUN")
-			fmt.Fprintln(w, "----\t----\t--\t--------\t---------\t-------")
-			for _, p := range profiles {
-				bw := ""
-				if p.Bandwidth > 0 {
-					bw = fmt.Sprintf("%dM", p.Bandwidth)
-				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%v\n",
-					p.Name, truncate(p.From, 40), truncate(p.To, 40), p.Parallel, bw, p.DryRun)
-			}
-			return w.Flush()
+			return runProfileList(cmd, a)
 		},
 	}
+}
+
+// runProfileList is the testable inner work of newProfileListCmd.
+func runProfileList(cmd *cobra.Command, a *app.App) error {
+	ctx := context.Background()
+	profiles, err := a.Store.Profiles().List(ctx)
+	if err != nil {
+		return err
+	}
+	if len(profiles) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No profiles configured. Use 'gn-drive profile add' to manage via UI.")
+		return nil
+	}
+
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tFROM\tTO\tPARALLEL\tBANDWIDTH\tDRY-RUN")
+	fmt.Fprintln(w, "----\t----\t--\t--------\t---------\t-------")
+	for _, p := range profiles {
+		bw := ""
+		if p.Bandwidth > 0 {
+			bw = fmt.Sprintf("%dM", p.Bandwidth)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%v\n",
+			p.Name, truncate(p.From, 40), truncate(p.To, 40), p.Parallel, bw, p.DryRun)
+	}
+	return w.Flush()
 }
 
 func newProfileAddCmd() *cobra.Command {
@@ -88,25 +93,12 @@ func newProfileAddCmd() *cobra.Command {
 				return fmt.Errorf("profile add: --name, --from, --to are required")
 			}
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			p := &store.Profile{
-				Name:      name,
-				From:      from,
-				To:        to,
-				Parallel:  parallel,
-				Bandwidth: bandwidth,
-				DryRun:    dryRun,
-			}
-			if err := a.Store.Profiles().Save(ctx, p); err != nil {
-				return err
-			}
-			fmt.Printf("✓ added profile %q\n", name)
-			return nil
+			return runProfileAdd(ctx, a, name, from, to, parallel, bandwidth, dryRun, cmd)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Profile name (required)")
@@ -118,6 +110,23 @@ func newProfileAddCmd() *cobra.Command {
 	return cmd
 }
 
+// runProfileAdd is the testable inner work of newProfileAddCmd.
+func runProfileAdd(ctx context.Context, a *app.App, name, from, to string, parallel, bandwidth int, dryRun bool, cmd *cobra.Command) error {
+	p := &store.Profile{
+		Name:      name,
+		From:      from,
+		To:        to,
+		Parallel:  parallel,
+		Bandwidth: bandwidth,
+		DryRun:    dryRun,
+	}
+	if err := a.Store.Profiles().Save(ctx, p); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ added profile %q\n", name)
+	return nil
+}
+
 func newProfileDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete [name]",
@@ -126,19 +135,23 @@ func newProfileDeleteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			if err := a.Store.Profiles().Delete(ctx, name); err != nil {
-				return err
-			}
-			fmt.Printf("✓ deleted profile %q\n", name)
-			return nil
+			return runProfileDelete(ctx, a, name, cmd)
 		},
 	}
+}
+
+// runProfileDelete is the testable inner work of newProfileDeleteCmd.
+func runProfileDelete(ctx context.Context, a *app.App, name string, cmd *cobra.Command) error {
+	if err := a.Store.Profiles().Delete(ctx, name); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ deleted profile %q\n", name)
+	return nil
 }
 
 func truncate(s string, n int) string {

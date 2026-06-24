@@ -78,7 +78,11 @@ type Spec struct {
 
 // Platform returns the current OS as a service-platform identifier.
 func Platform() string {
-	switch runtime.GOOS {
+	return platformOf(runtime.GOOS)
+}
+
+func platformOf(goos string) string {
+	switch goos {
 	case "linux":
 		return "systemd"
 	case "darwin":
@@ -86,7 +90,7 @@ func Platform() string {
 	case "windows":
 		return "scm"
 	default:
-		return runtime.GOOS
+		return goos
 	}
 }
 

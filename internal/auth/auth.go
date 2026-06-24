@@ -114,6 +114,8 @@ type Service struct {
 	configDir   string
 	logger      *slog.Logger
 	lockedAt    time.Time
+	sleep       func(time.Duration) // injectable for tests
+	randRead    func([]byte) (int, error) // injectable for tests
 }
 
 // New creates a new auth Service. It reads auth.json if present and
@@ -131,6 +133,8 @@ func New(opts Options) (*Service, error) {
 		authFile:  filepath.Join(opts.ConfigDir, "auth.json"),
 		configDir: opts.ConfigDir,
 		logger:    logger,
+		sleep:     time.Sleep,
+		randRead:  rand.Read,
 	}
 
 	authData, err := s.loadAuthData()
@@ -224,7 +228,7 @@ func (s *Service) SetupPassword(password string) error {
 	}
 
 	salt := make([]byte, argon2SaltLen)
-	if _, err := rand.Read(salt); err != nil {
+	if _, err := s.randRead(salt); err != nil {
 		return fmt.Errorf("auth: generate salt: %w", err)
 	}
 
@@ -273,7 +277,7 @@ func (s *Service) Unlock(password string) error {
 	if s.authData.FailedAttempts >= maxAttemptsBeforeDelay && s.authData.FailedAttempts < maxAttemptsBeforeLock {
 		delay := int(math.Pow(2, float64(s.authData.FailedAttempts-maxAttemptsBeforeDelay)))
 		s.mu.Unlock()
-		time.Sleep(time.Duration(delay) * time.Second)
+		s.sleep(time.Duration(delay) * time.Second)
 		s.mu.Lock()
 		if s.unlocked {
 			return nil
@@ -291,7 +295,7 @@ func (s *Service) Unlock(password string) error {
 		return ErrInvalidPassword
 	}
 
-	salt, err := extractSalt(s.authData.PasswordHash)
+	salt, err := extractSaltFn(s.authData.PasswordHash)
 	if err != nil {
 		return fmt.Errorf("auth: extract salt: %w", err)
 	}
@@ -356,7 +360,7 @@ func (s *Service) ChangePassword(oldPwd, newPwd string) error {
 	}
 
 	newSalt := make([]byte, argon2SaltLen)
-	if _, err := rand.Read(newSalt); err != nil {
+	if _, err := s.randRead(newSalt); err != nil {
 		return fmt.Errorf("auth: generate salt: %w", err)
 	}
 	newKey := deriveKey(newPwd, newSalt)
@@ -441,8 +445,11 @@ func (s *Service) loadAuthData() (*AuthData, error) {
 	return &d, nil
 }
 
+// marshalAuthData is overridable for tests; defaults to json.MarshalIndent.
+var marshalAuthData = json.MarshalIndent
+
 func (s *Service) saveAuthData() error {
-	data, err := json.MarshalIndent(s.authData, "", "  ")
+	data, err := marshalAuthData(s.authData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
@@ -478,13 +485,21 @@ func (s *Service) recoverFromCrash() {
 	}
 }
 
+// encryptFilesFn is overridable for tests; defaults to encryptFile.
+// Tests can swap it to inject errors into encryptConfigFiles.
+var encryptFilesFn = encryptFile
+
+// decryptFilesFn is overridable for tests; defaults to decryptFile.
+// Tests can swap it to inject errors into decryptConfigFiles.
+var decryptFilesFn = decryptFile
+
 func (s *Service) encryptConfigFiles(key []byte) error {
 	for _, name := range []string{"rclone.conf", "gn-drive.db"} {
 		src := filepath.Join(s.configDir, name)
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue
 		}
-		if err := encryptFile(src, src+".enc", key); err != nil {
+		if err := encryptFilesFn(src, src+".enc", key); err != nil {
 			return fmt.Errorf("encrypt %s: %w", name, err)
 		}
 		_ = os.Remove(src)
@@ -501,7 +516,7 @@ func (s *Service) decryptConfigFiles(key []byte) error {
 		if _, err := os.Stat(enc); os.IsNotExist(err) {
 			continue
 		}
-		if err := decryptFile(enc, base, key); err != nil {
+		if err := decryptFilesFn(enc, base, key); err != nil {
 			return fmt.Errorf("decrypt %s: %w", name, err)
 		}
 		_ = os.Remove(enc)
@@ -551,6 +566,9 @@ func verifyPasswordHash(password, encoded string) bool {
 	return subtle.ConstantTimeCompare(storedHash, computed) == 1
 }
 
+// extractSaltFn is overridable for tests; defaults to extractSalt.
+var extractSaltFn = extractSalt
+
 func extractSalt(encoded string) ([]byte, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 5 {
@@ -559,21 +577,27 @@ func extractSalt(encoded string) ([]byte, error) {
 	return base64.RawStdEncoding.DecodeString(parts[3])
 }
 
+// newCipher is overridable for tests; defaults to aes.NewCipher.
+var newCipher = aes.NewCipher
+
+// newGCM is overridable for tests; defaults to cipher.NewGCM.
+var newGCM = cipher.NewGCM
+
 func encryptFile(srcPath, dstPath string, key []byte) error {
 	plaintext, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
-	block, err := aes.NewCipher(key)
+	block, err := newCipher(key)
 	if err != nil {
 		return fmt.Errorf("cipher: %w", err)
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return fmt.Errorf("gcm: %w", err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
+	if _, err := cryptoRandRead(nonce); err != nil {
 		return fmt.Errorf("nonce: %w", err)
 	}
 	out := gcm.Seal(nonce, nonce, plaintext, nil)
@@ -585,11 +609,11 @@ func decryptFile(srcPath, dstPath string, key []byte) error {
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
-	block, err := aes.NewCipher(key)
+	block, err := newCipher(key)
 	if err != nil {
 		return fmt.Errorf("cipher: %w", err)
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return fmt.Errorf("gcm: %w", err)
 	}
@@ -607,16 +631,16 @@ func decryptFile(srcPath, dstPath string, key []byte) error {
 
 // EncryptData encrypts raw data using AES-256-GCM (used for export).
 func EncryptData(data, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+	block, err := newCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return nil, err
 	}
 	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
+	if _, err := cryptoRandRead(nonce); err != nil {
 		return nil, err
 	}
 	return gcm.Seal(nonce, nonce, data, nil), nil
@@ -624,11 +648,11 @@ func EncryptData(data, key []byte) ([]byte, error) {
 
 // DecryptData decrypts AES-256-GCM data (used for export).
 func DecryptData(ciphertext, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+	block, err := newCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return nil, err
 	}
@@ -652,3 +676,8 @@ func zeroBytes(b []byte) {
 		b[i] = 0
 	}
 }
+
+// cryptoRandRead is the testable inner of crypto/rand.Read. It allows
+// tests to inject a failing read.
+var cryptoRandRead = rand.Read
+

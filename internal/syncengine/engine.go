@@ -24,24 +24,29 @@ var ErrNotRunning = errors.New("syncengine: engine is not running")
 
 // Engine manages scheduled sync tasks and active task lifecycle.
 type Engine struct {
-    log      *slog.Logger
-    bus      *eventbus.Bus
-    store    *store.Store
-    rclone   *rclone.Client
-    cron     *cron.Cron
-    cronMu   sync.Mutex
-    schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
-    active   sync.Map                // taskID -> *Task
-    ctx      context.Context
-    cancel   context.CancelFunc
+	log      *slog.Logger
+	bus      *eventbus.Bus
+	store    *store.Store
+	rclone   SyncClient
+	cron     *cron.Cron
+	cronMu   sync.Mutex
+	schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
+	active   sync.Map                // taskID -> *Task
+	ctx      context.Context
+	cancel   context.CancelFunc
+}
+
+// SyncClient is the subset of rclone.Client used by the engine.
+type SyncClient interface {
+	Sync(ctx context.Context, cfg rclone.SyncConfig, onProgress func(rclone.Stats)) (*rclone.SyncResult, error)
 }
 
 // Deps holds the engine's dependencies.
 type Deps struct {
-    Logger *slog.Logger
-    Bus    *eventbus.Bus
-    Store  *store.Store
-    Rclone *rclone.Client
+	Logger *slog.Logger
+	Bus    *eventbus.Bus
+	Store  *store.Store
+	Rclone SyncClient
 }
 
 // New creates a new sync engine (not yet started).
@@ -59,20 +64,32 @@ func New(deps Deps) *Engine {
 
 // Start launches the cron scheduler goroutine.
 func (e *Engine) Start(ctx context.Context) error {
-    if e.ctx != nil {
-        return nil // already started
-    }
-    e.ctx, e.cancel = context.WithCancel(ctx)
-    e.cron = cron.New(cron.WithSeconds())
-    e.schedule = make(map[string]cron.EntryID)
+	if e.ctx != nil {
+		return nil // already started
+	}
+	e.ctx, e.cancel = context.WithCancel(ctx)
+	e.cron = cron.New(cron.WithSeconds())
+	e.schedule = make(map[string]cron.EntryID)
 
-    if e.store != nil {
-        e.loadSchedules()
-    }
+	if e.store != nil {
+		e.loadSchedules()
+	}
 
-    e.cron.Start()
-    e.log.Info("syncengine: started")
-    return nil
+	e.cron.Start()
+	e.log.Info("syncengine: started")
+	return nil
+}
+
+// Ctx returns the engine's context. It is cancelled when the engine stops.
+func (e *Engine) Ctx() context.Context {
+	return e.ctx
+}
+
+// Cancel cancels the engine's context. Useful for tests.
+func (e *Engine) Cancel() {
+	if e.cancel != nil {
+		e.cancel()
+	}
 }
 
 // Stop gracefully shuts down the engine.
@@ -84,12 +101,12 @@ func (e *Engine) Stop(ctx context.Context) error {
     if e.cron != nil {
         <-e.cron.Stop().Done()
     }
-    e.active.Range(func(key, _ any) bool {
-        if t, ok := key.(*Task); ok {
-            t.Cancel()
-        }
-        return true
-    })
+	e.active.Range(func(_, v any) bool {
+		if t, ok := v.(*Task); ok {
+			t.Cancel()
+		}
+		return true
+	})
     e.active = sync.Map{}
     e.schedule = nil
     e.cron = nil
@@ -176,13 +193,7 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
         return
     }
     id, err := e.cron.AddFunc(sch.Cron, func() {
-        e.log.Info("cron: triggering", "schedule", sch.ID, "profile", sch.ProfileName)
-        e.bus.Publish(eventbus.TopicScheduleTriggered, eventbus.ScheduleTriggeredEvent{
-            ScheduleID: sch.ID,
-            ProfileID:  sch.ProfileName,
-            Action:     sch.Action,
-        })
-        e.StartSync(context.Background(), sch.Action, sch.ProfileName)
+        e.triggerSchedule(sch)
     })
     if err != nil {
         e.log.Warn("cron: add func failed", "schedule", sch.ID, "err", err)
@@ -190,6 +201,19 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
     }
     e.schedule[sch.ID] = id
     e.log.Info("cron: registered", "schedule", sch.ID, "cron", sch.Cron)
+}
+
+// triggerSchedule runs the body of a cron-fired schedule: log, publish the
+// event, and start the sync. It is a separate method so tests can invoke it
+// without waiting for the real cron to tick.
+func (e *Engine) triggerSchedule(sch *store.Schedule) {
+    e.log.Info("cron: triggering", "schedule", sch.ID, "profile", sch.ProfileName)
+    e.bus.Publish(eventbus.TopicScheduleTriggered, eventbus.ScheduleTriggeredEvent{
+        ScheduleID: sch.ID,
+        ProfileID:  sch.ProfileName,
+        Action:     sch.Action,
+    })
+    e.StartSync(context.Background(), sch.Action, sch.ProfileName)
 }
 
 // UnregisterSchedule removes the cron entry for the given schedule ID.

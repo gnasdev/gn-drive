@@ -24,9 +24,28 @@ import (
 // while another is already running.
 var ErrAnotherInstance = errors.New("another gn-drive instance is running")
 
+// osMkdirAll is overridable for tests; defaults to os.MkdirAll.
+var osMkdirAll = os.MkdirAll
+
+// osWriteFile is overridable for tests; defaults to os.WriteFile.
+var osWriteFile = os.WriteFile
+
+// osGetpid is overridable for tests; defaults to os.Getpid.
+var osGetpid = os.Getpid
+
+// tryLocker is the subset of *flock.Flock used by Acquire and Release.
+// It exists so tests can inject a stub implementation.
+type tryLocker interface {
+	TryLock() (bool, error)
+	Unlock() error
+}
+
+// newFlock is overridable for tests; defaults to flock.New.
+var newFlock = func(path string) tryLocker { return flock.New(path) }
+
 // Locker represents an acquired advisory file lock.
 type Locker struct {
-	flock     *flock.Flock
+	flock     tryLocker
 	pidFile   string
 	pid       int
 	released  bool
@@ -40,11 +59,11 @@ func Acquire(configDir string) (*Locker, error) {
 	lockPath := filepath.Join(configDir, "gn-drive.lock")
 	pidPath := filepath.Join(configDir, "gn-drive.pid")
 
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
+	if err := osMkdirAll(configDir, 0o700); err != nil {
 		return nil, fmt.Errorf("instance: mkdir config dir: %w", err)
 	}
 
-	l := flock.New(lockPath)
+	l := newFlock(lockPath)
 	ok, err := l.TryLock()
 	if err != nil {
 		return nil, fmt.Errorf("instance: lock: %w", err)
@@ -57,8 +76,8 @@ func Acquire(configDir string) (*Locker, error) {
 		return nil, fmt.Errorf("%w. Run 'gn-drive service stop' to stop it, or kill the process manually", ErrAnotherInstance)
 	}
 
-	pid := os.Getpid()
-	if err := os.WriteFile(pidPath, []byte(strconv.Itoa(pid)), 0o644); err != nil {
+	pid := osGetpid()
+	if err := osWriteFile(pidPath, []byte(strconv.Itoa(pid)), 0o644); err != nil {
 		_ = l.Unlock()
 		return nil, fmt.Errorf("instance: write pid file: %w", err)
 	}

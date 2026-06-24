@@ -12,10 +12,13 @@ import (
 //go:embed all:dist
 var distFS embed.FS
 
+// subFS is overridable for tests; defaults to fs.Sub.
+var subFS = fs.Sub
+
 // Handler returns an http.Handler that serves the embedded dist/ directory.
 // Unknown paths fall back to index.html for SPA routing.
 func Handler() http.Handler {
-	sub, err := fs.Sub(distFS, "dist")
+	sub, err := subFS(distFS, "dist")
 	if err != nil {
 		// dist/ should always exist; this is a build-time error.
 		panic("webui: dist/ not embedded: " + err.Error())

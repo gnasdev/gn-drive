@@ -43,29 +43,33 @@ func newRemoteListCmd() *cobra.Command {
 		Short: "List all remotes",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			remotes, err := a.Rclone.ListRemotes(ctx)
-			if err != nil {
-				return err
-			}
-			if len(remotes) == 0 {
-				fmt.Println("No remotes configured. Use 'gn-drive remote add' to configure one.")
-				return nil
-			}
-			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tTYPE")
-			fmt.Fprintln(w, "----\t----")
-			for _, r := range remotes {
-				fmt.Fprintf(w, "%s\t%s\n", r.Name, r.Type)
-			}
-			return w.Flush()
+			return runRemoteList(ctx, a, cmd)
 		},
 	}
+}
+
+// runRemoteList is the testable inner work of newRemoteListCmd.
+func runRemoteList(ctx context.Context, a *app.App, cmd *cobra.Command) error {
+	remotes, err := a.Rclone.ListRemotes(ctx)
+	if err != nil {
+		return err
+	}
+	if len(remotes) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No remotes configured. Use 'gn-drive remote add' to configure one.")
+		return nil
+	}
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tTYPE")
+	fmt.Fprintln(w, "----\t----")
+	for _, r := range remotes {
+		fmt.Fprintf(w, "%s\t%s\n", r.Name, r.Type)
+	}
+	return w.Flush()
 }
 
 func newRemoteAddCmd() *cobra.Command {
@@ -86,23 +90,27 @@ Example (local filesystem):
 				return fmt.Errorf("remote add: --name and --type are required")
 			}
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			if err := a.Rclone.CreateRemote(ctx, name, remoteType, configKVs); err != nil {
-				return err
-			}
-			fmt.Printf("✓ added remote %q (type=%s)\n", name, remoteType)
-			return nil
+			return runRemoteAdd(ctx, a, name, remoteType, configKVs, cmd)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Remote name (required)")
 	cmd.Flags().StringVar(&remoteType, "type", "", "Remote type: drive, s3, local, sftp, ... (required)")
 	cmd.Flags().StringSliceVar(&configKVs, "config", nil, "Config k=v pairs (repeatable)")
 	return cmd
+}
+
+// runRemoteAdd is the testable inner work of newRemoteAddCmd.
+func runRemoteAdd(ctx context.Context, a *app.App, name, remoteType string, configKVs []string, cmd *cobra.Command) error {
+	if err := a.Rclone.CreateRemote(ctx, name, remoteType, configKVs); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ added remote %q (type=%s)\n", name, remoteType)
+	return nil
 }
 
 func newRemoteTestCmd() *cobra.Command {
@@ -113,21 +121,25 @@ func newRemoteTestCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			fmt.Printf("Testing remote %q... ", name)
-			if err := a.Rclone.TestRemote(ctx, name); err != nil {
-				fmt.Println("✗ FAILED")
-				return err
-			}
-			fmt.Println("✓ OK")
-			return nil
+			return runRemoteTest(ctx, a, name, cmd)
 		},
 	}
+}
+
+// runRemoteTest is the testable inner work of newRemoteTestCmd.
+func runRemoteTest(ctx context.Context, a *app.App, name string, cmd *cobra.Command) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "Testing remote %q... ", name)
+	if err := a.Rclone.TestRemote(ctx, name); err != nil {
+		fmt.Fprintln(cmd.OutOrStdout(), "✗ FAILED")
+		return err
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), "✓ OK")
+	return nil
 }
 
 func newRemoteDeleteCmd() *cobra.Command {
@@ -138,17 +150,21 @@ func newRemoteDeleteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			if err := a.Rclone.DeleteRemote(ctx, name); err != nil {
-				return err
-			}
-			fmt.Printf("✓ deleted remote %q\n", name)
-			return nil
+			return runRemoteDelete(ctx, a, name, cmd)
 		},
 	}
+}
+
+// runRemoteDelete is the testable inner work of newRemoteDeleteCmd.
+func runRemoteDelete(ctx context.Context, a *app.App, name string, cmd *cobra.Command) error {
+	if err := a.Rclone.DeleteRemote(ctx, name); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ deleted remote %q\n", name)
+	return nil
 }

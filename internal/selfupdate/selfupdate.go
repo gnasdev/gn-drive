@@ -116,7 +116,7 @@ var (
 // the running binary on disk if the request is for "check only" — see
 // Check.
 func Update(ctx context.Context, opts Options) (*Result, error) {
-	r, err := fetchRelease(ctx, opts)
+	r, err := fetchReleaseFn(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func Update(ctx context.Context, opts Options) (*Result, error) {
 		}, ErrAlreadyUpToDate
 	}
 
-	asset, sumAsset, err := pickAssets(r)
+	asset, sumAsset, err := pickAssetsFn(r)
 	if err != nil {
 		return nil, err
 	}
@@ -146,36 +146,36 @@ func Update(ctx context.Context, opts Options) (*Result, error) {
 	}()
 
 	archivePath := filepath.Join(stage, asset.Name)
-	if err := download(ctx, opts, asset.BrowserDownloadURL, archivePath); err != nil {
+	if err := downloadFn(ctx, opts, asset.BrowserDownloadURL, archivePath); err != nil {
 		return nil, fmt.Errorf("selfupdate: download archive: %w", err)
 	}
 
-	expectedSum, err := fetchChecksum(ctx, opts, sumAsset, archivePath)
+	expectedSum, err := fetchChecksumFn(ctx, opts, sumAsset, archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("selfupdate: checksum: %w", err)
 	}
-	if err := verifyFile(archivePath, expectedSum); err != nil {
+	if err := verifyFileFn(archivePath, expectedSum); err != nil {
 		return nil, err
 	}
 
-	binaryPath, err := extractBinary(archivePath, stage)
+	binaryPath, err := extractBinaryFn(archivePath, stage)
 	if err != nil {
 		return nil, fmt.Errorf("selfupdate: extract: %w", err)
 	}
 
-	currentPath, err := os.Executable()
+	currentPath, err := osExecutableFn()
 	if err != nil {
 		return nil, fmt.Errorf("selfupdate: locate current binary: %w", err)
 	}
-	currentPath, err = filepath.EvalSymlinks(currentPath)
+	currentPath, err = evalSymlinksFn(currentPath)
 	if err != nil {
 		return nil, fmt.Errorf("selfupdate: resolve symlinks: %w", err)
 	}
 
-	if err := os.Chmod(binaryPath, 0o755); err != nil {
+	if err := osChmodFn(binaryPath, 0o755); err != nil {
 		return nil, fmt.Errorf("selfupdate: chmod: %w", err)
 	}
-	if err := atomicSwap(binaryPath, currentPath); err != nil {
+	if err := atomicSwapFn(binaryPath, currentPath); err != nil {
 		return nil, fmt.Errorf("selfupdate: swap: %w", err)
 	}
 
@@ -246,7 +246,7 @@ func fetchRelease(ctx context.Context, opts Options) (*Release, error) {
 	owner, name := ownerName(opts)
 	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", APIBase, owner, name)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := newHTTPRequest(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func pickAssets(r *Release) (*Asset, *Asset, error) {
 	osName := runtime.GOOS
 	archName := runtime.GOARCH
 	ext := "tar.gz"
-	if osName == "windows" {
+	if isWindows() {
 		ext = "zip"
 	}
 	base := fmt.Sprintf("gn-drive-%s-%s.%s", osName, archName, ext)
@@ -318,8 +318,11 @@ func pickAssets(r *Release) (*Asset, *Asset, error) {
 	return bin, sum, nil
 }
 
+// mkDirTemp is overridable for tests; defaults to os.MkdirTemp.
+var mkDirTemp = os.MkdirTemp
+
 func makeStagingDir(opts Options) (string, error) {
-	dir, err := os.MkdirTemp(stagingOf(opts), "gn-drive-update-*")
+	dir, err := mkDirTemp(stagingOf(opts), "gn-drive-update-*")
 	if err != nil {
 		return "", err
 	}
@@ -327,7 +330,7 @@ func makeStagingDir(opts Options) (string, error) {
 }
 
 func download(ctx context.Context, opts Options, url, dest string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := newHTTPRequest(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -350,10 +353,46 @@ func download(ctx context.Context, opts Options, url, dest string) error {
 	return err
 }
 
+// fetchChecksumFn is overridable for tests; defaults to fetchChecksum.
+var fetchChecksumFn = fetchChecksum
+
+// verifyFileFn is overridable for tests; defaults to verifyFile.
+var verifyFileFn = verifyFile
+
+// extractBinaryFn is overridable for tests; defaults to extractBinary.
+var extractBinaryFn = extractBinary
+
+// downloadFn is overridable for tests; defaults to download.
+var downloadFn = download
+
+// pickAssetsFn is overridable for tests; defaults to pickAssets.
+var pickAssetsFn = pickAssets
+
+// atomicSwapFn is overridable for tests; defaults to atomicSwap.
+var atomicSwapFn = atomicSwap
+
+// fetchReleaseFn is overridable for tests; defaults to fetchRelease.
+var fetchReleaseFn = fetchRelease
+
+// newHTTPRequest is overridable for tests; defaults to http.NewRequestWithContext.
+var newHTTPRequest = http.NewRequestWithContext
+
+// osExecutableFn is overridable for tests; defaults to os.Executable.
+var osExecutableFn = os.Executable
+
+// evalSymlinksFn is overridable for tests; defaults to filepath.EvalSymlinks.
+var evalSymlinksFn = filepath.EvalSymlinks
+
+// osChmodFn is overridable for tests; defaults to os.Chmod.
+var osChmodFn = os.Chmod
+
+// osRenameFn is overridable for tests; defaults to os.Rename.
+var osRenameFn = os.Rename
+
 // fetchChecksum downloads the .sha256 sidecar (preferred) or reads the
 // local archive. The sidecar is a single line: "<hex>  <filename>\n".
 func fetchChecksum(ctx context.Context, opts Options, sumAsset *Asset, archivePath string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sumAsset.BrowserDownloadURL, nil)
+	req, err := newHTTPRequest(ctx, http.MethodGet, sumAsset.BrowserDownloadURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -387,8 +426,13 @@ func fetchChecksum(ctx context.Context, opts Options, sumAsset *Asset, archivePa
 	return sum, nil
 }
 
+// fileOpenerFn is overridable for tests; defaults to os.Open.
+var fileOpenerFn = func(path string) (io.ReadCloser, error) {
+	return os.Open(path)
+}
+
 func verifyFile(path, expectedHex string) error {
-	f, err := os.Open(path)
+	f, err := fileOpenerFn(path)
 	if err != nil {
 		return err
 	}
@@ -427,7 +471,7 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 	tr := tar.NewReader(gz)
 
 	binaryName := "gn-drive"
-	if runtime.GOOS == "windows" {
+	if isWindows() {
 		binaryName = "gn-drive.exe"
 	}
 	for {
@@ -459,6 +503,9 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 	return "", fmt.Errorf("selfupdate: %s not found in archive", binaryName)
 }
 
+// zipFileOpenerFn is overridable for tests; defaults to (*zip.File).Open.
+var zipFileOpenerFn = func(f *zip.File) (io.ReadCloser, error) { return f.Open() }
+
 func extractZip(archivePath, destDir string) (string, error) {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -471,7 +518,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 		if filepath.Base(f.Name) != binaryName {
 			continue
 		}
-		src, err := f.Open()
+		src, err := zipFileOpenerFn(f)
 		if err != nil {
 			return "", err
 		}
@@ -493,6 +540,10 @@ func extractZip(archivePath, destDir string) (string, error) {
 	return "", fmt.Errorf("selfupdate: %s not found in archive", binaryName)
 }
 
+// isWindows is overridable for tests so we can exercise the Windows branch
+// on non-Windows platforms.
+var isWindows = func() bool { return runtime.GOOS == "windows" }
+
 // atomicSwap renames the running binary to <bin>.bak and moves the new
 // binary into place. On Windows the running binary cannot be renamed
 // while it is executing, so we use a two-step move: rename the running
@@ -504,38 +555,38 @@ func atomicSwap(newBin, currentBin string) error {
 	// Remove any leftover .bak from a previous failed update.
 	_ = os.Remove(filepath.Join(dir, base+".bak"))
 
-	if runtime.GOOS == "windows" {
+	if isWindows() {
 		old := filepath.Join(dir, base+".old")
 		_ = os.Remove(old)
-		if err := os.Rename(currentBin, old); err != nil {
+		if err := osRenameFn(currentBin, old); err != nil {
 			return fmt.Errorf("rename current to .old: %w", err)
 		}
-		if err := os.Rename(newBin, currentBin); err != nil {
+		if err := osRenameFn(newBin, currentBin); err != nil {
 			// Try to restore.
-			_ = os.Rename(old, currentBin)
+			_ = osRenameFn(old, currentBin)
 			return fmt.Errorf("rename new into place: %w", err)
 		}
 		_ = os.Remove(old)
 		return nil
 	}
 
-	if err := os.Rename(currentBin, filepath.Join(dir, base+".bak")); err != nil {
+	if err := osRenameFn(currentBin, filepath.Join(dir, base+".bak")); err != nil {
 		return fmt.Errorf("rename current to .bak: %w", err)
 	}
-	if err := os.Rename(newBin, currentBin); err != nil {
+	if err := osRenameFn(newBin, currentBin); err != nil {
 		// Try to restore from .bak.
-		_ = os.Rename(filepath.Join(dir, base+".bak"), currentBin)
+		_ = osRenameFn(filepath.Join(dir, base+".bak"), currentBin)
 		return fmt.Errorf("rename new into place: %w", err)
 	}
 	return nil
 }
 
 func currentBinary() string {
-	p, err := os.Executable()
+	p, err := osExecutableFn()
 	if err != nil {
 		return ""
 	}
-	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+	if resolved, err := evalSymlinksFn(p); err == nil {
 		return resolved
 	}
 	return p

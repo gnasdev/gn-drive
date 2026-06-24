@@ -62,22 +62,16 @@ func New(ctx context.Context, opts Options) (*App, error) {
 
 	// 3. Logger
 	logWrap := logging.New(opts.LogMode)
-	if logWrap == nil {
-		logWrap = logging.New(logging.ModeForeground)
-	}
 	log := logWrap.Logger
 	if opts.LogMode == logging.ModeService {
 		log = log.With("service", "gn-drive")
 	}
 
 	// 4. Auth
-	authSvc, err := auth.New(auth.Options{
+	authSvc, _ := auth.New(auth.Options{
 		ConfigDir: cfg.ConfigDir,
 		Logger:    log,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("init auth: %w", err)
-	}
 
 	// 4a. Unlock if requested
 	switch {

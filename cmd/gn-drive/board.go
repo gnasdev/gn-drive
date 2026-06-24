@@ -33,81 +33,12 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			boardID := args[0]
 			ctx := context.Background()
-			a, err := app.New(ctx, app.Options{LogMode: logging.ModeForeground})
+			a, err := appNewFn(ctx, app.Options{LogMode: logging.ModeForeground})
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-
-			b, err := a.Store.Boards().LoadGraph(ctx, boardID)
-			if err != nil {
-				return fmt.Errorf("board: %q: %w", boardID, err)
-			}
-			if len(b.Nodes) == 0 {
-				return fmt.Errorf("board %q has no nodes — define nodes in the web UI first", boardID)
-			}
-			if len(b.Edges) == 0 {
-				return fmt.Errorf("board %q has no edges", boardID)
-			}
-
-			fmt.Printf("▶ Board: %s (%s) — %d nodes, %d edges\n",
-				b.Name, b.ID, len(b.Nodes), len(b.Edges))
-
-			// Build node index for resolving source/target.
-			nodeByID := make(map[string]store.BoardNode, len(b.Nodes))
-			for _, n := range b.Nodes {
-				nodeByID[n.ID] = n
-			}
-
-			// Topological sort via Kahn's algorithm. We compute layers so the
-			// executor can report progress layer by layer and short-circuit on
-			// the first failed edge (when --stop-on-error is on).
-			layers, err := topoLayers(b.Nodes, b.Edges)
-			if err != nil {
-				return fmt.Errorf("board: %w", err)
-			}
-
-			concur := concurrency
-			if concur < 1 {
-				concur = 1
-			}
-
-			idx := 0
-			total := len(b.Edges)
-			var firstErr error
-			for layerI, layer := range layers {
-				fmt.Printf("  ┌─ layer %d (%d edge(s))\n", layerI+1, len(layer))
-				for _, edge := range layer {
-					idx++
-					src, sok := nodeByID[edge.SourceID]
-					dst, dok := nodeByID[edge.TargetID]
-					if !sok || !dok {
-						return fmt.Errorf("edge %s references missing node (source=%s target=%s)",
-							edge.ID, edge.SourceID, edge.TargetID)
-					}
-					fmt.Printf("  │ [%d/%d] %s — %s : %s → %s (action=%s)\n",
-						idx, total, edge.ID, edge.Action, src.Label, dst.Label, edge.Action)
-					if err := runEdge(ctx, a, edge, src, dst); err != nil {
-						fmt.Printf("  │   ✗ edge %s failed: %v\n", edge.ID, err)
-						if stopOnError {
-							return fmt.Errorf("board: stopped at edge %s: %w", edge.ID, err)
-						}
-						if firstErr == nil {
-							firstErr = err
-						}
-						continue
-					}
-					fmt.Printf("  │   ✓ edge %s ok\n", edge.ID)
-				}
-				fmt.Printf("  └─ layer %d done\n", layerI+1)
-				_ = concur // parallelism reserved for future sync groups
-			}
-
-			if firstErr != nil {
-				return fmt.Errorf("board: completed with errors (first: %w)", firstErr)
-			}
-			fmt.Printf("✓ board %q executed %d edges successfully\n", b.ID, total)
-			return nil
+			return runBoard(ctx, a, boardID, stopOnError, concurrency, cmd)
 		},
 	}
 	cmd.Flags().BoolVar(&stopOnError, "stop-on-error", true, "Stop execution at the first failed edge")
@@ -115,10 +46,93 @@ Examples:
 	return cmd
 }
 
-// runEdge executes one board edge by shelling out to rclone. The edge's
-// sync_config JSON may contain overrides; for Phase 3 we apply only the
-// recognized keys and ignore the rest.
+// runBoard is the testable inner work of the board command.
+func runBoard(ctx context.Context, a *app.App, boardID string, stopOnError bool, concurrency int, cmd *cobra.Command) error {
+	b, err := a.Store.Boards().LoadGraph(ctx, boardID)
+	if err != nil {
+		return fmt.Errorf("board: %q: %w", boardID, err)
+	}
+	if len(b.Nodes) == 0 {
+		return fmt.Errorf("board %q has no nodes — define nodes in the web UI first", boardID)
+	}
+	if len(b.Edges) == 0 {
+		return fmt.Errorf("board %q has no edges", boardID)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "▶ Board: %s (%s) — %d nodes, %d edges\n",
+		b.Name, b.ID, len(b.Nodes), len(b.Edges))
+
+	nodeByID := make(map[string]store.BoardNode, len(b.Nodes))
+	for _, n := range b.Nodes {
+		nodeByID[n.ID] = n
+	}
+
+	layers, err := topoLayers(b.Nodes, b.Edges)
+	if err != nil {
+		return fmt.Errorf("board: %w", err)
+	}
+
+	concur := concurrency
+	if concur < 1 {
+		concur = 1
+	}
+
+	idx := 0
+	total := len(b.Edges)
+	var firstErr error
+	for layerI, layer := range layers {
+		fmt.Fprintf(cmd.OutOrStdout(), "  ┌─ layer %d (%d edge(s))\n", layerI+1, len(layer))
+		for _, edge := range layer {
+			idx++
+			src, sok := nodeByID[edge.SourceID]
+			dst, dok := nodeByID[edge.TargetID]
+			if !sok || !dok {
+				return fmt.Errorf("edge %s references missing node (source=%s target=%s)",
+					edge.ID, edge.SourceID, edge.TargetID)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  │ [%d/%d] %s — %s : %s → %s (action=%s)\n",
+				idx, total, edge.ID, edge.Action, src.Label, dst.Label, edge.Action)
+			if err := runEdge(ctx, a, edge, src, dst); err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "  │   ✗ edge %s failed: %v\n", edge.ID, err)
+				if stopOnError {
+					return fmt.Errorf("board: stopped at edge %s: %w", edge.ID, err)
+				}
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  │   ✓ edge %s ok\n", edge.ID)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  └─ layer %d done\n", layerI+1)
+		_ = concur
+	}
+
+	if firstErr != nil {
+		return fmt.Errorf("board: completed with errors (first: %w)", firstErr)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ board %q executed %d edges successfully\n", b.ID, total)
+	return nil
+}
+
+// syncExecutor is the subset of rclone.Client used by runEdge. It allows
+// tests to inject a stub without shelling out to rclone.
+type syncExecutor interface {
+	Sync(ctx context.Context, cfg rclone.SyncConfig, onProgress func(rclone.Stats)) (*rclone.SyncResult, error)
+}
+
+// newSyncExecutor is the production constructor; tests may override it.
+var newSyncExecutor = func(a *app.App) syncExecutor {
+	return a.Rclone
+}
+
 func runEdge(ctx context.Context, a *app.App, edge store.BoardEdge, src, dst store.BoardNode) error {
+	return runEdgeWith(ctx, newSyncExecutor(a), edge, src, dst)
+}
+
+// runEdgeWith is the testable inner of runEdge that accepts an injected
+// syncExecutor.
+func runEdgeWith(ctx context.Context, exec syncExecutor, edge store.BoardEdge, src, dst store.BoardNode) error {
 	source := src.RemoteName
 	if source != "" && src.Path != "" && src.Path != "/" {
 		source = source + ":" + src.Path
@@ -151,7 +165,7 @@ func runEdge(ctx context.Context, a *app.App, edge store.BoardEdge, src, dst sto
 			Transfers: 4,
 		},
 	}
-	_, err := a.Rclone.Sync(ctx, cfg, nil)
+	_, err := exec.Sync(ctx, cfg, nil)
 	return err
 }
 
@@ -207,3 +221,6 @@ func topoLayers(nodes []store.BoardNode, edges []store.BoardEdge) ([][]store.Boa
 	}
 	return layers, nil
 }
+
+// appNewFn is overridable for tests; defaults to app.New.
+var appNewFn = app.New
