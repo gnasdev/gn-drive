@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -67,21 +68,64 @@ type runOpts struct {
 	password    string
 }
 
+// runDeps is the set of overridable functions used by run. Tests can swap
+// these out to avoid binding to real ports, real config dirs, and long-lived
+// goroutines.
+type runDeps struct {
+	allocatePort func(int) (net.Listener, int, error)
+	acquireLock  func(string) (locker, error)
+	newApp       func(context.Context, app.Options) (*app.App, error)
+	signalNotify func(chan<- os.Signal, ...os.Signal)
+	serve        func(*app.App, net.Listener) error
+}
+
+// defaultRunDeps is the production implementation of runDeps. It is a
+// variable so tests can override it.
+var defaultRunDeps = func() runDeps {
+	return runDeps{
+		allocatePort: func(p int) (net.Listener, int, error) {
+			ln, port, err := ports.AllocatePort(p)
+			if err != nil {
+				return nil, 0, err
+			}
+			return ln, port, nil
+		},
+		acquireLock: func(dir string) (locker, error) {
+			l, err := instance.Acquire(dir)
+			return l, err
+		},
+		newApp:       app.New,
+		signalNotify: signal.Notify,
+		serve: func(a *app.App, ln net.Listener) error {
+			return a.API.Serve(ln)
+		},
+	}
+}
+
+// locker is the subset of instance.Locker we use; lets tests inject a fake.
+type locker interface {
+	Release() error
+}
+
 func run(ctx context.Context, opts runOpts) error {
+	return runWithDeps(ctx, opts, defaultRunDeps())
+}
+
+func runWithDeps(ctx context.Context, opts runOpts, deps runDeps) error {
 	logMode := logging.ModeForeground
 	if opts.serviceMode {
 		logMode = logging.ModeService
 	}
 
 	// 1. Allocate port
-	ln, port, err := ports.AllocatePort(opts.port)
+	ln, port, err := deps.allocatePort(opts.port)
 	if err != nil {
 		return fmt.Errorf("allocate port: %w", err)
 	}
 
 	// 2. Detect config dir + acquire instance lock
 	cfg := config.Detect()
-	locker, err := instance.Acquire(cfg.ConfigDir)
+	locker, err := deps.acquireLock(cfg.ConfigDir)
 	if err != nil {
 		_ = ln.Close()
 		return fmt.Errorf("instance lock: %w", err)
@@ -89,7 +133,7 @@ func run(ctx context.Context, opts runOpts) error {
 	defer locker.Release()
 
 	// 3. Init app
-	a, err := app.New(ctx, app.Options{
+	a, err := deps.newApp(ctx, app.Options{
 		LogMode:        logMode,
 		UnlockPassword: opts.password,
 	})
@@ -124,7 +168,7 @@ func run(ctx context.Context, opts runOpts) error {
 	// 5. Start API server (goroutine)
 	serverErr := make(chan error, 1)
 	go func() {
-		serverErr <- a.API.Serve(ln)
+		serverErr <- deps.serve(a, ln)
 	}()
 
 	// 6. Print URL
@@ -147,7 +191,7 @@ func run(ctx context.Context, opts runOpts) error {
 
 	// 8. Wait for signal or server error
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	deps.signalNotify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case err := <-serverErr:
 		return fmt.Errorf("server: %w", err)

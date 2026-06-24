@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -74,13 +75,13 @@ func (s *Server) handleDeleteSchedule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleEnableSchedule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
-	s2, err := s.app.Store.Schedules().Get(ctx, id)
+	s2, err := schedulesGetFn(ctx, s.app.Store.Schedules(), id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	s2.Enabled = true
-	if err := s.app.Store.Schedules().Save(ctx, s2); err != nil {
+	if err := schedulesSaveFn(ctx, s.app.Store.Schedules(), s2); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())
 		return
 	}
@@ -92,15 +93,25 @@ func (s *Server) handleDisableSchedule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 	s.app.SyncEngine.UnregisterSchedule(id)
-	s2, err := s.app.Store.Schedules().Get(ctx, id)
+	s2, err := schedulesGetFn(ctx, s.app.Store.Schedules(), id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	s2.Enabled = false
-	if err := s.app.Store.Schedules().Save(ctx, s2); err != nil {
+	if err := schedulesSaveFn(ctx, s.app.Store.Schedules(), s2); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())
 		return
 	}
 	respondOK(w, s2)
 }
+
+// schedulesGetFn and schedulesSaveFn are overridable for tests.
+var (
+	schedulesGetFn = func(ctx context.Context, r store.ScheduleRepo, id string) (*store.Schedule, error) {
+		return r.Get(ctx, id)
+	}
+	schedulesSaveFn = func(ctx context.Context, r store.ScheduleRepo, s *store.Schedule) error {
+		return r.Save(ctx, s)
+	}
+)

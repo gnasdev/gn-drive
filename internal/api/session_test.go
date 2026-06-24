@@ -75,7 +75,10 @@ func TestSessionStore_Concurrent(t *testing.T) {
 	for i := 0; i < N; i++ {
 		go func(i int) {
 			defer wg.Done()
-			token := string(rune('a'+(i%26))) + "-x"
+			// Each goroutine uses a unique token to avoid races on the
+			// same map key. The test verifies that Add/Valid/Delete
+			// are safe under concurrent use (no panic, no race).
+			token := string(rune('a'+(i%26))) + "-" + string(rune('0'+(i/26)))
 			s.Add(token)
 			if !s.Valid(token) {
 				t.Errorf("token %q not valid immediately after Add", token)
@@ -84,11 +87,4 @@ func TestSessionStore_Concurrent(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	// Allow duplicates per bucket (a-x, b-x, ...) so final count may be up
-	// to 26; just ensure no entries are leaked from goroutines.
-	for i := 0; i < 26; i++ {
-		token := string(rune('a'+i)) + "-x"
-		// Token may or may not exist depending on race; ensure no panic.
-		_ = s.Valid(token)
-	}
 }

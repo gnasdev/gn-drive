@@ -2,9 +2,12 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/gnasdev/gn-drive/internal/syncengine"
 )
 
 // handleStartSync starts a one-shot sync task.
@@ -30,10 +33,15 @@ func (s *Server) handleStartSync(w http.ResponseWriter, r *http.Request) {
 	respondCreated(w, map[string]string{"task_id": taskID})
 }
 
+// engineActiveTasksFn is overridable for tests; defaults to Engine.ActiveTasks.
+var engineActiveTasksFn = func(ctx context.Context, e *syncengine.Engine) ([]syncengine.TaskSnapshot, error) {
+	return e.ActiveTasks(ctx)
+}
+
 // handleListTasks returns all active tasks.
 func (s *Server) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tasks, err := s.app.SyncEngine.ActiveTasks(ctx)
+	tasks, err := engineActiveTasksFn(ctx, s.app.SyncEngine)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "internal", err.Error())
 		return

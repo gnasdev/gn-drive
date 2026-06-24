@@ -13,18 +13,24 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("gn-drive %s (commit=%s, go=%s)\n", Version, Commit, runtime.Version())
-			bi, ok := debug.ReadBuildInfo()
-			if !ok {
-				return nil
-			}
-			fmt.Printf("  path:   %s\n", bi.Path)
-			for _, s := range bi.Settings {
-				if s.Key == "vcs.modified" || s.Key == "vcs.revision" {
-					fmt.Printf("  %s:   %s\n", s.Key, s.Value)
-				}
-			}
-			return nil
+			return runVersion(cmd)
 		},
 	}
+}
+
+// runVersion is the testable inner work of newVersionCmd.
+func runVersion(cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "gn-drive %s (commit=%s, go=%s)\n", Version, Commit, runtime.Version())
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return nil
+	}
+	fmt.Fprintf(out, "  path:   %s\n", bi.Path)
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.modified" || s.Key == "vcs.revision" {
+			fmt.Fprintf(out, "  %s:   %s\n", s.Key, s.Value)
+		}
+	}
+	return nil
 }

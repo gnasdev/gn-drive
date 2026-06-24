@@ -44,6 +44,10 @@ type Paths struct {
 	Env Env
 }
 
+// runtimeGOOS is overridable for tests so we can exercise the
+// platform-specific code paths on any platform.
+var runtimeGOOS = func() string { return runtime.GOOS }
+
 // Detect returns the Paths by probing the environment.
 // It does not create any directories — callers must ensure ConfigDir exists.
 func Detect() *Paths {
@@ -52,15 +56,16 @@ func Detect() *Paths {
 		home = "/tmp"
 	}
 
+	goos := runtimeGOOS()
 	cfgDir := os.Getenv("XDG_CONFIG_HOME")
-	if cfgDir == "" || runtime.GOOS != "linux" {
+	if cfgDir == "" || goos != "linux" {
 		cfgDir = filepath.Join(home, ".config", "gn-drive")
 	} else {
 		cfgDir = filepath.Join(cfgDir, "gn-drive")
 	}
 
 	var logDir string
-	if runtime.GOOS == "linux" {
+	if goos == "linux" {
 		xdgState := os.Getenv("XDG_STATE_HOME")
 		if xdgState == "" {
 			xdgState = filepath.Join(home, ".local", "state")
@@ -75,7 +80,7 @@ func Detect() *Paths {
 		workDir = filepath.Dir(workDir)
 	}
 
-	platform := Platform(runtime.GOOS)
+	platform := Platform(goos)
 	env := EnvProduction
 	if isDevEnv() {
 		env = EnvDevelopment
@@ -91,6 +96,9 @@ func Detect() *Paths {
 	}
 }
 
+// osExecutable is overridable for tests.
+var osExecutable = os.Executable
+
 // isDevEnv returns true when running from a development build.
 // Detected by checking if the binary lives inside a "bin/" directory
 // next to the desktop source tree, or if GN_DRIVE_DEV env var is set.
@@ -99,7 +107,7 @@ func isDevEnv() bool {
 		return true
 	}
 	// Heuristic: dev builds land in gn-drive/bin/ during `task dev`
-	wd, _ := os.Executable()
+	wd, _ := osExecutable()
 	if wd != "" {
 		// /path/to/gn-drive/bin/gn-drive → dev
 		if strings.HasSuffix(filepath.Dir(wd), filepath.Join("gn-drive", "bin")) {

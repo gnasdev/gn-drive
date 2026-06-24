@@ -24,6 +24,25 @@ func TestPlatform(t *testing.T) {
 	}
 }
 
+func TestPlatformOf(t *testing.T) {
+	tests := []struct {
+		goos, want string
+	}{
+		{"linux", "systemd"},
+		{"darwin", "launchd"},
+		{"windows", "scm"},
+		{"freebsd", "freebsd"},
+		{"openbsd", "openbsd"},
+		{"plan9", "plan9"},
+	}
+	for _, tt := range tests {
+		got := platformOf(tt.goos)
+		if got != tt.want {
+			t.Errorf("platformOf(%q) = %q, want %q", tt.goos, got, tt.want)
+		}
+	}
+}
+
 func TestDefaultSpec(t *testing.T) {
 	spec := DefaultSpec(ScopeUser)
 	if spec.Name == "" {

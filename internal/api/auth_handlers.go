@@ -4,6 +4,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/gnasdev/gn-drive/internal/auth"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 )
 
@@ -72,6 +73,11 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	respondCreated(w, map[string]string{"token": token})
 }
 
+// authLockFn is overridable for tests; defaults to auth.Service.Lock.
+var authLockFn = func(a *auth.Service) error {
+	return a.Lock()
+}
+
 // handleLock encrypts config files and clears the session.
 func (s *Server) handleLock(w http.ResponseWriter, r *http.Request) {
 	// Find our session token.
@@ -81,7 +87,7 @@ func (s *Server) handleLock(w http.ResponseWriter, r *http.Request) {
 		clearSessionCookie(w)
 	}
 
-	if err := s.app.Auth.Lock(); err != nil {
+	if err := authLockFn(s.app.Auth); err != nil {
 		respondError(w, http.StatusInternalServerError, "lock_failed", err.Error())
 		return
 	}

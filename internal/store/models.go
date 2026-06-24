@@ -77,6 +77,7 @@ type Profile struct {
 func (p *Profile) StripEncryptPasswords() {
 	// Encryption credentials live in a separate struct (SyncConfig overlay) in
 	// Phase 2; full crypt wrapping is implemented in Phase 3.
+	_ = p
 }
 
 // Schedule represents a cron-scheduled sync.
@@ -271,7 +272,19 @@ func scanProfile(r rowScanner) (*Profile, error) {
 	return &p, nil
 }
 
+// rowsScanner is the minimal interface satisfied by *sql.Rows.
+type rowsScanner interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}
+
 func scanProfiles(rows *sql.Rows) ([]Profile, error) {
+	return scanProfilesRows(rows)
+}
+
+// scanProfilesRows is overridable for tests.
+var scanProfilesRows = func(rows rowsScanner) ([]Profile, error) {
 	var out []Profile
 	for rows.Next() {
 		p, err := scanProfile(rows)
@@ -284,6 +297,11 @@ func scanProfiles(rows *sql.Rows) ([]Profile, error) {
 }
 
 func scanHistory(rows *sql.Rows) ([]HistoryEntry, error) {
+	return scanHistoryRows(rows)
+}
+
+// scanHistoryRows is overridable for tests.
+var scanHistoryRows = func(rows rowsScanner) ([]HistoryEntry, error) {
 	var out []HistoryEntry
 	for rows.Next() {
 		var e HistoryEntry

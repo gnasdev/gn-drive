@@ -142,7 +142,7 @@ func TestBus_SubscribeAllFiresAcrossTopics(t *testing.T) {
 
 	mu := sync.Mutex{}
 	seen := map[string]string{}
-	b.SubscribeAll([]string{"a", "b", "c"}, func(topic string, ev Event) {
+	cancel := b.SubscribeAll([]string{"a", "b", "c"}, func(topic string, ev Event) {
 		mu.Lock()
 		seen[topic] = ev.(TestEvent).Payload
 		mu.Unlock()
@@ -163,10 +163,15 @@ func TestBus_SubscribeAllFiresAcrossTopics(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
+	// Test the cancel function: after cancelling, no more events delivered.
+	cancel()
+	b.Publish("a", newTestEvent("post-cancel"))
+	time.Sleep(50 * time.Millisecond)
+
 	mu.Lock()
 	defer mu.Unlock()
 	if seen["a"] != "alpha" || seen["b"] != "beta" || seen["c"] != "gamma" {
-		t.Errorf("unexpected seen map: %+v", seen)
+		t.Errorf("seen = %+v", seen)
 	}
 }
 

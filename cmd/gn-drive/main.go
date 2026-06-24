@@ -17,6 +17,9 @@ var (
 	Commit  = "unknown"
 )
 
+// osExit is overridable for tests.
+var osExit = os.Exit
+
 func main() {
 	root := &cobra.Command{
 		Use:   "gn-drive",
@@ -52,11 +55,11 @@ Subcommands:
 	)
 
 	if err := root.Execute(); err != nil {
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "fatal: "+format+"\n", args...)
-	os.Exit(1)
+	osExit(1)
 }

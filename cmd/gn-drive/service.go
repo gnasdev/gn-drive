@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -31,36 +32,7 @@ Examples:
   gn-drive service restart`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sub := args[0]
-			system, _ := cmd.Flags().GetBool("system")
-			scope := service.ScopeUser
-			if system {
-				scope = service.ScopeSystem
-			}
-			mgr, err := service.NewManager()
-			if err != nil {
-				return err
-			}
-			spec := service.DefaultSpec(scope)
-			// Refresh ExecPath/ConfigDir with detected values.
-			spec.ConfigDir = config.Detect().ConfigDir
-
-			switch sub {
-			case "install":
-				return runServiceInstall(mgr, spec)
-			case "uninstall":
-				return runServiceUninstall(mgr, spec)
-			case "start":
-				return runServiceStart(mgr, spec)
-			case "stop":
-				return runServiceStop(mgr, spec)
-			case "status":
-				return runServiceStatus(mgr, spec)
-			case "restart":
-				return runServiceRestart(mgr, spec)
-			default:
-				return fmt.Errorf("unknown service action: %q (want install|uninstall|start|stop|status|restart)", sub)
-			}
+			return runServiceAction(cmd, args[0], cmd.OutOrStdout())
 		},
 	}
 
@@ -68,125 +40,161 @@ Examples:
 	return cmd
 }
 
-func runServiceInstall(mgr service.Manager, spec service.Spec) error {
-	if spec.Scope == service.ScopeSystem {
-		fmt.Println("Note: system-level install requires elevated privileges (sudo).")
+// runServiceAction is the testable inner of newServiceCmd.RunE. It builds
+// the spec + manager and dispatches to the right run* helper.
+func runServiceAction(cmd *cobra.Command, sub string, out io.Writer) error {
+	system, _ := cmd.Flags().GetBool("system")
+	scope := service.ScopeUser
+	if system {
+		scope = service.ScopeSystem
 	}
-	fmt.Printf("Installing gn-drive service (%s, %s)...\n", service.Platform(), spec.Scope)
+	mgr, err := newServiceManager()
+	if err != nil {
+		return err
+	}
+	spec := service.DefaultSpec(scope)
+	spec.ConfigDir = config.Detect().ConfigDir
+
+	switch sub {
+	case "install":
+		return runServiceInstall(mgr, spec, out)
+	case "uninstall":
+		return runServiceUninstall(mgr, spec, out)
+	case "start":
+		return runServiceStart(mgr, spec, out)
+	case "stop":
+		return runServiceStop(mgr, spec, out)
+	case "status":
+		return runServiceStatus(mgr, spec, out)
+	case "restart":
+		return runServiceRestart(mgr, spec, out)
+	default:
+		return fmt.Errorf("unknown service action: %q (want install|uninstall|start|stop|status|restart)", sub)
+	}
+}
+
+// newServiceManager is the testable inner of service.NewManager().
+var newServiceManager = func() (service.Manager, error) {
+	return service.NewManager()
+}
+
+func runServiceInstall(mgr service.Manager, spec service.Spec, out io.Writer) error {
+	if spec.Scope == service.ScopeSystem {
+		fmt.Fprintln(out, "Note: system-level install requires elevated privileges (sudo).")
+	}
+	fmt.Fprintf(out, "Installing gn-drive service (%s, %s)...\n", service.Platform(), spec.Scope)
 	if err := mgr.Install(spec); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	fmt.Printf("✓ installed.\n")
-	fmt.Println()
-	fmt.Println("Status:")
-	if err := runServiceStatus(mgr, spec); err != nil {
-		fmt.Println("  (could not read status: " + err.Error() + ")")
+	fmt.Fprintln(out, "✓ installed.")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Status:")
+	if err := runServiceStatus(mgr, spec, out); err != nil {
+		fmt.Fprintln(out, "  (could not read status: "+err.Error()+")")
 	}
 	return nil
 }
 
-func runServiceUninstall(mgr service.Manager, spec service.Spec) error {
-	fmt.Printf("Uninstalling gn-drive service (%s, %s)...\n", service.Platform(), spec.Scope)
+func runServiceUninstall(mgr service.Manager, spec service.Spec, out io.Writer) error {
+	fmt.Fprintf(out, "Uninstalling gn-drive service (%s, %s)...\n", service.Platform(), spec.Scope)
 	if err := mgr.Uninstall(spec); err != nil {
 		return fmt.Errorf("uninstall: %w", err)
 	}
-	fmt.Println("✓ uninstalled.")
+	fmt.Fprintln(out, "✓ uninstalled.")
 	return nil
 }
 
-func runServiceStart(mgr service.Manager, spec service.Spec) error {
-	fmt.Printf("Starting gn-drive service...\n")
+func runServiceStart(mgr service.Manager, spec service.Spec, out io.Writer) error {
+	fmt.Fprintln(out, "Starting gn-drive service...")
 	if err := mgr.Start(spec); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
-	fmt.Println("✓ started.")
+	fmt.Fprintln(out, "✓ started.")
 	return nil
 }
 
-func runServiceStop(mgr service.Manager, spec service.Spec) error {
-	fmt.Printf("Stopping gn-drive service...\n")
+func runServiceStop(mgr service.Manager, spec service.Spec, out io.Writer) error {
+	fmt.Fprintln(out, "Stopping gn-drive service...")
 	if err := mgr.Stop(spec); err != nil {
 		return fmt.Errorf("stop: %w", err)
 	}
-	fmt.Println("✓ stopped.")
+	fmt.Fprintln(out, "✓ stopped.")
 	return nil
 }
 
-func runServiceStatus(mgr service.Manager, spec service.Spec) error {
+func runServiceStatus(mgr service.Manager, spec service.Spec, out io.Writer) error {
 	installed, err := mgr.IsInstalled(spec)
 	if err != nil {
 		return err
 	}
 	if !installed {
-		fmt.Println("Service: not installed.")
-		fmt.Println()
-		fmt.Println("To install:")
-		fmt.Printf("  gn-drive service install%s\n", scopeFlag(spec.Scope))
+		fmt.Fprintln(out, "Service: not installed.")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "To install:")
+		fmt.Fprintf(out, "  gn-drive service install%s\n", scopeFlag(spec.Scope))
 		return nil
 	}
 
 	st, err := mgr.Status(spec)
 	if err != nil {
-		// Status check failed but service is installed; report what we can.
-		fmt.Println("Service: installed (status check failed: " + err.Error() + ")")
+		fmt.Fprintln(out, "Service: installed (status check failed: "+err.Error()+")")
 		return nil
 	}
 
-	fmt.Println("Service:")
-	fmt.Printf("  Mode:     %s\n", st.Mode)
-	fmt.Printf("  Scope:    %s\n", st.Scope)
-	fmt.Printf("  Platform: %s\n", service.Platform())
+	fmt.Fprintln(out, "Service:")
+	fmt.Fprintf(out, "  Mode:     %s\n", st.Mode)
+	fmt.Fprintf(out, "  Scope:    %s\n", st.Scope)
+	fmt.Fprintf(out, "  Platform: %s\n", service.Platform())
 	if st.Running {
-		fmt.Printf("  Running:  yes (pid %d)\n", st.PID)
+		fmt.Fprintf(out, "  Running:  yes (pid %d)\n", st.PID)
 	} else {
-		fmt.Println("  Running:  no")
+		fmt.Fprintln(out, "  Running:  no")
 	}
 
-	// Read health file for richer info.
 	health, herr := service.ReadHealth(spec.ConfigDir)
 	if herr == nil {
-		fmt.Println()
-		fmt.Println("Health:")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "Health:")
 		if !health.StartedAt.IsZero() {
-			fmt.Printf("  Started:        %s\n", health.StartedAt.Format(time.RFC3339))
+			fmt.Fprintf(out, "  Started:        %s\n", health.StartedAt.Format(time.RFC3339))
 		}
 		if !health.LastHeartbeat.IsZero() {
-			fmt.Printf("  Last heartbeat: %s\n", health.LastHeartbeat.Format(time.RFC3339))
+			fmt.Fprintf(out, "  Last heartbeat: %s\n", health.LastHeartbeat.Format(time.RFC3339))
 			if health.IsStale(60 * time.Second) {
-				fmt.Println("  ⚠ heartbeat stale (>60s old) — service may be unresponsive")
+				fmt.Fprintln(out, "  ⚠ heartbeat stale (>60s old) — service may be unresponsive")
 			}
 		}
 		if health.WebPort > 0 {
-			fmt.Printf("  Web port:       %d\n", health.WebPort)
+			fmt.Fprintf(out, "  Web port:       %d\n", health.WebPort)
 		}
 		if health.Uptime() > 0 {
-			fmt.Printf("  Uptime:         %s\n", health.Uptime().Round(time.Second))
+			fmt.Fprintf(out, "  Uptime:         %s\n", health.Uptime().Round(time.Second))
 		}
 		if health.LastError != "" {
-			fmt.Printf("  Last error:     %s\n", health.LastError)
+			fmt.Fprintf(out, "  Last error:     %s\n", health.LastError)
 		}
 		if !health.LastSyncAt.IsZero() {
-			fmt.Printf("  Last sync:      %s\n", health.LastSyncAt.Format(time.RFC3339))
+			fmt.Fprintf(out, "  Last sync:      %s\n", health.LastSyncAt.Format(time.RFC3339))
 		}
 		if !health.NextScheduleAt.IsZero() {
-			fmt.Printf("  Next schedule:  %s\n", health.NextScheduleAt.Format(time.RFC3339))
+			fmt.Fprintf(out, "  Next schedule:  %s\n", health.NextScheduleAt.Format(time.RFC3339))
 		}
 		if len(health.ActiveTasks) > 0 {
-			fmt.Printf("  Active tasks:   %s\n", joinTasks(health.ActiveTasks))
+			fmt.Fprintf(out, "  Active tasks:   %s\n", joinTasks(health.ActiveTasks))
 		}
 	} else if herr != service.ErrNotInstalled {
-		fmt.Println()
-		fmt.Println("Health: (could not read: " + herr.Error() + ")")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "Health: (could not read: "+herr.Error()+")")
 	}
 	return nil
 }
 
-func runServiceRestart(mgr service.Manager, spec service.Spec) error {
-	fmt.Println("Restarting gn-drive service...")
+func runServiceRestart(mgr service.Manager, spec service.Spec, out io.Writer) error {
+	fmt.Fprintln(out, "Restarting gn-drive service...")
 	if err := mgr.Restart(spec); err != nil {
 		return fmt.Errorf("restart: %w", err)
 	}
-	fmt.Println("✓ restarted.")
+	fmt.Fprintln(out, "✓ restarted.")
 	return nil
 }
 

@@ -66,7 +66,11 @@ func New(opts Options) (*Client, error) {
 		}
 		bin = p
 	} else {
-		if _, err := os.Stat(bin); err != nil {
+		// Try LookPath first (handles "rclone" on PATH). Fall back to Stat
+		// for absolute paths that LookPath can't resolve.
+		if p, err := exec.LookPath(bin); err == nil {
+			bin = p
+		} else if _, err := os.Stat(bin); err != nil {
 			return nil, fmt.Errorf("rclone: binary not found at %s: %w", bin, err)
 		}
 	}
@@ -188,9 +192,11 @@ func (c *Client) buildArgs(cfg SyncConfig) (args []string, cleanup string, err e
 
 	switch cfg.Action {
 	case ActionPull:
+		// Pull: dst = local cache, src = remote. Download from remote to local.
 		args = append([]string{"sync", src, dst, "--update"}, base...)
 	case ActionPush:
-		args = append([]string{"sync", dst, src, "--update"}, base...)
+		// Push: src = local, dst = remote. Upload from local to remote.
+		args = append([]string{"sync", src, dst, "--update"}, base...)
 	case ActionBi:
 		args = append([]string{"bisync", src, dst, "--resync"}, base...)
 		cleanup = filepath.Join(os.TempDir(), fmt.Sprintf("gn-drive-resync-%d", os.Getpid()))
@@ -271,9 +277,23 @@ func profileToFlags(p *ProfileFlags) []string {
 }
 
 // execute runs rclone with the given args and parses --stats-one-line output.
+// execCmd is the subset of *exec.Cmd used by execute. It exists so tests
+// can inject a stub to exercise the StdoutPipe/StderrPipe/Start error paths.
+type execCmd interface {
+	StdoutPipe() (io.ReadCloser, error)
+	StderrPipe() (io.ReadCloser, error)
+	Start() error
+	Wait() error
+}
+
+// newExecCommand is overridable for tests; defaults to exec.CommandContext.
+var newExecCommand = func(ctx context.Context, name string, args ...string) execCmd {
+	return exec.CommandContext(ctx, name, args...)
+}
+
 func (c *Client) execute(ctx context.Context, args []string, onProgress func(Stats), _ string) (*SyncResult, error) {
 	c.mu.Lock()
-	cmd := exec.CommandContext(ctx, c.rcloneBin, args...)
+	cmd := newExecCommand(ctx, c.rcloneBin, args...)
 	c.mu.Unlock()
 
 	stdout, err := cmd.StdoutPipe()
@@ -512,9 +532,9 @@ type Remote struct {
 
 // ListRemotes returns all remotes in rclone.conf.
 func (c *Client) ListRemotes(ctx context.Context) ([]Remote, error) {
-	// rclone config listremotes (no --long flag; format: "remote:")
+	// rclone listremotes (no --long flag; format: "remote:")
 	// Exit 2 + Usage message when config is empty/missing — treat as zero remotes.
-	out, err := c.run(ctx, nil, "config", "listremotes", "--config", c.config)
+	out, err := c.run(ctx, nil, "listremotes", "--config", c.config)
 	if err != nil {
 		outStr := string(out)
 		if strings.Contains(outStr, "Usage:") || strings.Contains(outStr, "Available commands:") {

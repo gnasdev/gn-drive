@@ -103,6 +103,14 @@ func (m *LaunchdManager) IsInstalled(spec Spec) (bool, error) {
 	return false, err
 }
 
+// installPlistPathFn is overridable for tests; defaults to (*LaunchdManager).plistPath.
+var installPlistPathFn = func(m *LaunchdManager, spec Spec) (string, error) {
+	return m.plistPath(spec)
+}
+
+// installMkdirAllFn is overridable for tests; defaults to os.MkdirAll.
+var installMkdirAllFn = os.MkdirAll
+
 func (m *LaunchdManager) Install(spec Spec) error {
 	installed, err := m.IsInstalled(spec)
 	if err != nil {
@@ -117,12 +125,12 @@ func (m *LaunchdManager) Install(spec Spec) error {
 		return err
 	}
 
-	plistPath, err := m.plistPath(spec)
+	plistPath, err := installPlistPathFn(m, spec)
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(plistPath), 0o755); err != nil {
+	if err := installMkdirAllFn(filepath.Dir(plistPath), 0o755); err != nil {
 		return fmt.Errorf("mkdir plist dir: %w", err)
 	}
 
@@ -132,17 +140,14 @@ func (m *LaunchdManager) Install(spec Spec) error {
 
 	// Bootstrap the service. System-level requires sudo (caller's responsibility).
 	domain := m.domainTarget(spec)
-	cmd := exec.Command("launchctl", "bootstrap", domain, plistPath)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := runLaunchctl("bootstrap", domain, plistPath); err != nil {
 		// Plist was written; bootstrap failed. Don't remove the plist — the user
 		// can run `launchctl bootstrap` manually or fix permissions and retry.
-		return fmt.Errorf("launchctl bootstrap: %w (%s)\nplist written to: %s", err, strings.TrimSpace(stderr.String()), plistPath)
+		return fmt.Errorf("launchctl bootstrap: %w\nplist written to: %s", err, plistPath)
 	}
 
 	// Enable so it auto-starts on next login/boot.
-	_ = m.runLaunchctl("enable", domain+"/"+m.label(spec))
+	_ = runLaunchctl("enable", domain+"/"+m.label(spec))
 
 	return nil
 }
@@ -160,9 +165,9 @@ func (m *LaunchdManager) Uninstall(spec Spec) error {
 	label := m.label(spec)
 
 	// Bootout (unload) the service.
-	_ = m.runLaunchctl("bootout", domain+"/"+label)
+	_ = runLaunchctl("bootout", domain+"/"+label)
 	// Disable.
-	_ = m.runLaunchctl("disable", domain+"/"+label)
+	_ = runLaunchctl("disable", domain+"/"+label)
 
 	plistPath, _ := m.plistPath(spec)
 	if err := os.Remove(plistPath); err != nil {
@@ -173,12 +178,12 @@ func (m *LaunchdManager) Uninstall(spec Spec) error {
 
 func (m *LaunchdManager) Start(spec Spec) error {
 	domain := m.domainTarget(spec)
-	return m.runLaunchctl("kickstart", "-k", domain+"/"+m.label(spec))
+	return runLaunchctl("kickstart", "-k", domain+"/"+m.label(spec))
 }
 
 func (m *LaunchdManager) Stop(spec Spec) error {
 	domain := m.domainTarget(spec)
-	return m.runLaunchctl("kill", "SIGTERM", domain+"/"+m.label(spec))
+	return runLaunchctl("kill", "SIGTERM", domain+"/"+m.label(spec))
 }
 
 func (m *LaunchdManager) Restart(spec Spec) error {
@@ -195,7 +200,7 @@ func (m *LaunchdManager) Status(spec Spec) (Status, error) {
 	label := m.label(spec)
 
 	// Try `launchctl print` to get detailed info.
-	out, err := m.runLaunchctlOutput("print", domain+"/"+label)
+	out, err := runLaunchctlOutput("print", domain+"/"+label)
 	if err == nil {
 		st.Running = strings.Contains(string(out), "state = running")
 		// Extract PID.
@@ -225,7 +230,9 @@ func (m *LaunchdManager) plistPathFor(spec Spec) string {
 	return p
 }
 
-func (m *LaunchdManager) runLaunchctl(args ...string) error {
+// runLaunchctl is the testable inner of runLaunchctl. It allows tests to
+// override the actual launchctl invocation.
+var runLaunchctl = func(args ...string) error {
 	cmd := exec.Command("launchctl", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -235,7 +242,8 @@ func (m *LaunchdManager) runLaunchctl(args ...string) error {
 	return nil
 }
 
-func (m *LaunchdManager) runLaunchctlOutput(args ...string) ([]byte, error) {
+// runLaunchctlOutput is the testable inner of runLaunchctlOutput.
+var runLaunchctlOutput = func(args ...string) ([]byte, error) {
 	cmd := exec.Command("launchctl", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

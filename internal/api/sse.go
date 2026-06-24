@@ -12,6 +12,27 @@ import (
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 )
 
+// sseHeartbeatInterval is overridable for tests to speed up the
+// heartbeat.
+var sseHeartbeatInterval = 25 * time.Second
+
+// sseNewTickerFn is overridable for tests; defaults to time.NewTicker.
+var sseNewTickerFn = func(d time.Duration) tickerIface {
+	return tickerAdapter{time.NewTicker(d)}
+}
+
+type tickerIface interface {
+	C() <-chan time.Time
+	Stop()
+}
+
+type tickerAdapter struct {
+	*time.Ticker
+}
+
+func (t tickerAdapter) C() <-chan time.Time { return t.Ticker.C }
+func (t tickerAdapter) Stop()               { t.Ticker.Stop() }
+
 // handleSSE streams events from the eventbus as Server-Sent Events.
 func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
@@ -33,7 +54,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	for _, t := range topics {
 		topic := t
-		cancel := s.app.Bus.Subscribe(topic, makeSSEHandler(w, flusher, topic, s.log))
+		cancel := s.app.Bus.Subscribe(topic, makeSSEHandlerFn(w, flusher, topic, s.log))
 		subs = append(subs, cancel)
 	}
 	defer func() {
@@ -42,14 +63,14 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	heartbeat := time.NewTicker(25 * time.Second)
+	heartbeat := sseNewTickerFn(sseHeartbeatInterval)
 	defer heartbeat.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-heartbeat.C:
+		case <-heartbeat.C():
 			io.WriteString(w, ": heartbeat\n\n")
 			flusher.Flush()
 		}
@@ -57,6 +78,11 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeSSEHandler(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger) func(eventbus.Event) {
+	return makeSSEHandlerFn(w, flusher, topic, log)
+}
+
+// makeSSEHandlerFn is overridable for tests.
+var makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger) func(eventbus.Event) {
 	return func(ev eventbus.Event) {
 		data, err := json.Marshal(ev)
 		if err != nil {

@@ -148,11 +148,16 @@ func (w *Writer) Stop() {
 }
 
 func (w *Writer) writeLocked() error {
-	data, err := json.MarshalIndent(w.health, "", "  ")
+	data, err := marshalHealth(w.health)
 	if err != nil {
 		return fmt.Errorf("marshal health: %w", err)
 	}
 	return os.WriteFile(w.path, data, 0o644)
+}
+
+// marshalHealth is overridable for tests.
+var marshalHealth = func(h Health) ([]byte, error) {
+	return json.MarshalIndent(h, "", "  ")
 }
 
 // ReadHealth reads and parses the service.health file.

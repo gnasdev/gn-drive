@@ -22,14 +22,23 @@ func (s *Server) runServiceCLI(action string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return runServiceCommand(exe, action)
+}
+
+// runServiceCommand is the testable inner of runServiceCLI. It allows
+// tests to override the actual command execution.
+var runServiceCommand = func(exe, action string) (string, error) {
 	out, err := exec.Command(exe, "service", action).CombinedOutput()
 	return string(out), err
 }
 
+// serviceNewManagerFn is overridable for tests; defaults to service.NewManager.
+var serviceNewManagerFn = service.NewManager
+
 // handleServiceStatus returns the current service state and health.
 func (s *Server) handleServiceStatus(w http.ResponseWriter, r *http.Request) {
 	spec := s.serviceSpec()
-	mgr, err := service.NewManager()
+	mgr, err := serviceNewManagerFn()
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "platform_error", err.Error())
 		return

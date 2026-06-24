@@ -29,6 +29,16 @@ type Store struct {
 	mu     sync.Mutex // serialize schema changes
 }
 
+// sqlOpenFn is overridable for tests; defaults to sql.Open.
+var sqlOpenFn = func(driver, path string) (*sql.DB, error) {
+	return sql.Open(driver, path)
+}
+
+// execContextFn is overridable for tests; defaults to (*sql.DB).ExecContext.
+var execContextFn = func(db *sql.DB, ctx context.Context, q string) (sql.Result, error) {
+	return db.ExecContext(ctx, q)
+}
+
 // New opens the SQLite database at the given path, applies migrations,
 // and returns a Store with all repositories ready.
 func New(ctx context.Context, dbPath string, logger *slog.Logger) (*Store, error) {
@@ -40,16 +50,16 @@ func New(ctx context.Context, dbPath string, logger *slog.Logger) (*Store, error
 		return nil, fmt.Errorf("create db directory: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sqlOpenFn("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if _, err := db.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
+	if _, err := execContextFn(db, ctx, "PRAGMA journal_mode=WAL"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("enable WAL: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys=ON"); err != nil {
+	if _, err := execContextFn(db, ctx, "PRAGMA foreign_keys=ON"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
@@ -57,7 +67,7 @@ func New(ctx context.Context, dbPath string, logger *slog.Logger) (*Store, error
 	db.SetMaxOpenConns(1) // SQLite single-writer
 
 	s := &Store{db: db, logger: logger}
-	if err := s.migrate(ctx); err != nil {
+	if err := migrateFn(s, ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
@@ -76,6 +86,9 @@ func (s *Store) Close() error {
 
 // DB returns the underlying *sql.DB. Used for transactions in repositories.
 func (s *Store) DB() *sql.DB { return s.db }
+
+// migrateFn is overridable for tests; defaults to (*Store).migrate.
+var migrateFn = func(s *Store, ctx context.Context) error { return s.migrate(ctx) }
 
 // migrate creates all tables and applies schema migrations.
 func (s *Store) migrate(ctx context.Context) error {
@@ -447,9 +460,11 @@ func (r BoardRepo) LoadGraph(ctx context.Context, id string) (*Board, error) {
 	defer erows.Close()
 	for erows.Next() {
 		var e BoardEdge
-		if err := erows.Scan(&e.ID, &e.SourceID, &e.TargetID, &e.Action, &e.SyncConfig); err != nil {
+		var syncCfg string
+		if err := erows.Scan(&e.ID, &e.SourceID, &e.TargetID, &e.Action, &syncCfg); err != nil {
 			return nil, err
 		}
+		e.SyncConfig = json.RawMessage(syncCfg)
 		b.Edges = append(b.Edges, e)
 	}
 	return b, erows.Err()
@@ -465,6 +480,57 @@ func (r BoardRepo) Save(ctx context.Context, b *Board) error {
 		   updated_at=datetime('now')`,
 		b.ID, b.Name, b.Description, 0, "")
 	return err
+}
+
+// SaveGraph persists the board along with its nodes and edges in a single
+// transaction. It deletes any prior nodes/edges for the board.
+func (r BoardRepo) SaveGraph(ctx context.Context, b *Board) error {
+	tx, err := r.s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO boards (id, name, description, schedule_enabled, cron_expr, updated_at)
+		 VALUES (?, ?, ?, ?, ?, datetime('now'))
+		 ON CONFLICT(id) DO UPDATE SET
+		   name=excluded.name, description=excluded.description,
+		   schedule_enabled=excluded.schedule_enabled, cron_expr=excluded.cron_expr,
+		   updated_at=datetime('now')`,
+		b.ID, b.Name, b.Description, 0, ""); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM board_nodes WHERE board_id = ?", b.ID); err != nil {
+		return err
+	}
+	for _, n := range b.Nodes {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO board_nodes (id, board_id, remote_name, path, label, x, y)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			n.ID, b.ID, n.RemoteName, n.Path, n.Label, n.X, n.Y); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM board_edges WHERE board_id = ?", b.ID); err != nil {
+		return err
+	}
+	for _, e := range b.Edges {
+		cfg := string(e.SyncConfig)
+		if cfg == "" {
+			cfg = "{}"
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO board_edges (id, board_id, source_id, target_id, action, sync_config)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			e.ID, b.ID, e.SourceID, e.TargetID, e.Action, cfg); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r BoardRepo) Delete(ctx context.Context, id string) error {
@@ -535,8 +601,8 @@ func (r FlowRepo) Get(ctx context.Context, id string) (*Flow, error) {
 
 func (r FlowRepo) Save(ctx context.Context, f *Flow) error {
 	_, err := r.s.db.ExecContext(ctx,
-		`INSERT INTO flows (id, name, schedule_enabled, cron_expr, sort_order, updated_at)
-		 VALUES (?, ?, ?, ?, ?, datetime('now'))
+		`INSERT INTO flows (id, name, schedule_enabled, cron_expr, sort_order, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, COALESCE(NULLIF(?, ''), datetime('now')), datetime('now'))
 		 ON CONFLICT(id) DO UPDATE SET
 		   name=excluded.name, schedule_enabled=excluded.schedule_enabled,
 		   cron_expr=excluded.cron_expr, sort_order=excluded.sort_order,

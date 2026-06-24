@@ -249,9 +249,12 @@ func parseJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
+// generateTokenRand is overridable for tests; defaults to rand.Read.
+var generateTokenRand = rand.Read
+
 func generateToken() (string, error) {
 	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := generateTokenRand(b); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
