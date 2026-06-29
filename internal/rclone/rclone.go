@@ -18,7 +18,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -188,7 +187,11 @@ func (c *Client) buildArgs(cfg SyncConfig) (args []string, cleanup string, err e
 		interval = "1s"
 	}
 
-	base := []string{"--config", c.config, "--stats", interval, "--stats-one-line", "-v"}
+	// --use-json-log makes rclone emit periodic stats as a structured JSON
+	// object (parsed by parseJSONStatsLine), which is far more robust than
+	// scraping the human-readable one-line text. The text parser remains as a
+	// fallback for older rclone builds / non-JSON lines.
+	base := []string{"--config", c.config, "--stats", interval, "--use-json-log", "-v"}
 
 	switch cfg.Action {
 	case ActionPull:
@@ -198,11 +201,17 @@ func (c *Client) buildArgs(cfg SyncConfig) (args []string, cleanup string, err e
 		// Push: src = local, dst = remote. Upload from local to remote.
 		args = append([]string{"sync", src, dst, "--update"}, base...)
 	case ActionBi:
-		args = append([]string{"bisync", src, dst, "--resync"}, base...)
-		cleanup = filepath.Join(os.TempDir(), fmt.Sprintf("gn-drive-resync-%d", os.Getpid()))
-		_ = os.WriteFile(cleanup, []byte{}, 0o600)
-		args = append(args, "--resync-mode-path", cleanup)
+		// Incremental bidirectional sync. bisync relies on the listings stored
+		// in its workdir by a previous run; it must NOT pass --resync on every
+		// run (that re-establishes the baseline and can clobber concurrent
+		// changes / delete data). A brand-new pair must be primed once with
+		// ActionBiResync; until then rclone bisync exits with a clear
+		// "cannot find prior listing — run with --resync" error, which is the
+		// safe behaviour.
+		args = append([]string{"bisync", src, dst}, base...)
 	case ActionBiResync:
+		// Establish (or rebuild) the bisync baseline. --force permits large
+		// deltas that bisync would otherwise refuse.
 		args = append([]string{"bisync", src, dst, "--resync", "--force"}, base...)
 	case ActionCopy:
 		args = append([]string{"copy", src, dst}, base...)
@@ -329,7 +338,11 @@ func (c *Client) execute(ctx context.Context, args []string, onProgress func(Sta
 	go func() {
 		for scanner.Scan() {
 			line := scanner.Text()
-			parseStatsLine(line, &stats)
+			// Prefer rclone's structured JSON stats (--use-json-log); fall
+			// back to the legacy one-line text parser for non-JSON lines.
+			if !parseJSONStatsLine(line, &stats) {
+				parseStatsLine(line, &stats)
+			}
 			if onProgress != nil {
 				stats.LastUpdate = nowUnix()
 				onProgress(stats)
@@ -353,6 +366,55 @@ func (c *Client) execute(ctx context.Context, args []string, onProgress func(Sta
 	result.EndedAt = nowUnix()
 	result.Stats = stats
 	return result, nil
+}
+
+// jsonLogStats mirrors the "stats" object rclone emits under --use-json-log.
+// Field names match rclone's JSON keys.
+type jsonLogStats struct {
+	Bytes          int64    `json:"bytes"`
+	TotalBytes     int64    `json:"totalBytes"`
+	Transfers      int64    `json:"transfers"`
+	TotalTransfers int64    `json:"totalTransfers"`
+	Checks         int64    `json:"checks"`
+	TotalChecks    int64    `json:"totalChecks"`
+	Deletes        int64    `json:"deletes"`
+	Errors         int64    `json:"errors"`
+	Speed          float64  `json:"speed"`
+	Eta            *float64 `json:"eta"`
+}
+
+type jsonLogLine struct {
+	Stats *jsonLogStats `json:"stats"`
+}
+
+// parseJSONStatsLine parses a single rclone --use-json-log line. If the line is
+// a JSON object carrying a "stats" object, it populates s and returns true.
+// Non-JSON or non-stats lines return false so the caller can fall back to the
+// legacy text parser.
+func parseJSONStatsLine(line string, s *Stats) bool {
+	line = strings.TrimSpace(line)
+	if len(line) == 0 || line[0] != '{' {
+		return false
+	}
+	var entry jsonLogLine
+	if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.Stats == nil {
+		return false
+	}
+	st := entry.Stats
+	s.Bytes = st.Bytes
+	s.BytesTotal = st.TotalBytes
+	s.Files = st.Transfers
+	s.FilesTotal = st.TotalTransfers
+	s.Transfers = st.Transfers
+	s.Checks = st.Checks
+	s.ChecksTotal = st.TotalChecks
+	s.Deletes = st.Deletes
+	s.Errors = st.Errors
+	s.Speed = st.Speed
+	if st.Eta != nil {
+		s.ETA = int64(*st.Eta)
+	}
+	return true
 }
 
 // parseStatsLine extracts progress numbers from an rclone --stats-one-line line.

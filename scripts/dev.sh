@@ -63,13 +63,18 @@ echo "dev: building frontend (initial)…"
 # pnpm treats as non-zero exit. We don't care about that for dev — only the
 # build itself matters. So we run install with `|| true` to keep going.
 ( cd frontend && pnpm install --frozen-lockfile >/dev/null 2>&1 || pnpm install >/dev/null 2>&1 || true )
-( cd frontend && pnpm run build )
+# Build directly into internal/webui/dist — the path the Go binary embeds via
+# `//go:embed all:dist`. (The default `vite build` outDir is frontend/dist,
+# which the Go embed never sees, so the dev build must override it here.)
+# Use `pnpm exec vite` (not `pnpm run build -- …`): `pnpm run` injects a
+# literal `--` separator that vite ignores, dropping the --outDir override.
+( cd frontend && pnpm exec vite build --mode development --sourcemap --outDir ../internal/webui/dist --emptyOutDir )
 echo "dev: initial build done."
 echo ""
 
 # --- Start Vite watch in background -----------------------------------
 echo "dev: starting Vite --watch (foreground output piped to this terminal)…"
-( cd frontend && pnpm run build:watch ) &
+( cd frontend && pnpm exec vite build --watch --mode development --sourcemap --outDir ../internal/webui/dist --emptyOutDir ) &
 PID_VITE=$!
 
 # --- Start air in background ------------------------------------------

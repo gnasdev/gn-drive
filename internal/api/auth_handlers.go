@@ -83,9 +83,11 @@ func (s *Server) handleLock(w http.ResponseWriter, r *http.Request) {
 	// Find our session token.
 	cookie, _ := r.Cookie(SessionCookieName)
 	if cookie != nil && cookie.Value != "" {
-		sessionDelete(cookie.Value)
 		clearSessionCookie(w)
 	}
+	// Revoke ALL sessions, not just the caller's: locking the app must
+	// invalidate every outstanding session.
+	sessionClearAll()
 
 	if err := authLockFn(s.app.Auth); err != nil {
 		respondError(w, http.StatusInternalServerError, "lock_failed", err.Error())
@@ -115,5 +117,9 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, "change_failed", err.Error())
 		return
 	}
+	// Invalidate all outstanding sessions (including the caller's) so a
+	// password change forces re-authentication everywhere.
+	sessionClearAll()
+	clearSessionCookie(w)
 	respondOK(w, map[string]bool{"ok": true})
 }

@@ -96,12 +96,62 @@ func (s *Store) migrate(ctx context.Context) error {
 		return fmt.Errorf("create tables: %w", err)
 	}
 	s.migrateProfilesNewColumns(ctx)
+	if err := s.applyMigrations(ctx); err != nil {
+		return fmt.Errorf("apply versioned migrations: %w", err)
+	}
 	return nil
 }
 
 func (s *Store) createAllTables(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, schema)
 	return err
+}
+
+// schemaVersion is the current schema version stamped into the database's
+// PRAGMA user_version. Bump it whenever you append a migration below.
+const schemaVersion = 1
+
+// migration is a single forward schema change, applied when the database's
+// user_version is below its version.
+type migration struct {
+	version int
+	sql     string
+}
+
+// migrations are applied in ascending version order. Version 1 is the baseline
+// schema already materialised by createAllTables, so it carries no extra SQL.
+// Add future changes as {version: 2, sql: "ALTER TABLE ..."} and bump
+// schemaVersion to match.
+var migrations = []migration{
+	{version: 1, sql: ""},
+}
+
+// applyMigrations runs any forward migrations whose version exceeds the
+// database's current user_version, stamping user_version as it goes. It is
+// idempotent: a fully-migrated database is a no-op.
+func (s *Store) applyMigrations(ctx context.Context) error {
+	var current int
+	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {
+		return fmt.Errorf("read user_version: %w", err)
+	}
+	for _, m := range migrations {
+		if m.version <= current {
+			continue
+		}
+		if m.sql != "" {
+			if _, err := s.db.ExecContext(ctx, m.sql); err != nil {
+				return fmt.Errorf("migration v%d: %w", m.version, err)
+			}
+		}
+		// PRAGMA user_version does not accept bound parameters; m.version is an
+		// internal constant (never user input), so the formatted value is safe.
+		if _, err := s.db.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
+			return fmt.Errorf("stamp user_version=%d: %w", m.version, err)
+		}
+		current = m.version
+		s.logger.Info("store: applied migration", "version", m.version)
+	}
+	return nil
 }
 
 // --- Settings repository ----------------------------------------------------
@@ -337,7 +387,7 @@ func (r HistoryRepo) Save(ctx context.Context, e *HistoryEntry) error {
 		   files_transferred=excluded.files_transferred, bytes_transferred=excluded.bytes_transferred,
 		   errors=excluded.errors, error_message=excluded.error_message`,
 		e.ID, e.ProfileName, e.Action, e.State, e.StartedAt, e.FinishedAt, e.Duration,
-		e.Files, e.Bytes, e.Errors, "")
+		e.Files, e.Bytes, e.Errors, e.ErrorMessage)
 	return err
 }
 

@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexedwards/argon2id"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -56,6 +57,15 @@ const (
 	argon2KeyLen      = 32
 	argon2SaltLen     = 32
 )
+
+// argon2Params is used by alexedwards/argon2id for creating new hashes.
+var argon2Params = &argon2id.Params{
+	Memory:      argon2Memory,
+	Iterations:  argon2Iterations,
+	Parallelism: argon2Parallelism,
+	SaltLength:  argon2SaltLen,
+	KeyLength:   argon2KeyLen,
+}
 
 // Rate limit constants.
 const (
@@ -115,7 +125,6 @@ type Service struct {
 	logger      *slog.Logger
 	lockedAt    time.Time
 	sleep       func(time.Duration) // injectable for tests
-	randRead    func([]byte) (int, error) // injectable for tests
 }
 
 // New creates a new auth Service. It reads auth.json if present and
@@ -134,7 +143,6 @@ func New(opts Options) (*Service, error) {
 		configDir: opts.ConfigDir,
 		logger:    logger,
 		sleep:     time.Sleep,
-		randRead:  rand.Read,
 	}
 
 	authData, err := s.loadAuthData()
@@ -227,13 +235,16 @@ func (s *Service) SetupPassword(password string) error {
 		return errors.New("auth: password must be at least 4 characters")
 	}
 
-	salt := make([]byte, argon2SaltLen)
-	if _, err := s.randRead(salt); err != nil {
-		return fmt.Errorf("auth: generate salt: %w", err)
+	hash, err := createPasswordHash(password)
+	if err != nil {
+		return fmt.Errorf("auth: create hash: %w", err)
 	}
 
+	salt, err := extractSalt(hash)
+	if err != nil {
+		return fmt.Errorf("auth: extract salt: %w", err)
+	}
 	key := deriveKey(password, salt)
-	hash := encodePasswordHash(password, salt)
 
 	s.authData = &AuthData{
 		Enabled:        true,
@@ -359,12 +370,15 @@ func (s *Service) ChangePassword(oldPwd, newPwd string) error {
 		return errors.New("auth: new password must be at least 4 characters")
 	}
 
-	newSalt := make([]byte, argon2SaltLen)
-	if _, err := s.randRead(newSalt); err != nil {
-		return fmt.Errorf("auth: generate salt: %w", err)
+	newHash, err := createPasswordHash(newPwd)
+	if err != nil {
+		return fmt.Errorf("auth: create hash: %w", err)
+	}
+	newSalt, err := extractSalt(newHash)
+	if err != nil {
+		return fmt.Errorf("auth: extract salt: %w", err)
 	}
 	newKey := deriveKey(newPwd, newSalt)
-	newHash := encodePasswordHash(newPwd, newSalt)
 
 	if err := s.encryptConfigFiles(newKey); err != nil {
 		// Try to recover: decrypt with new key.
@@ -541,15 +555,19 @@ func deriveKey(password string, salt []byte) []byte {
 	return argon2.IDKey([]byte(password), salt, argon2Iterations, argon2Memory, argon2Parallelism, argon2KeyLen)
 }
 
-func encodePasswordHash(password string, salt []byte) string {
-	hash := argon2.IDKey([]byte(password), salt, argon2Iterations, argon2Memory, argon2Parallelism, argon2KeyLen)
-	saltB64 := base64.RawStdEncoding.EncodeToString(salt)
-	hashB64 := base64.RawStdEncoding.EncodeToString(hash)
-	return fmt.Sprintf("argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
-		argon2Memory, argon2Iterations, argon2Parallelism, saltB64, hashB64)
+func createPasswordHash(password string) (string, error) {
+	return argon2id.CreateHash(password, argon2Params)
 }
 
 func verifyPasswordHash(password, encoded string) bool {
+	if strings.HasPrefix(encoded, "$argon2id$") {
+		match, err := argon2id.ComparePasswordAndHash(password, encoded)
+		return err == nil && match
+	}
+	return verifyLegacyHash(password, encoded)
+}
+
+func verifyLegacyHash(password, encoded string) bool {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 5 {
 		return false
@@ -570,6 +588,15 @@ func verifyPasswordHash(password, encoded string) bool {
 var extractSaltFn = extractSalt
 
 func extractSalt(encoded string) ([]byte, error) {
+	// Handle new format ($argon2id$v=19$m=...$salt$hash) — 6 parts split by $
+	if strings.HasPrefix(encoded, "$argon2id$") {
+		parts := strings.Split(encoded, "$")
+		if len(parts) != 6 {
+			return nil, errors.New("invalid hash format")
+		}
+		return base64.RawStdEncoding.DecodeString(parts[4])
+	}
+	// Legacy format (argon2id$v=19$m=...$salt$hash) — 5 parts
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 5 {
 		return nil, errors.New("invalid hash format")

@@ -479,7 +479,7 @@ func TestSync_Push(t *testing.T) {
 	}
 }
 
-func TestSync_Bi_CreatesResyncPath(t *testing.T) {
+func TestSync_Bi(t *testing.T) {
 	bin := newFakeRclone(t)
 	c, _ := New(Options{BinaryPath: bin, Logger: noopLogger()})
 	_, err := c.Sync(context.Background(), SyncConfig{
