@@ -88,13 +88,10 @@ func TestBus_CancelStopsSubscription(t *testing.T) {
 	}
 }
 
-func TestBus_MultipleSubscribersLoadShare(t *testing.T) {
-	// The current bus implementation has one channel per topic; multiple
-	// subscribers on the same topic share that channel via independent
-	// goroutines. A single Publish delivers to exactly ONE subscriber
-	// (whichever goroutine reads from the channel first). Verifying that
-	// here keeps the contract honest; if we ever change the bus to
-	// fan-out per subscriber, this test will need to be updated.
+func TestBus_MultipleSubscribersBroadcast(t *testing.T) {
+	// The bus fans out: every subscriber of a topic receives a copy of every
+	// published event. Publishing E events to N subscribers yields E*N total
+	// deliveries (each subscriber sees all E).
 	b := NewBus(context.Background())
 	defer b.Close()
 
@@ -107,32 +104,29 @@ func TestBus_MultipleSubscribersLoadShare(t *testing.T) {
 		})
 	}
 
-	// Publish N events. Each one must be delivered to exactly one
-	// subscriber, so the total across all subscribers equals N.
 	const events = 50
 	for i := 0; i < events; i++ {
 		b.Publish("multi", newTestEvent("x"))
 	}
 
-	// Wait for delivery to drain.
+	// Wait for delivery to drain: each of the N subscribers must receive all
+	// `events`, for a total of events*N.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		total := int32(0)
 		for i := 0; i < N; i++ {
 			total += atomic.LoadInt32(&counts[i])
 		}
-		if total == events {
+		if total == events*N {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	total := int32(0)
 	for i := 0; i < N; i++ {
-		total += atomic.LoadInt32(&counts[i])
-	}
-	if total != events {
-		t.Errorf("total events delivered = %d, want %d", total, events)
+		if got := atomic.LoadInt32(&counts[i]); got != events {
+			t.Errorf("subscriber %d received %d events, want %d (broadcast)", i, got, events)
+		}
 	}
 }
 

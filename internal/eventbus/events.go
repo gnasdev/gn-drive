@@ -33,6 +33,9 @@ type SyncProgressEvent struct {
 	CurrentFile     string  `json:"current_file"`
 	FilesTransferred int    `json:"files_transferred"`
 	TotalFiles      int     `json:"total_files"`
+	// ErrorMessage is set on failed sync events so the UI can surface the
+	// reason (omitted for running/completed events).
+	ErrorMessage string `json:"error_message,omitempty"`
 }
 
 // SyncStartedEvent is emitted when a sync task begins.

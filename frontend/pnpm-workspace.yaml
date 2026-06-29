@@ -1,3 +1,13 @@
+allowBuilds:
+  esbuild: set this to true or false
+  vue-demi: set this to true or false
+# pnpm workspace settings.
+# Approve build scripts for these deps so `pnpm install` does not abort with
+# ERR_PNPM_IGNORED_BUILDS (esbuild/vue-demi run native postinstall steps).
 onlyBuiltDependencies:
   - esbuild
   - vue-demi
+# Don't run an implicit `pnpm install` before every `pnpm run` script; that
+# implicit install aborts on the ignored-builds error above and would kill
+# `pnpm run build` / `build:watch` in the dev workflow.
+verifyDepsBeforeRun: false

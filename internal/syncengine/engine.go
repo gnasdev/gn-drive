@@ -22,6 +22,11 @@ import (
 // ErrNotRunning is returned when the engine is stopped.
 var ErrNotRunning = errors.New("syncengine: engine is not running")
 
+// ErrProfileBusy is returned by StartSync when a sync for the same profile is
+// already in flight. Concurrent syncs on one profile could let two rclone
+// processes mutate the same source/dest simultaneously.
+var ErrProfileBusy = errors.New("syncengine: a sync for this profile is already running")
+
 // Engine manages scheduled sync tasks and active task lifecycle.
 type Engine struct {
 	log      *slog.Logger
@@ -32,6 +37,11 @@ type Engine struct {
 	cronMu   sync.Mutex
 	schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
 	active   sync.Map                // taskID -> *Task
+	// running guards against two concurrent syncs for the same profile, which
+	// would let two rclone processes mutate the same paths at once (especially
+	// dangerous for bisync). Keyed by profile name.
+	runningMu sync.Mutex
+	running   map[string]struct{}
 	ctx      context.Context
 	cancel   context.CancelFunc
 }
@@ -59,6 +69,7 @@ func New(deps Deps) *Engine {
         bus:    deps.Bus,
         store:  deps.Store,
         rclone: deps.Rclone,
+        running: make(map[string]struct{}),
     }
 }
 
@@ -108,6 +119,9 @@ func (e *Engine) Stop(ctx context.Context) error {
 		return true
 	})
     e.active = sync.Map{}
+    e.runningMu.Lock()
+    e.running = make(map[string]struct{})
+    e.runningMu.Unlock()
     e.schedule = nil
     e.cron = nil
     e.ctx = nil
@@ -126,6 +140,16 @@ func (e *Engine) StartSync(ctx context.Context, action, profileName string) (str
     if err != nil {
         return "", err
     }
+
+    // Reject a concurrent run for the same profile (see ErrProfileBusy).
+    // The entry is cleared by runSync's deferred cleanup when the sync ends.
+    e.runningMu.Lock()
+    if _, busy := e.running[profileName]; busy {
+        e.runningMu.Unlock()
+        return "", ErrProfileBusy
+    }
+    e.running[profileName] = struct{}{}
+    e.runningMu.Unlock()
 
     task := &Task{
         ID:     uuid.New().String(),
@@ -213,7 +237,9 @@ func (e *Engine) triggerSchedule(sch *store.Schedule) {
         ProfileID:  sch.ProfileName,
         Action:     sch.Action,
     })
-    e.StartSync(context.Background(), sch.Action, sch.ProfileName)
+    if _, err := e.StartSync(context.Background(), sch.Action, sch.ProfileName); err != nil {
+        e.log.Warn("cron: sync not started", "schedule", sch.ID, "profile", sch.ProfileName, "err", err)
+    }
 }
 
 // UnregisterSchedule removes the cron entry for the given schedule ID.
@@ -252,9 +278,28 @@ func (e *Engine) loadSchedules() {
 func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
     defer func() {
         e.active.Delete(t.ID)
+        e.runningMu.Lock()
+        delete(e.running, p.Name)
+        e.runningMu.Unlock()
     }()
 
+    startedAt := time.Now()
+    t.Mu.Lock()
+    t.StartedAt = startedAt
+    t.Mu.Unlock()
+
     e.log.Info("sync: started", "task", t.ID, "profile", p.Name, "action", action)
+
+    // Record the run as in-progress so the History view shows it immediately.
+    // History().Save upserts by task ID, so the terminal Save below updates
+    // this same row rather than inserting a duplicate.
+    e.saveHistory(&store.HistoryEntry{
+        ID:          t.ID,
+        ProfileName: p.Name,
+        Action:      action,
+        State:       "running",
+        StartedAt:   startedAt.UTC().Format(time.RFC3339),
+    })
 
     res, err := e.rclone.Sync(t.ctx, rclone.SyncConfig{
         Action: rclone.Action(action),
@@ -284,19 +329,32 @@ func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
         })
     })
 
+    endedAt := time.Now()
+
+    // Prefer the result's parsed stats; fall back to the last progress
+    // snapshot if the run errored before producing a SyncResult.
+    finalStats := t.Stats
+    if res != nil {
+        finalStats = res.Stats
+    }
+
     t.Mu.Lock()
-    t.EndedAt = time.Now()
+    t.EndedAt = endedAt
+    var state string
     if err != nil {
-        t.Status = "failed"
+        state = "failed"
+        t.Status = state
         e.bus.Publish(eventbus.TopicSyncFailed, eventbus.SyncProgressEvent{
-            TaskID:    t.ID,
-            ProfileID: p.Name,
-            Action:    action,
-            State:     "failed",
+            TaskID:       t.ID,
+            ProfileID:    p.Name,
+            Action:       action,
+            State:        "failed",
+            ErrorMessage: truncateErrMsg(err.Error(), 1000),
         })
         e.log.Error("sync: failed", "task", t.ID, "profile", p.Name, "err", err)
     } else {
-        t.Status = "completed"
+        state = "completed"
+        t.Status = state
         e.bus.Publish(eventbus.TopicSyncCompleted, eventbus.SyncCompletedEvent{
             TaskID:    t.ID,
             ProfileID: p.Name,
@@ -308,4 +366,42 @@ func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
         e.log.Info("sync: completed", "task", t.ID, "profile", p.Name, "bytes", res.Stats.Bytes, "errors", res.Stats.Errors)
     }
     t.Mu.Unlock()
+
+    // Persist the terminal outcome to history (upsert over the running row).
+    entry := &store.HistoryEntry{
+        ID:          t.ID,
+        ProfileName: p.Name,
+        Action:      action,
+        State:       state,
+        StartedAt:   startedAt.UTC().Format(time.RFC3339),
+        FinishedAt:  endedAt.UTC().Format(time.RFC3339),
+        Duration:    int64(endedAt.Sub(startedAt).Seconds()),
+        Bytes:       finalStats.Bytes,
+        Files:       int(finalStats.Files),
+        Errors:      int(finalStats.Errors),
+    }
+    if err != nil {
+        entry.ErrorMessage = truncateErrMsg(err.Error(), 1000)
+    }
+    e.saveHistory(entry)
+}
+
+// saveHistory persists a sync history entry. It tolerates a nil store (some
+// tests construct the engine without one) and logs—rather than fails—on
+// error, so a sync outcome is not lost on a transient write hiccup.
+func (e *Engine) saveHistory(entry *store.HistoryEntry) {
+    if e.store == nil {
+        return
+    }
+    if err := e.store.History().Save(context.Background(), entry); err != nil {
+        e.log.Warn("sync: persist history failed", "task", entry.ID, "err", err)
+    }
+}
+
+// truncateErrMsg bounds the length of an error string stored in history.
+func truncateErrMsg(s string, n int) string {
+    if len(s) <= n {
+        return s
+    }
+    return s[:n]
 }

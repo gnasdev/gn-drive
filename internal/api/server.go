@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,8 +202,10 @@ func authMiddleware(authSvc *auth.Service) func(http.Handler) http.Handler {
 			path := r.URL.Path
 			if path == "/api/v1/status" ||
 				path == "/api/v1/events" ||
-				len(path) >= 9 && path[:9] == "/api/v1/a" {
-				// /api/v1/auth/* — public (unlock, setup, lock, change-password)
+				strings.HasPrefix(path, "/api/v1/auth/") {
+				// /api/v1/auth/* — public (unlock, setup, lock, change-password).
+				// Use an exact prefix (not path[:9]) so unrelated future routes
+				// like /api/v1/about are NOT accidentally made public.
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -287,38 +290,67 @@ func clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// SessionStore is an in-memory, process-local session token registry.
-// Valid for the lifetime of the process; cleared on shutdown. Token format
-// is opaque to the caller — produced by crypto/rand in generateToken.
+// sessionTTL bounds how long a session token stays valid. It is a var (not a
+// const) so tests can shrink it; sessionNow is overridable for deterministic
+// expiry tests.
+var (
+	sessionTTL = 24 * time.Hour
+	sessionNow = time.Now
+)
+
+// SessionStore is an in-memory, process-local session token registry. Tokens
+// expire after sessionTTL and are cleared on shutdown, lock, or password
+// change. Token format is opaque to the caller — produced by crypto/rand in
+// generateToken.
 type SessionStore struct {
 	mu     sync.RWMutex
-	tokens map[string]struct{}
+	tokens map[string]time.Time // token -> expiry time
 }
 
 // NewSessionStore creates a new empty SessionStore.
 func NewSessionStore() *SessionStore {
-	return &SessionStore{tokens: make(map[string]struct{})}
+	return &SessionStore{tokens: make(map[string]time.Time)}
 }
 
-// Add registers a token. Duplicate adds are idempotent.
+// Add registers a token with a fresh expiry. Duplicate adds refresh the expiry.
 func (s *SessionStore) Add(token string) {
 	s.mu.Lock()
-	s.tokens[token] = struct{}{}
+	s.tokens[token] = sessionNow().Add(sessionTTL)
 	s.mu.Unlock()
 }
 
-// Valid reports whether the token is currently registered.
+// Valid reports whether the token is registered and not expired. Expired
+// tokens are removed lazily on lookup.
 func (s *SessionStore) Valid(token string) bool {
 	s.mu.RLock()
-	_, ok := s.tokens[token]
+	exp, ok := s.tokens[token]
 	s.mu.RUnlock()
-	return ok
+	if !ok {
+		return false
+	}
+	if !sessionNow().Before(exp) { // now >= exp → expired
+		s.mu.Lock()
+		if e, ok := s.tokens[token]; ok && !sessionNow().Before(e) {
+			delete(s.tokens, token)
+		}
+		s.mu.Unlock()
+		return false
+	}
+	return true
 }
 
 // Delete removes a token. Missing-token deletes are no-ops.
 func (s *SessionStore) Delete(token string) {
 	s.mu.Lock()
 	delete(s.tokens, token)
+	s.mu.Unlock()
+}
+
+// Clear revokes every registered token. Used on lock and password change so a
+// security-sensitive action invalidates all outstanding sessions.
+func (s *SessionStore) Clear() {
+	s.mu.Lock()
+	s.tokens = make(map[string]time.Time)
 	s.mu.Unlock()
 }
 
@@ -338,6 +370,7 @@ var sessionStore = NewSessionStore()
 func sessionValid(t string) bool   { return sessionStore.Valid(t) }
 func sessionAdd(t string)          { sessionStore.Add(t) }
 func sessionDelete(t string)       { sessionStore.Delete(t) }
+func sessionClearAll()             { sessionStore.Clear() }
 
 // silence unused
 var _ = context.Background

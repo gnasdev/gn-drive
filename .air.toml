@@ -4,14 +4,21 @@
 [build]
   # Build command. We use `go build` into a tmp binary that air then runs.
   cmd = "go build -trimpath -o ./tmp/gn-drive ./cmd/gn-drive"
-  # Binary that air invokes after each build. Use entrypoint (preferred
-  # over the deprecated `bin` field). Path is relative to project root.
-  entrypoint = ["./tmp/gn-drive"]
+  # Binary that air invokes after each build, plus its arguments. The bare
+  # binary just prints help and exits, so we must pass the `run` subcommand
+  # (and --no-browser, since dev opens the URL manually). Path is relative to
+  # project root. `bin` is deprecated in favour of `entrypoint`.
+  entrypoint = ["./tmp/gn-drive", "run", "--no-browser"]
   # Delay before triggering a new build (ms). Vite --watch rebuilds happen
   # frequently; 800ms keeps the Go side from restarting mid-Vue-build.
   delay = 800
   # Stop running the previous binary cleanly on rebuild.
   stop_on_error = true
+  # Extensions that trigger a rebuild. We include js/css/html so that when
+  # Vite re-bundles internal/webui/dist/, air rebuilds the Go binary and
+  # re-embeds the latest UI (go:embed is baked at compile time, so a dist
+  # change is only visible after a recompile).
+  include_ext = ["go", "html", "js", "css", "tpl", "tmpl"]
 
 [log]
   # Show only air's own output; the binary's stdout/stderr already flows
@@ -34,14 +41,12 @@
   keep_scroll = true
 
 [exclude]
-  # Don't watch frontend or build output — Vite rebuilds the dist/ and
-  # air picks up the change via the file watcher; air only needs to
-  # restart the Go server when .go files change OR when the dist/ was
-  # re-bundled.
+  # Watch internal/webui/dist (the go:embed source) so a Vite re-bundle
+  # triggers a Go rebuild + re-embed. We still ignore node_modules, the
+  # legacy frontend/dist output, and build scratch dirs.
   regex_dirs = [
     "frontend/node_modules",
     "frontend/dist",
-    "internal/webui/dist",
     "tmp",
     "bin",
     ".git",
