@@ -2,8 +2,10 @@
 import { onMounted, computed } from 'vue'
 import { PhClockCounterClockwise, PhTrash } from '@phosphor-icons/vue'
 import { useHistoryStore } from '@/stores/history'
+import { useConfirmDialog } from '@gnas/ui-shared'
 
 const store = useHistoryStore()
+const { confirmDialog } = useConfirmDialog()
 onMounted(() => store.load())
 
 const totalBytes = computed(() => store.stats?.total_bytes ?? 0)
@@ -31,7 +33,8 @@ function stateColor(s: string): string {
 }
 
 async function doClear() {
-  if (!confirm('Clear all history? This cannot be undone.')) return
+  const ok = await confirmDialog({ title: 'Clear history', message: 'Clear all history? This cannot be undone.', confirmText: 'Clear', confirmVariant: 'danger' })
+  if (!ok) return
   await store.clear()
 }
 </script>

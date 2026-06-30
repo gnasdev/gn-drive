@@ -3,8 +3,10 @@ import { onMounted, ref } from 'vue'
 import { PhSquaresFour, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { useBoardsStore } from '@/stores/boards'
 import type { Board } from '@/api/types'
+import { useConfirmDialog } from '@gnas/ui-shared'
 
 const store = useBoardsStore()
+const { confirmDialog } = useConfirmDialog()
 const showAdd = ref(false)
 const draft = ref<Board>({ id: '', name: '', description: '', created_at: '', updated_at: '', nodes: [], edges: [] })
 
@@ -18,7 +20,8 @@ async function submitAdd() {
 }
 
 async function doDelete(id: string, name: string) {
-  if (!confirm(`Delete board "${name}"?`)) return
+  const ok = await confirmDialog({ title: 'Delete board', message: `Delete board "${name}"?`, confirmText: 'Delete', confirmVariant: 'danger' })
+  if (!ok) return
   await store.remove(id)
 }
 </script>

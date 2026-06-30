@@ -3,8 +3,10 @@ import { onMounted, ref } from 'vue'
 import { PhStack, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { useFlowsStore } from '@/stores/flows'
 import type { Flow } from '@/api/types'
+import { useConfirmDialog } from '@gnas/ui-shared'
 
 const store = useFlowsStore()
+const { confirmDialog } = useConfirmDialog()
 const showAdd = ref(false)
 const draft = ref<Flow>({ id: '', name: '', enabled: false })
 
@@ -18,7 +20,8 @@ async function submitAdd() {
 }
 
 async function doDelete(id: string, name: string) {
-  if (!confirm(`Delete flow "${name}"?`)) return
+  const ok = await confirmDialog({ title: 'Delete flow', message: `Delete flow "${name}"?`, confirmText: 'Delete', confirmVariant: 'danger' })
+  if (!ok) return
   await store.remove(id)
 }
 </script>

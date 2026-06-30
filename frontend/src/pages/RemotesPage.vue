@@ -3,9 +3,11 @@ import { onMounted, ref } from 'vue'
 import { PhCloud, PhPlus, PhTrash, PhCheckCircle, PhXCircle, PhSpinner } from '@phosphor-icons/vue'
 import { useRemotesStore } from '@/stores/remotes'
 import { useApi } from '@/composables/useApi'
+import { useConfirmDialog } from '@gnas/ui-shared'
 
 const store = useRemotesStore()
 const api = useApi()
+const { confirmDialog } = useConfirmDialog()
 
 const showAdd = ref(false)
 const newName = ref('')
@@ -33,7 +35,8 @@ async function doTest(name: string) {
 }
 
 async function doDelete(name: string) {
-  if (!confirm(`Delete remote "${name}"?`)) return
+  const ok = await confirmDialog({ title: 'Delete remote', message: `Delete remote "${name}"?`, confirmText: 'Delete', confirmVariant: 'danger' })
+  if (!ok) return
   await store.remove(name)
 }
 </script>

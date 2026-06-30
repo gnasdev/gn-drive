@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AppSidebar from '@/components/layout/Sidebar.vue'
 import AppTopbar from '@/components/layout/Topbar.vue'
+import { AppDialogProvider } from '@gnas/ui-shared'
+import ToastContainer from '@/components/ui/ToastContainer.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -26,6 +28,9 @@ const showLayout = computed(() => auth.unlocked && route.name !== 'unlock')
       <RouterView />
     </template>
   </div>
+  <!-- Global overlays from @gnas/ui-shared (confirm/alert dialogs + toasts) -->
+  <AppDialogProvider />
+  <ToastContainer />
 </template>
 
 <style scoped>

@@ -5,10 +5,13 @@ import { PhSun, PhMoon, PhLock, PhCircle } from '@phosphor-icons/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { api } from '@/api/client'
+import { useConfirmDialog, useToast } from '@gnas/ui-shared'
 
 const auth = useAuthStore()
 const theme = useThemeStore()
 const router = useRouter()
+const { confirmDialog } = useConfirmDialog()
+const toast = useToast()
 
 const online = ref(false)
 const checking = ref(true)
@@ -30,12 +33,17 @@ onMounted(() => {
 })
 
 async function onLock() {
-  if (!confirm('Lock the app? You will need your master password to unlock again.')) return
+  const ok = await confirmDialog({
+    title: 'Lock app',
+    message: 'Lock the app? You will need your master password to unlock again.',
+    confirmText: 'Lock',
+  })
+  if (!ok) return
   try {
     await auth.lock()
     router.push({ name: 'unlock' })
   } catch (e) {
-    alert((e as Error).message)
+    toast.error((e as Error).message)
   }
 }
 </script>
@@ -55,8 +63,8 @@ async function onLock() {
 
     <div class="spacer" />
 
-    <button class="icon-btn" :title="`theme: ${theme.mode}`" @click="theme.toggle">
-      <PhSun v-if="theme.mode === 'dark'" :size="18" weight="regular" />
+    <button class="icon-btn" :title="`theme: ${theme.preference}`" @click="theme.setTheme(theme.isDark ? 'light' : 'dark')">
+      <PhSun v-if="theme.isDark" :size="18" weight="regular" />
       <PhMoon v-else :size="18" weight="regular" />
     </button>
 

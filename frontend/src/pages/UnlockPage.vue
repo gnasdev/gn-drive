@@ -2,9 +2,11 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@gnas/ui-shared'
 
 const auth = useAuthStore()
 const router = useRouter()
+const toast = useToast()
 
 const password = ref('')
 const confirm = ref('')
@@ -16,10 +18,10 @@ onMounted(async () => {
 
 async function submit() {
   if (mode.value === 'setup' && password.value !== confirm.value) {
-    return alert('Passwords do not match.')
+    return toast.error('Passwords do not match.')
   }
   if (password.value.length < 4) {
-    return alert('Password must be at least 4 characters.')
+    return toast.error('Password must be at least 4 characters.')
   }
   try {
     if (mode.value === 'setup') {
