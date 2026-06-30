@@ -4,9 +4,12 @@ import { PhCalendar, PhPlus, PhTrash, PhPause, PhPlay } from '@phosphor-icons/vu
 import { useSchedulesStore } from '@/stores/schedules'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
+import { useConfirmDialog, useToast } from '@gnas/ui-shared'
 
 const store = useSchedulesStore()
 const api = useApi()
+const { confirmDialog } = useConfirmDialog()
+const toast = useToast()
 
 const showAdd = ref(false)
 const draft = ref<Schedule>({ id: '', profile_name: '', action: 'pull', cron: '0 * * * *', enabled: true })
@@ -15,7 +18,7 @@ onMounted(() => store.load())
 
 async function submitAdd() {
   if (!draft.value.profile_name || !draft.value.cron) {
-    alert('Profile and cron are required')
+    toast.error('Profile and cron are required')
     return
   }
   await store.add({ ...draft.value, id: crypto.randomUUID() })
@@ -24,7 +27,8 @@ async function submitAdd() {
 }
 
 async function doDelete(id: string) {
-  if (!confirm('Delete this schedule?')) return
+  const ok = await confirmDialog({ title: 'Delete schedule', message: 'Delete this schedule?', confirmText: 'Delete', confirmVariant: 'danger' })
+  if (!ok) return
   await store.remove(id)
 }
 </script>

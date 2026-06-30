@@ -70,10 +70,10 @@ async function selfUpdate() {
           <div class="row-help">Dark by default; light via this toggle.</div>
         </div>
         <div class="row-actions">
-          <button class="toggle" :class="{ on: theme.mode === 'dark' }" @click="theme.set('dark')">
+          <button class="toggle" :class="{ on: theme.preference === 'dark' }" @click="theme.setTheme('dark')">
             <PhMoon :size="14" weight="bold" /> Dark
           </button>
-          <button class="toggle" :class="{ on: theme.mode === 'light' }" @click="theme.set('light')">
+          <button class="toggle" :class="{ on: theme.preference === 'light' }" @click="theme.setTheme('light')">
             <PhSun :size="14" weight="bold" /> Light
           </button>
         </div>

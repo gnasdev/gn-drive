@@ -16,7 +16,9 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@gnas/ui-shared": ["../../gn-ui-shared/src/index.ts"],
+      "@gnas/ui-shared/*": ["../../gn-ui-shared/src/*"]
     },
     "types": ["vite/client"]
   },

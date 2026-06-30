@@ -4,9 +4,12 @@ import { PhKey, PhPlus, PhTrash, PhArrowRight } from '@phosphor-icons/vue'
 import { useProfilesStore } from '@/stores/profiles'
 import { useApi } from '@/composables/useApi'
 import type { Profile } from '@/api/types'
+import { useConfirmDialog, useToast } from '@gnas/ui-shared'
 
 const store = useProfilesStore()
 const api = useApi()
+const { confirmDialog } = useConfirmDialog()
+const toast = useToast()
 
 const showAdd = ref(false)
 const draft = ref<Profile>({
@@ -22,7 +25,7 @@ onMounted(() => store.load())
 
 async function submitAdd() {
   if (!draft.value.name || !draft.value.from || !draft.value.to) {
-    alert('Name, From, To are required')
+    toast.error('Name, From, To are required')
     return
   }
   await store.add({ ...draft.value })
@@ -31,7 +34,8 @@ async function submitAdd() {
 }
 
 async function doDelete(name: string) {
-  if (!confirm(`Delete profile "${name}"?`)) return
+  const ok = await confirmDialog({ title: 'Delete profile', message: `Delete profile "${name}"?`, confirmText: 'Delete', confirmVariant: 'danger' })
+  if (!ok) return
   await store.remove(name)
 }
 </script>

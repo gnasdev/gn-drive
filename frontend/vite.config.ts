@@ -7,8 +7,15 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
   resolve: {
+    // dedupe is critical: @gnas/ui-shared is imported from source, so without
+    // deduping these singletons Vite could bundle two copies of Vue/Pinia and
+    // break provide/inject + the active Pinia instance.
+    dedupe: ['vue', 'vue-router', 'pinia'],
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Resolve the shared UI library to its source (same pattern as the other
+      // GNAS frontends) so Vite/Tailwind compile its .vue/.ts directly.
+      '@gnas/ui-shared': fileURLToPath(new URL('../../gn-ui-shared/src', import.meta.url)),
     },
   },
   server: {
