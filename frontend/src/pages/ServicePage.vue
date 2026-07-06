@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { PhCircleNotch, PhCheckCircle, PhXCircle, PhPlay, PhStop, PhArrowsClockwise, PhTrash, PhDownloadSimple, PhTerminal } from '@phosphor-icons/vue'
 import { useServiceStore } from '@/stores/service'
+import AppDialog from '@gnas/ui-shared/components/AppDialog.vue'
 
 const store = useServiceStore()
 const showInstallConfirm = ref(false)
@@ -137,32 +138,26 @@ function logCommand(): string {
     </section>
 
     <!-- Install confirm dialog -->
-    <div v-if="showInstallConfirm" class="modal-bg" @click.self="showInstallConfirm = false">
-      <div class="modal">
-        <h3>Install gn-drive as a background service?</h3>
-        <p>This will register gn-drive with your init system (systemd / launchd / SCM).</p>
-        <ul class="checklist">
-          <li>Main process will run in the background and auto-start on login.</li>
-          <li>Web UI stays live at loopback — you can open it any time.</li>
-          <li>You can stop and uninstall at any time.</li>
-        </ul>
-        <div class="modal-actions">
-          <button class="ghost" @click="showInstallConfirm = false">Cancel</button>
-          <button class="primary" @click="store.install(); showInstallConfirm = false">Install</button>
-        </div>
+    <AppDialog v-model="showInstallConfirm" title="Install gn-drive as a background service?" size="sm">
+      <p>This will register gn-drive with your init system (systemd / launchd / SCM).</p>
+      <ul class="checklist">
+        <li>Main process will run in the background and auto-start on login.</li>
+        <li>Web UI stays live at loopback — you can open it any time.</li>
+        <li>You can stop and uninstall at any time.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="ghost" @click="showInstallConfirm = false">Cancel</button>
+        <button class="primary" @click="store.install(); showInstallConfirm = false">Install</button>
       </div>
-    </div>
+    </AppDialog>
 
-    <div v-if="showUninstallConfirm" class="modal-bg" @click.self="showUninstallConfirm = false">
-      <div class="modal">
-        <h3>Uninstall service?</h3>
-        <p>This will stop the service and remove the unit file / plist / SCM entry.</p>
-        <div class="modal-actions">
-          <button class="ghost" @click="showUninstallConfirm = false">Cancel</button>
-          <button class="danger" @click="store.uninstall(); showUninstallConfirm = false">Uninstall</button>
-        </div>
+    <AppDialog v-model="showUninstallConfirm" title="Uninstall service?" size="sm">
+      <p>This will stop the service and remove the unit file / plist / SCM entry.</p>
+      <div class="modal-actions">
+        <button class="ghost" @click="showUninstallConfirm = false">Cancel</button>
+        <button class="danger" @click="store.uninstall(); showUninstallConfirm = false">Uninstall</button>
       </div>
-    </div>
+    </AppDialog>
   </div>
 </template>
 

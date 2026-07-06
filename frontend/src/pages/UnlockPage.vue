@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@gnas/ui-shared'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -79,7 +80,7 @@ async function submit() {
           />
         </label>
 
-        <div v-if="auth.error" class="error">{{ auth.error }}</div>
+        <AppAlert v-if="auth.error" type="error">{{ auth.error }}</AppAlert>
 
         <button type="submit" class="primary" :disabled="auth.busy || !password">
           {{ auth.busy ? '…' : (mode === 'setup' ? 'Set up & unlock' : 'Unlock') }}

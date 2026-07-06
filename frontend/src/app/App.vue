@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppSidebar from '@/components/layout/Sidebar.vue'
 import AppTopbar from '@/components/layout/Topbar.vue'
 import { AppDialogProvider } from '@gnas/ui-shared'
-import ToastContainer from '@/components/ui/ToastContainer.vue'
+import ToastContainer from '@gnas/ui-shared/components/ToastContainer.vue'
 
 const auth = useAuthStore()
 const route = useRoute()

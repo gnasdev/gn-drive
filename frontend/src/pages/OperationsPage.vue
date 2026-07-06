@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { PhSwap, PhPlay, PhFolder, PhFile, PhArrowLeft } from '@phosphor-icons/vue'
 import { useOperationsStore } from '@/stores/operations'
 import { useApi } from '@/composables/useApi'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const store = useOperationsStore()
 const api = useApi()
@@ -48,12 +50,12 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
         <button class="ghost" @click="doStartSync('bi')"><PhPlay :size="14" weight="bold" /> bi</button>
         <button class="ghost" @click="doStartSync('bi-resync')"><PhPlay :size="14" weight="bold" /> bi-resync</button>
       </div>
-      <div v-if="lastTaskId" class="banner ok">Started task <code>{{ lastTaskId }}</code></div>
+      <AppAlert v-if="lastTaskId" type="success">Started task <code>{{ lastTaskId }}</code></AppAlert>
     </section>
 
     <section class="card">
       <h3>Active tasks</h3>
-      <div v-if="store.tasks.length === 0" class="empty">No active tasks.</div>
+      <div v-if="store.tasks.length === 0"><EmptyState title="No active tasks" /></div>
       <div v-else class="task-list">
         <div v-for="t in store.tasks" :key="t.id" class="task">
           <div class="task-name">{{ t.name }} <span class="badge">{{ t.action }}</span></div>
@@ -71,7 +73,7 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
         <input v-model="remoteInput" placeholder="remote:/path" @keydown.enter="doBrowse" />
         <button class="primary" @click="doBrowse" :disabled="store.busy">{{ store.busy ? 'Loading…' : 'Browse' }}</button>
       </div>
-      <div v-if="store.error" class="banner err">{{ store.error }}</div>
+      <AppAlert v-if="store.error" type="error">{{ store.error }}</AppAlert>
       <p class="row-help">
         Note: file browser requires the backend's <code>/api/v1/operations/fs</code> endpoint
         to be implemented. Currently returns 501 in Phase 3.

@@ -4,6 +4,8 @@ import { PhSquaresFour, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { useBoardsStore } from '@/stores/boards'
 import type { Board } from '@/api/types'
 import { useConfirmDialog } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
 
 const store = useBoardsStore()
 const { confirmDialog } = useConfirmDialog()
@@ -65,8 +67,8 @@ async function doDelete(id: string, name: string) {
         </div>
       </div>
     </div>
-    <div v-else-if="!store.loading" class="empty">No boards configured.</div>
-    <div v-else class="loading">Loading…</div>
+    <div v-else-if="!store.loading"><EmptyState title="No boards configured" /></div>
+    <div v-else><AppSectionLoading label="Loading boards..." /></div>
   </div>
 </template>
 

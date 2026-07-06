@@ -3,6 +3,7 @@ import { onMounted, computed } from 'vue'
 import { PhClockCounterClockwise, PhTrash } from '@phosphor-icons/vue'
 import { useHistoryStore } from '@/stores/history'
 import { useConfirmDialog } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 
 const store = useHistoryStore()
 const { confirmDialog } = useConfirmDialog()
@@ -101,8 +102,11 @@ async function doClear() {
           </tr>
           <tr v-if="store.entries.length === 0 && !store.loading">
             <td colspan="8" class="empty">
-              <PhClockCounterClockwise :size="32" weight="light" />
-              <p>No sync history yet.</p>
+              <EmptyState title="No history yet">
+                <template #icon>
+                  <PhClockCounterClockwise :size="32" weight="light" />
+                </template>
+              </EmptyState>
             </td>
           </tr>
         </tbody>

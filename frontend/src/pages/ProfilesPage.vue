@@ -5,6 +5,9 @@ import { useProfilesStore } from '@/stores/profiles'
 import { useApi } from '@/composables/useApi'
 import type { Profile } from '@/api/types'
 import { useConfirmDialog, useToast } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const store = useProfilesStore()
 const api = useApi()
@@ -81,7 +84,7 @@ async function doDelete(name: string) {
       </form>
     </div>
 
-    <div v-if="api.error.value" class="error">{{ api.error.value }}</div>
+    <AppAlert v-if="api.error.value" type="error">{{ api.error.value }}</AppAlert>
 
     <div class="table-wrap" v-if="store.items.length > 0 || !store.loading">
       <table>
@@ -109,12 +112,12 @@ async function doDelete(name: string) {
             </td>
           </tr>
           <tr v-if="store.items.length === 0 && !store.loading">
-            <td colspan="8" class="empty">No profiles configured.</td>
+            <td colspan="8" class="empty"><EmptyState title="No profiles configured" /></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-else class="loading">Loading…</div>
+    <div v-else><AppSectionLoading label="Loading profiles..." /></div>
   </div>
 </template>
 

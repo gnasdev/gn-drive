@@ -8,6 +8,7 @@ import {
   PhCircleNotch,
   PhStack,
 } from '@phosphor-icons/vue'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 
 interface Profile { name: string; direction: string }
 interface Remote { name: string; type: string }
@@ -106,8 +107,8 @@ const activeTasks = computed(() => tasks.value.filter((t) => t.status === 'runni
 
     <section class="section">
       <h2>Recent activity</h2>
-      <div v-if="stats?.total_syncs === 0" class="empty">
-        No syncs yet. Create a profile and a remote, then trigger your first sync.
+      <div v-if="stats?.total_syncs === 0">
+        <EmptyState title="No syncs yet" description="Create a profile and a remote, then trigger your first sync." />
       </div>
       <div v-else class="muted">Run history is shown on the History page.</div>
     </section>

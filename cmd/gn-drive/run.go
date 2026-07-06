@@ -22,11 +22,11 @@ import (
 
 func newRunCmd() *cobra.Command {
 	var (
-		port         int
-		noBrowser    bool
-		devMode      bool
-		serviceMode  bool
-		password     string
+		port        int
+		noBrowser   bool
+		devMode     bool
+		serviceMode bool
+		password    string
 	)
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -133,10 +133,16 @@ func runWithDeps(ctx context.Context, opts runOpts, deps runDeps) error {
 	defer locker.Release()
 
 	// 3. Init app
-	a, err := deps.newApp(ctx, app.Options{
+	appOpts := app.Options{
 		LogMode:        logMode,
 		UnlockPassword: opts.password,
-	})
+	}
+	if opts.devMode {
+		if devPwd := os.Getenv("GN_DRIVE_DEV_PASSWORD"); devPwd != "" {
+			appOpts.DevUnlockPassword = devPwd
+		}
+	}
+	a, err := deps.newApp(ctx, appOpts)
 	if err != nil {
 		_ = ln.Close()
 		return fmt.Errorf("app init: %w", err)

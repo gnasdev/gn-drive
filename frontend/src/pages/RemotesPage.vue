@@ -4,6 +4,9 @@ import { PhCloud, PhPlus, PhTrash, PhCheckCircle, PhXCircle, PhSpinner } from '@
 import { useRemotesStore } from '@/stores/remotes'
 import { useApi } from '@/composables/useApi'
 import { useConfirmDialog } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const store = useRemotesStore()
 const api = useApi()
@@ -78,7 +81,7 @@ async function doDelete(name: string) {
       </p>
     </div>
 
-    <div v-if="api.error.value" class="error">{{ api.error.value }}</div>
+    <AppAlert v-if="api.error.value" type="error">{{ api.error.value }}</AppAlert>
 
     <div class="table-wrap" v-if="store.items.length > 0 || !store.loading">
       <table>
@@ -116,13 +119,13 @@ async function doDelete(name: string) {
           </tr>
           <tr v-if="store.items.length === 0 && !store.loading">
             <td colspan="3" class="empty">
-              No remotes configured. Use "Add remote" to create one.
+              <EmptyState title="No remotes configured" description="Use &quot;Add remote&quot; to create one." />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-else class="loading">Loading…</div>
+    <div v-else><AppSectionLoading /></div>
   </div>
 </template>
 

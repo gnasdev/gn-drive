@@ -5,6 +5,9 @@ import { useSchedulesStore } from '@/stores/schedules'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
 import { useConfirmDialog, useToast } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const store = useSchedulesStore()
 const api = useApi()
@@ -71,7 +74,7 @@ async function doDelete(id: string) {
       </form>
     </div>
 
-    <div v-if="api.error.value" class="error">{{ api.error.value }}</div>
+    <AppAlert v-if="api.error.value" type="error">{{ api.error.value }}</AppAlert>
 
     <div class="table-wrap" v-if="store.items.length > 0 || !store.loading">
       <table>
@@ -102,12 +105,12 @@ async function doDelete(id: string) {
             </td>
           </tr>
           <tr v-if="store.items.length === 0 && !store.loading">
-            <td colspan="7" class="empty">No schedules configured.</td>
+            <td colspan="7" class="empty"><EmptyState title="No schedules configured" /></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-else class="loading">Loading…</div>
+    <div v-else><AppSectionLoading /></div>
   </div>
 </template>
 

@@ -4,6 +4,9 @@ import { PhStack, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { useFlowsStore } from '@/stores/flows'
 import type { Flow } from '@/api/types'
 import { useConfirmDialog } from '@gnas/ui-shared'
+import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
+import AppCheckbox from '@gnas/ui-shared/components/AppCheckbox.vue'
 
 const store = useFlowsStore()
 const { confirmDialog } = useConfirmDialog()
@@ -44,7 +47,7 @@ async function doDelete(id: string, name: string) {
         <label class="span-2"><span>Name</span><input v-model="draft.name" required /></label>
         <label><span>Cron (optional)</span><input v-model="draft.schedule_cron" placeholder="0 * * * *" /></label>
         <label class="checkbox">
-          <input v-model="draft.enabled" type="checkbox" /> Enabled
+          <AppCheckbox v-model="draft.enabled" label="Enabled" />
         </label>
         <div class="form-actions">
           <button type="button" class="ghost" @click="showAdd = false">Cancel</button>
@@ -71,8 +74,8 @@ async function doDelete(id: string, name: string) {
         </div>
       </div>
     </div>
-    <div v-else-if="!store.loading" class="empty">No flows configured.</div>
-    <div v-else class="loading">Loading…</div>
+    <div v-else-if="!store.loading"><EmptyState title="No flows configured" /></div>
+    <div v-else><AppSectionLoading label="Loading flows..." /></div>
   </div>
 </template>
 

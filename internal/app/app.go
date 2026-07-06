@@ -33,17 +33,18 @@ type App struct {
 	SyncEngine *syncengine.Engine
 	Browser    *browser.Opener
 	API        *api.Server
-	Listener   net.Listener // set by Run()
+	Listener   net.Listener    // set by Run()
 	Health     *service.Writer // non-nil when running in service mode
 }
 
 // Options configures App construction.
 type Options struct {
-	ConfigDir       string
-	LogMode        logging.Mode
-	RcloneBinary   string
-	UnlockStdin    bool
-	UnlockPassword string
+	ConfigDir         string
+	LogMode           logging.Mode
+	RcloneBinary      string
+	UnlockStdin       bool
+	UnlockPassword    string
+	DevUnlockPassword string
 }
 
 // New constructs a new App and initializes all services.
@@ -78,6 +79,19 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	case opts.UnlockStdin:
 		if err := authSvc.UnlockFromStdin(); err != nil {
 			return nil, fmt.Errorf("unlock from stdin: %w", err)
+		}
+	case opts.DevUnlockPassword != "":
+		// Development-only auto unlock: set up the master password if the app
+		// has never been configured, then unlock. This is gated by the caller
+		// (run --dev + GN_DRIVE_DEV_PASSWORD) and should never be used outside
+		// of local development.
+		if !authSvc.IsSetup() {
+			if err := authSvc.SetupPassword(opts.DevUnlockPassword); err != nil {
+				return nil, fmt.Errorf("dev unlock setup: %w", err)
+			}
+		}
+		if err := authSvc.Unlock(opts.DevUnlockPassword); err != nil {
+			return nil, fmt.Errorf("dev unlock: %w", err)
 		}
 	case opts.UnlockPassword != "":
 		if err := authSvc.Unlock(opts.UnlockPassword); err != nil {

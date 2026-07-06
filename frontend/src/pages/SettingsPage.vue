@@ -4,6 +4,7 @@ import { PhGearSix, PhSun, PhMoon, PhKey, PhLock, PhDownloadSimple } from '@phos
 import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { useApi } from '@/composables/useApi'
+import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const theme = useThemeStore()
 const auth = useAuthStore()
@@ -60,7 +61,7 @@ async function selfUpdate() {
       <p class="sub">App preferences, master password, and self-update.</p>
     </header>
 
-    <div v-if="msg" class="banner" :class="msg.kind">{{ msg.text }}</div>
+    <AppAlert v-if="msg" :type="msg.kind === 'ok' ? 'success' : 'error'">{{ msg.text }}</AppAlert>
 
     <section class="card">
       <h2><PhSun :size="14" weight="bold" /> Appearance</h2>
