@@ -8,7 +8,11 @@
   # binary just prints help and exits, so we must pass the `run` subcommand
   # (and --no-browser, since dev opens the URL manually). Path is relative to
   # project root. `bin` is deprecated in favour of `entrypoint`.
-  entrypoint = ["./tmp/gn-drive", "run", "--no-browser"]
+  #
+  # Fixed --port so air restarts keep the same loopback URL. Auto-port (0)
+  # would rebind a new port on every Vue/Go reload and break the browser tab.
+  # Keep in sync with frontend/vite.config.ts proxy default (53241).
+  entrypoint = ["./tmp/gn-drive", "run", "--no-browser", "--dev", "--port", "53241"]
   # Delay before triggering a new build (ms). Vite --watch rebuilds happen
   # frequently; 800ms keeps the Go side from restarting mid-Vue-build.
   delay = 800

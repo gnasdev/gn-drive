@@ -28,6 +28,14 @@ export async function newPage(): Promise<Page> {
   const page = await ctx.newPage()
   page.setDefaultTimeout(20_000)
   page.setDefaultNavigationTimeout(30_000)
+  // Pin UI language so heading/confirm labels stay English for assertions.
+  await page.evaluateOnNewDocument(() => {
+    try {
+      localStorage.setItem('gn-drive:locale', 'en')
+    } catch {
+      // ignore
+    }
+  })
   ;(page as any).__e2eContext = ctx
   return page
 }

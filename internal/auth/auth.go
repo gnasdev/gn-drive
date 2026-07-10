@@ -436,15 +436,6 @@ func (s *Service) RemovePassword(password string) error {
 	return nil
 }
 
-// UnlockFromStdin reads password from GN_DRIVE_PASSWORD env var (service mode).
-func (s *Service) UnlockFromStdin() error {
-	pwd := os.Getenv("GN_DRIVE_PASSWORD")
-	if pwd == "" {
-		return errors.New("auth: GN_DRIVE_PASSWORD env var not set (required for service mode)")
-	}
-	return s.Unlock(pwd)
-}
-
 // --- Internal helpers -----------------------------------------------------
 
 func (s *Service) loadAuthData() (*AuthData, error) {

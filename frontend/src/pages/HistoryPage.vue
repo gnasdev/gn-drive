@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { PhClockCounterClockwise, PhTrash } from '@phosphor-icons/vue'
 import { useHistoryStore } from '@/stores/history'
-import { useConfirmDialog } from '@gnas/ui-shared'
-import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { cn } from '@/lib/cn'
 
+const { t } = useI18n()
 const store = useHistoryStore()
 const { confirmDialog } = useConfirmDialog()
-// History is capped at 1000 rows server-side; fetch the full cap and let the
-// virtualizer below render only the rows in view instead of paginating.
 onMounted(() => store.load(1000))
 
 const columnsTemplate = '1.2fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 0.8fr 1.2fr'
@@ -42,144 +43,134 @@ function formatDuration(s: number): string {
 }
 
 function stateColor(s: string): string {
-  if (s === 'completed') return 'ok'
-  if (s === 'failed') return 'fail'
-  if (s === 'cancelled') return 'warn'
+  if (s === 'completed') return 'text-success'
+  if (s === 'failed') return 'text-danger'
+  if (s === 'cancelled') return 'text-warning'
   return ''
 }
 
 async function doClear() {
-  const ok = await confirmDialog({ title: 'Clear history', message: 'Clear all history? This cannot be undone.', confirmText: 'Clear', confirmVariant: 'danger' })
+  const ok = await confirmDialog({
+    title: t('history.clearTitle'),
+    message: t('history.clearMessage'),
+    confirmText: t('common.clear'),
+    confirmVariant: 'danger',
+  })
   if (!ok) return
   await store.clear()
 }
 </script>
 
 <template>
-  <div class="history-page" data-testid="page-history">
-    <header class="page-header">
+  <div class="page-shell-wide" data-testid="page-history">
+    <header class="mb-5 flex items-end justify-between gap-4">
       <div>
-        <h1>History</h1>
-        <p class="sub">Past sync runs (capped at 1000 rows).</p>
+        <h1 class="page-title">{{ t('history.title') }}</h1>
+        <p class="page-sub">{{ t('history.sub') }}</p>
       </div>
-      <button class="danger" data-testid="history-clear" @click="doClear"><PhTrash :size="14" weight="regular" /> Clear all</button>
+      <button class="danger" data-testid="history-clear" @click="doClear">
+        <PhTrash :size="14" weight="regular" /> {{ t('history.clearAll') }}
+      </button>
     </header>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="label">Total syncs</div>
-        <div class="value">{{ store.stats?.total_syncs ?? 0 }}</div>
+    <div class="mb-5 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
+      <div class="card px-3.5 py-3">
+        <div class="mb-1.5 text-[11px] uppercase tracking-wide text-text-dim">{{ t('history.totalSyncs') }}</div>
+        <div class="font-mono text-xl font-bold tabular-nums leading-none">{{ store.stats?.total_syncs ?? 0 }}</div>
       </div>
-      <div class="stat-card">
-        <div class="label">Total bytes</div>
-        <div class="value">{{ formatBytes(totalBytes) }}</div>
+      <div class="card px-3.5 py-3">
+        <div class="mb-1.5 text-[11px] uppercase tracking-wide text-text-dim">{{ t('history.totalBytes') }}</div>
+        <div class="font-mono text-xl font-bold tabular-nums leading-none">{{ formatBytes(totalBytes) }}</div>
       </div>
-      <div class="stat-card">
-        <div class="label">Total errors</div>
-        <div class="value" :class="{ danger: (store.stats?.total_errors ?? 0) > 0 }">
+      <div class="card px-3.5 py-3">
+        <div class="mb-1.5 text-[11px] uppercase tracking-wide text-text-dim">{{ t('history.totalErrors') }}</div>
+        <div
+          :class="cn(
+            'font-mono text-xl font-bold tabular-nums leading-none',
+            (store.stats?.total_errors ?? 0) > 0 && 'text-danger',
+          )"
+        >
           {{ store.stats?.total_errors ?? 0 }}
         </div>
       </div>
-      <div class="stat-card">
-        <div class="label">Total duration</div>
-        <div class="value">{{ formatDuration(totalDuration) }}</div>
+      <div class="card px-3.5 py-3">
+        <div class="mb-1.5 text-[11px] uppercase tracking-wide text-text-dim">{{ t('history.totalDuration') }}</div>
+        <div class="font-mono text-xl font-bold tabular-nums leading-none">{{ formatDuration(totalDuration) }}</div>
       </div>
     </div>
 
-    <div v-if="store.stats?.by_profile && Object.keys(store.stats.by_profile).length > 0" class="by-profile">
-      <h3>By profile</h3>
-      <div class="by-grid">
-        <div v-for="(s, name) in store.stats.by_profile" :key="name" class="by-card">
-          <div class="by-name mono">{{ name }}</div>
-          <div class="by-row"><span>Syncs</span><span class="mono">{{ s.syncs }}</span></div>
-          <div class="by-row"><span>Bytes</span><span class="mono">{{ formatBytes(s.bytes) }}</span></div>
-          <div class="by-row"><span>Errors</span><span class="mono">{{ s.errors }}</span></div>
-          <div class="by-row"><span>Duration</span><span class="mono">{{ formatDuration(s.duration_secs) }}</span></div>
+    <div v-if="store.stats?.by_profile && Object.keys(store.stats.by_profile).length > 0" class="mb-5">
+      <h3 class="section-label">{{ t('history.byProfile') }}</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2">
+        <div v-for="(s, name) in store.stats.by_profile" :key="name" class="card px-3 py-2.5">
+          <div class="mb-1.5 font-mono text-[13px] font-semibold">{{ name }}</div>
+          <div class="flex justify-between py-0.5 text-[11px] text-text-muted">
+            <span>{{ t('history.syncs') }}</span><span class="font-mono text-text">{{ s.syncs }}</span>
+          </div>
+          <div class="flex justify-between py-0.5 text-[11px] text-text-muted">
+            <span>{{ t('history.bytes') }}</span><span class="font-mono text-text">{{ formatBytes(s.bytes) }}</span>
+          </div>
+          <div class="flex justify-between py-0.5 text-[11px] text-text-muted">
+            <span>{{ t('history.errors') }}</span><span class="font-mono text-text">{{ s.errors }}</span>
+          </div>
+          <div class="flex justify-between py-0.5 text-[11px] text-text-muted">
+            <span>{{ t('history.duration') }}</span><span class="font-mono text-text">{{ formatDuration(s.duration_secs) }}</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="table-wrap">
-      <div class="row head-row" :style="{ gridTemplateColumns: columnsTemplate }">
-        <div>Profile</div><div>Action</div><div>State</div><div>Bytes</div>
-        <div>Files</div><div>Errors</div><div>Duration</div><div>Started</div>
+      <div
+        class="grid h-[33px] items-center gap-2 border-b border-border bg-surface-hover/50 px-3.5 text-[10px] font-semibold uppercase tracking-wide text-text-dim"
+        :style="{ gridTemplateColumns: columnsTemplate }"
+      >
+        <div>{{ t('history.colProfile') }}</div>
+        <div>{{ t('history.colAction') }}</div>
+        <div>{{ t('history.colState') }}</div>
+        <div>{{ t('history.colBytes') }}</div>
+        <div>{{ t('history.colFiles') }}</div>
+        <div>{{ t('history.colErrors') }}</div>
+        <div>{{ t('history.colDuration') }}</div>
+        <div>{{ t('history.colStarted') }}</div>
       </div>
 
-      <EmptyState v-if="store.entries.length === 0 && !store.loading" title="No history yet" class="empty">
+      <EmptyState v-if="store.entries.length === 0 && !store.loading" :title="t('history.empty')">
         <template #icon>
           <PhClockCounterClockwise :size="32" weight="light" />
         </template>
       </EmptyState>
 
-      <!--
-        Virtualized: History caps at 1000 rows, so only the ~20 rows in the
-        viewport (+ overscan) are ever mounted, regardless of total count.
-      -->
-      <div v-else ref="scrollParentEl" class="tbody-scroll">
-        <div class="virtual-spacer" :style="{ height: `${totalSize}px` }">
+      <div v-else ref="scrollParentEl" class="max-h-[60vh] overflow-y-auto">
+        <div class="relative w-full" :style="{ height: `${totalSize}px` }">
           <div
             v-for="vRow in virtualRows"
             :key="vRow.index"
-            class="row body-row"
+            class="absolute top-0 left-0 grid h-[33px] w-full items-center gap-2 border-t border-border px-3.5 text-xs"
             :style="{ gridTemplateColumns: columnsTemplate, transform: `translateY(${vRow.start}px)` }"
           >
-            <div class="mono small">{{ store.entries[vRow.index].profile_name }}</div>
-            <div><span class="badge">{{ store.entries[vRow.index].action }}</span></div>
-            <div><span class="badge" :class="stateColor(store.entries[vRow.index].state)">{{ store.entries[vRow.index].state }}</span></div>
-            <div class="num">{{ formatBytes(store.entries[vRow.index].bytes) }}</div>
-            <div class="num">{{ store.entries[vRow.index].files }}</div>
-            <div class="num" :class="{ danger: store.entries[vRow.index].errors > 0 }">{{ store.entries[vRow.index].errors }}</div>
-            <div class="num">{{ formatDuration(store.entries[vRow.index].duration_secs) }}</div>
-            <div class="muted small">{{ store.entries[vRow.index].started_at }}</div>
+            <div class="font-mono text-[11px]">{{ store.entries[vRow.index].profile_name }}</div>
+            <div><span class="badge !text-[10px]">{{ store.entries[vRow.index].action }}</span></div>
+            <div>
+              <span :class="cn('badge !text-[10px]', stateColor(store.entries[vRow.index].state))">
+                {{ store.entries[vRow.index].state }}
+              </span>
+            </div>
+            <div class="text-right font-mono">{{ formatBytes(store.entries[vRow.index].bytes) }}</div>
+            <div class="text-right font-mono">{{ store.entries[vRow.index].files }}</div>
+            <div
+              :class="cn(
+                'text-right font-mono',
+                store.entries[vRow.index].errors > 0 && 'text-danger',
+              )"
+            >
+              {{ store.entries[vRow.index].errors }}
+            </div>
+            <div class="text-right font-mono">{{ formatDuration(store.entries[vRow.index].duration_secs) }}</div>
+            <div class="text-[11px] text-text-muted">{{ store.entries[vRow.index].started_at }}</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.history-page { max-width: 1200px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; gap: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
-.page-header .sub { color: var(--color-text-muted); font-size: 13px; margin: 0; }
-.danger { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text-muted); font-size: 12px; }
-.danger:hover { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 20px; }
-.stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 14px; }
-.stat-card .label { font-size: 11px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-.stat-card .value { font-size: 20px; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1; }
-.value.danger { color: var(--color-danger); }
-
-.by-profile { margin-bottom: 20px; }
-.by-profile h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); letter-spacing: 0.5px; margin: 0 0 8px; }
-.by-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
-.by-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 10px 12px; }
-.by-name { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.by-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; color: var(--color-text-muted); }
-.by-row .mono { color: var(--color-text); }
-
-.table-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
-
-/* Grid-based rows (not a native <table>) so the virtualizer can absolutely
-   position only the rows in view; head and body share one column template
-   to stay aligned. */
-.row { display: grid; align-items: center; gap: 8px; padding: 0 14px; }
-.head-row { height: 33px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-text-dim); background: color-mix(in srgb, var(--color-surface-hover) 50%, transparent); border-bottom: 1px solid var(--color-border); }
-.tbody-scroll { max-height: 60vh; overflow-y: auto; }
-.virtual-spacer { position: relative; width: 100%; }
-.body-row { position: absolute; top: 0; left: 0; width: 100%; height: 33px; font-size: 12px; border-top: 1px solid var(--color-border); }
-.body-row:first-child { border-top: 0; }
-.mono { font-family: var(--font-mono); }
-.muted { color: var(--color-text-muted); }
-.small { font-size: 11px; }
-.badge { display: inline-block; padding: 1px 6px; background: var(--color-surface-hover); border-radius: 4px; font-size: 10px; font-family: var(--font-mono); color: var(--color-text-muted); }
-.badge.ok { color: var(--color-success); }
-.badge.fail { color: var(--color-danger); }
-.badge.warn { color: var(--color-warning); }
-.num { font-family: var(--font-mono); text-align: right; }
-.num.danger { color: var(--color-danger); }
-.empty { text-align: center; color: var(--color-text-dim); padding: 40px; }
-.empty p { margin-top: 8px; font-size: 13px; }
-</style>

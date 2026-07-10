@@ -1,9 +1,22 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { PhCircleNotch, PhCheckCircle, PhXCircle, PhPlay, PhStop, PhArrowsClockwise, PhTrash, PhDownloadSimple, PhTerminal } from '@phosphor-icons/vue'
+import { useI18n } from 'vue-i18n'
+import {
+  PhCircleNotch,
+  PhCheckCircle,
+  PhXCircle,
+  PhPlay,
+  PhStop,
+  PhArrowsClockwise,
+  PhTrash,
+  PhDownloadSimple,
+  PhTerminal,
+} from '@phosphor-icons/vue'
 import { useServiceStore } from '@/stores/service'
-import AppDialog from '@gnas/ui-shared/components/AppDialog.vue'
+import AppDialog from '@/components/ui/Dialog.vue'
+import { cn } from '@/lib/cn'
 
+const { t } = useI18n()
 const store = useServiceStore()
 const showInstallConfirm = ref(false)
 const showUninstallConfirm = ref(false)
@@ -11,7 +24,7 @@ const showUninstallConfirm = ref(false)
 onMounted(() => store.load())
 
 function formatUptime(secs: number): string {
-  if (secs <= 0) return '—'
+  if (secs <= 0) return t('common.empty')
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   if (h > 0) return `${h}h ${m}m`
@@ -23,191 +36,178 @@ function logCommand(): string {
   switch (store.status?.platform) {
     case 'systemd': return 'journalctl --user -u gn-drive -f'
     case 'launchd': return 'log show --predicate \'process == "gn-drive"\' --follow'
-    case 'scm':      return 'eventvwr.msc (Application log)'
-    default:         return ''
+    case 'scm': return 'eventvwr.msc (Application log)'
+    default: return ''
   }
+}
+
+function statusLabel(): string {
+  if (!store.status) return t('service.notInstalled')
+  if (store.status.running) return t('service.running')
+  if (store.status.installed) return t('service.stopped')
+  return t('service.notInstalled')
 }
 </script>
 
 <template>
-  <div class="service-page" data-testid="page-service">
-    <header class="page-header">
+  <div class="mx-auto max-w-[900px]" data-testid="page-service">
+    <header class="mb-5 flex items-end justify-between gap-4">
       <div>
-        <h1>Service</h1>
-        <p class="sub">Opt-in background service. The foreground mode is the default.</p>
+        <h1 class="page-title">{{ t('service.title') }}</h1>
+        <p class="page-sub">{{ t('service.sub') }}</p>
       </div>
-      <div v-if="store.status?.installed" class="status-pill" :class="{ on: store.status.running }">
+      <div
+        v-if="store.status?.installed"
+        :class="cn(
+          'inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-muted',
+          store.status.running && 'border-success/30 text-success',
+        )"
+      >
         <PhCheckCircle v-if="store.status.running" :size="14" weight="fill" />
         <PhXCircle v-else-if="store.status.installed" :size="14" weight="fill" />
-        <PhCircleNotch v-else :size="14" weight="fill" class="spin" />
-        <span>{{ store.status.running ? 'running' : (store.status.installed ? 'stopped' : 'not installed') }}</span>
+        <PhCircleNotch v-else :size="14" weight="fill" class="animate-spin" />
+        <span>{{ statusLabel() }}</span>
       </div>
     </header>
 
-    <!-- State 1: Not installed -->
-    <section v-if="!store.status?.installed" class="card hero">
-      <div class="hero-icon"><PhDownloadSimple :size="32" weight="light" /></div>
-      <h2>Install as background service</h2>
-      <p>
-        The service runs in the background and auto-starts on login. The web UI stays live at
-        <code>127.0.0.1</code> — you can open it any time.
+    <section v-if="!store.status?.installed" class="card mb-3.5 px-7 py-8 text-center">
+      <div class="mb-2 flex justify-center text-accent">
+        <PhDownloadSimple :size="32" weight="light" />
+      </div>
+      <h2 class="mb-2 text-base font-semibold">{{ t('service.installTitle') }}</h2>
+      <p class="mb-3 text-[13px] leading-relaxed text-text-muted">
+        <i18n-t keypath="service.installBody" tag="span">
+          <template #host>
+            <code class="rounded bg-surface-hover px-1 font-mono text-xs">127.0.0.1</code>
+          </template>
+        </i18n-t>
       </p>
-      <ul class="checklist">
-        <li>Main process will run in background (managed by systemd / launchd / SCM).</li>
-        <li>Web UI stays accessible at loopback port.</li>
-        <li>You can stop and uninstall at any time.</li>
+      <ul class="mx-auto mb-4 max-w-[420px] list-none p-0 text-left">
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.check1') }}
+        </li>
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.check2') }}
+        </li>
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.check3') }}
+        </li>
       </ul>
-      <button class="primary" @click="showInstallConfirm = true" :disabled="store.busy">
-        {{ store.busy ? 'Installing…' : 'Install service' }}
+      <button class="btn-primary" :disabled="store.busy" @click="showInstallConfirm = true">
+        {{ store.busy ? t('service.installing') : t('service.install') }}
       </button>
     </section>
 
-    <!-- State 2: Installed (running or stopped) -->
-    <section v-else class="card status">
-      <div class="status-grid">
+    <section v-else class="card mb-3.5 px-6 py-5">
+      <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
         <div>
-          <div class="row-label">Mode</div>
-          <div class="value-mono">service</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.mode') }}</div>
+          <div class="font-mono text-[13px]">service</div>
         </div>
         <div>
-          <div class="row-label">Scope</div>
-          <div class="value-mono">{{ store.status?.scope }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.scope') }}</div>
+          <div class="font-mono text-[13px]">{{ store.status?.scope }}</div>
         </div>
         <div>
-          <div class="row-label">Platform</div>
-          <div class="value-mono">{{ store.status?.platform }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.platform') }}</div>
+          <div class="font-mono text-[13px]">{{ store.status?.platform }}</div>
         </div>
         <div>
-          <div class="row-label">PID</div>
-          <div class="value-mono">{{ store.status?.pid || '—' }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.pid') }}</div>
+          <div class="font-mono text-[13px]">{{ store.status?.pid || t('common.empty') }}</div>
         </div>
         <div>
-          <div class="row-label">Web port</div>
-          <div class="value-mono">{{ store.status?.web_port || '—' }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.webPort') }}</div>
+          <div class="font-mono text-[13px]">{{ store.status?.web_port || t('common.empty') }}</div>
         </div>
         <div>
-          <div class="row-label">Uptime</div>
-          <div class="value-mono">{{ formatUptime(store.status?.uptime_secs || 0) }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.uptime') }}</div>
+          <div class="font-mono text-[13px]">{{ formatUptime(store.status?.uptime_secs || 0) }}</div>
         </div>
         <div v-if="store.status?.started_at">
-          <div class="row-label">Started</div>
-          <div class="value-mono small">{{ store.status.started_at }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.started') }}</div>
+          <div class="font-mono text-[11px]">{{ store.status.started_at }}</div>
         </div>
         <div v-if="store.status?.last_heartbeat">
-          <div class="row-label">Last heartbeat</div>
-          <div class="value-mono small">
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.lastHeartbeat') }}</div>
+          <div class="font-mono text-[11px]">
             {{ store.status.last_heartbeat }}
-            <span v-if="store.status.heartbeat_stale" class="stale">stale</span>
+            <span
+              v-if="store.status.heartbeat_stale"
+              class="ml-1.5 rounded bg-warning/20 px-1.5 py-px text-[10px] text-warning"
+            >
+              {{ t('service.stale') }}
+            </span>
           </div>
         </div>
         <div v-if="store.status?.active_tasks?.length">
-          <div class="row-label">Active tasks</div>
-          <div class="value-mono small">{{ store.status.active_tasks.join(', ') }}</div>
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.activeTasks') }}</div>
+          <div class="font-mono text-[11px]">{{ store.status.active_tasks.join(', ') }}</div>
         </div>
-        <div v-if="store.status?.last_error" class="span-2">
-          <div class="row-label">Last error</div>
-          <div class="value-mono small danger">{{ store.status.last_error }}</div>
+        <div v-if="store.status?.last_error" class="col-span-full">
+          <div class="mb-1 text-[10px] uppercase tracking-wide text-text-dim">{{ t('service.lastError') }}</div>
+          <div class="font-mono text-[11px] text-danger">{{ store.status.last_error }}</div>
         </div>
       </div>
 
-      <div class="actions">
-        <button v-if="!store.status.running" class="primary" @click="store.start()" :disabled="store.busy">
-          <PhPlay :size="14" weight="bold" /> Start
+      <div class="flex flex-wrap gap-2 border-t border-border pt-3">
+        <button v-if="!store.status.running" class="btn-primary" :disabled="store.busy" @click="store.start()">
+          <PhPlay :size="14" weight="bold" /> {{ t('service.start') }}
         </button>
-        <button v-if="store.status.running" class="primary" @click="store.restart()" :disabled="store.busy">
-          <PhArrowsClockwise :size="14" weight="bold" /> Restart
+        <button v-if="store.status.running" class="btn-primary" :disabled="store.busy" @click="store.restart()">
+          <PhArrowsClockwise :size="14" weight="bold" /> {{ t('service.restart') }}
         </button>
-        <button v-if="store.status.running" class="danger" @click="store.stop()" :disabled="store.busy">
-          <PhStop :size="14" weight="bold" /> Stop
+        <button v-if="store.status.running" class="danger !px-3.5 !py-1.5" :disabled="store.busy" @click="store.stop()">
+          <PhStop :size="14" weight="bold" /> {{ t('service.stop') }}
         </button>
-        <button class="ghost" @click="showUninstallConfirm = true" :disabled="store.busy">
-          <PhTrash :size="14" weight="regular" /> Uninstall
+        <button class="btn-ghost" :disabled="store.busy" @click="showUninstallConfirm = true">
+          <PhTrash :size="14" weight="regular" /> {{ t('service.uninstall') }}
         </button>
       </div>
 
-      <a v-if="logCommand()" class="logs-link" :href="logCommand().startsWith('eventvwr') ? '#' : '#'" @click.prevent>
+      <a
+        v-if="logCommand()"
+        class="mt-3 inline-flex items-center gap-1.5 text-[11px] text-text-muted"
+        href="#"
+        @click.prevent
+      >
         <PhTerminal :size="14" weight="regular" />
-        View logs: <code>{{ logCommand() }}</code>
+        {{ t('service.viewLogs') }} <code class="rounded border border-border bg-bg px-1 font-mono">{{ logCommand() }}</code>
       </a>
     </section>
 
-    <!-- Output panel (after install/uninstall) -->
-    <section v-if="store.lastOutput" class="card">
-      <h3>Output</h3>
-      <pre class="out">{{ store.lastOutput }}</pre>
+    <section v-if="store.lastOutput" class="card mb-3.5 px-6 py-5">
+      <h3 class="section-label">{{ t('service.output') }}</h3>
+      <pre class="max-h-[200px] overflow-auto whitespace-pre-wrap rounded-md bg-bg p-3 font-mono text-[11px] text-text-muted">{{ store.lastOutput }}</pre>
     </section>
 
-    <!-- Install confirm dialog -->
-    <AppDialog v-model="showInstallConfirm" title="Install gn-drive as a background service?" size="sm">
-      <p>This will register gn-drive with your init system (systemd / launchd / SCM).</p>
-      <ul class="checklist">
-        <li>Main process will run in the background and auto-start on login.</li>
-        <li>Web UI stays live at loopback — you can open it any time.</li>
-        <li>You can stop and uninstall at any time.</li>
+    <AppDialog v-model="showInstallConfirm" :title="t('service.installDialogTitle')" size="sm">
+      <p class="mb-3 text-[13px] text-text-muted">{{ t('service.installDialogBody') }}</p>
+      <ul class="mb-4 list-none p-0">
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.installDlg1') }}
+        </li>
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.installDlg2') }}
+        </li>
+        <li class="relative py-1 pl-[18px] text-[13px] text-text-muted before:absolute before:left-0 before:text-success before:content-['✓']">
+          {{ t('service.installDlg3') }}
+        </li>
       </ul>
-      <div class="modal-actions">
-        <button class="ghost" @click="showInstallConfirm = false">Cancel</button>
-        <button class="primary" @click="store.install(); showInstallConfirm = false">Install</button>
+      <div class="flex justify-end gap-2">
+        <button class="btn-ghost" @click="showInstallConfirm = false">{{ t('common.cancel') }}</button>
+        <button class="btn-primary" @click="store.install(); showInstallConfirm = false">{{ t('service.installShort') }}</button>
       </div>
     </AppDialog>
 
-    <AppDialog v-model="showUninstallConfirm" title="Uninstall service?" size="sm">
-      <p>This will stop the service and remove the unit file / plist / SCM entry.</p>
-      <div class="modal-actions">
-        <button class="ghost" @click="showUninstallConfirm = false">Cancel</button>
-        <button class="danger" @click="store.uninstall(); showUninstallConfirm = false">Uninstall</button>
+    <AppDialog v-model="showUninstallConfirm" :title="t('service.uninstallTitle')" size="sm">
+      <p class="mb-4 text-[13px] text-text-muted">{{ t('service.uninstallBody') }}</p>
+      <div class="flex justify-end gap-2">
+        <button class="btn-ghost" @click="showUninstallConfirm = false">{{ t('common.cancel') }}</button>
+        <button class="danger !px-3.5 !py-1.5" @click="store.uninstall(); showUninstallConfirm = false">
+          {{ t('service.uninstall') }}
+        </button>
       </div>
     </AppDialog>
   </div>
 </template>
-
-<style scoped>
-.service-page { max-width: 900px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; gap: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
-.page-header .sub { color: var(--color-text-muted); font-size: 13px; margin: 0; }
-.status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; color: var(--color-text-muted); }
-.status-pill.on { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 30%, transparent); }
-
-.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; padding: 20px 24px; margin-bottom: 14px; }
-.card.hero { text-align: center; padding: 32px 28px; }
-.hero-icon { color: var(--color-accent); margin-bottom: 8px; display: flex; justify-content: center; }
-.card h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
-.card p { color: var(--color-text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
-.card p code { font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; background: var(--color-surface-hover); border-radius: 3px; }
-.checklist { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; max-width: 420px; margin-left: auto; margin-right: auto; }
-.checklist li { font-size: 13px; color: var(--color-text-muted); padding: 4px 0; padding-left: 18px; position: relative; }
-.checklist li::before { content: '✓'; position: absolute; left: 0; color: var(--color-success); }
-
-.status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.row-label { font-size: 10px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-.value-mono { font-size: 13px; font-family: var(--font-mono); color: var(--color-text); }
-.value-mono.small { font-size: 11px; }
-.value-mono.danger { color: var(--color-danger); }
-.span-2 { grid-column: 1 / -1; }
-.stale { margin-left: 6px; padding: 1px 6px; background: color-mix(in srgb, var(--color-warning) 20%, transparent); color: var(--color-warning); border-radius: 4px; font-size: 10px; }
-
-.actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--color-border); }
-.primary, .danger, .ghost { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; border: 0; }
-.primary { background: var(--color-accent); color: white; }
-.danger { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
-.danger:hover { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
-.ghost { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
-.ghost:hover { background: var(--color-surface-hover); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.logs-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--color-text-muted); font-size: 11px; }
-.logs-link code { font-family: var(--font-mono); padding: 1px 5px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 3px; }
-
-.out { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); background: var(--color-bg); padding: 12px; border-radius: 6px; white-space: pre-wrap; max-height: 200px; overflow: auto; }
-.card h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); letter-spacing: 0.5px; margin: 0 0 8px; }
-
-.modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; padding: 24px; max-width: 460px; width: 90%; }
-.modal h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
-.modal p { color: var(--color-text-muted); font-size: 13px; margin: 0 0 12px; }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-
-.spin { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-</style>

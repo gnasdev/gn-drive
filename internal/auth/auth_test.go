@@ -354,30 +354,6 @@ func TestRemovePassword_Success(t *testing.T) {
 	}
 }
 
-func TestUnlockFromStdin_EnvNotSet(t *testing.T) {
-	s := newTestService(t)
-	t.Setenv("GN_DRIVE_PASSWORD", "")
-	if err := s.UnlockFromStdin(); err == nil {
-		t.Error("expected error when env var unset")
-	}
-}
-
-func TestUnlockFromStdin_Success(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := New(Options{ConfigDir: dir})
-	if err := s.SetupPassword("secret-pw-1"); err != nil {
-		t.Fatal(err)
-	}
-	s.Lock()
-	t.Setenv("GN_DRIVE_PASSWORD", "secret-pw-1")
-	if err := s.UnlockFromStdin(); err != nil {
-		t.Fatal(err)
-	}
-	if !s.IsUnlocked() {
-		t.Error("should be unlocked after UnlockFromStdin")
-	}
-}
-
 func TestLockoutStatus_AfterFailures(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := New(Options{ConfigDir: dir})

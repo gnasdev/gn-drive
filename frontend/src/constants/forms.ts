@@ -23,6 +23,33 @@ export const SYNC_ACTIONS = ['pull', 'push', 'bi', 'bi-resync'] as const
 
 export type SyncAction = (typeof SYNC_ACTIONS)[number]
 
+export type OpRisk = 'safe' | 'caution' | 'danger'
+
+/** Risk level only; copy lives in i18n (syncHelp.*). */
+export const SYNC_ACTION_META: Record<SyncAction, { risk: OpRisk }> = {
+  pull: { risk: 'caution' },
+  push: { risk: 'caution' },
+  bi: { risk: 'caution' },
+  'bi-resync': { risk: 'danger' },
+}
+
+/** One-shot file operations available on Operations page. */
+export const FILE_OPS = ['copy', 'move', 'check', 'mkdir', 'purge', 'delete'] as const
+
+export type FileOpKind = (typeof FILE_OPS)[number]
+
+export const FILE_OP_META: Record<
+  FileOpKind,
+  { fields: 'source-dest' | 'path'; risk: OpRisk }
+> = {
+  copy: { fields: 'source-dest', risk: 'safe' },
+  move: { fields: 'source-dest', risk: 'caution' },
+  check: { fields: 'source-dest', risk: 'safe' },
+  mkdir: { fields: 'path', risk: 'safe' },
+  purge: { fields: 'path', risk: 'danger' },
+  delete: { fields: 'path', risk: 'danger' },
+}
+
 export function isAbsoluteLocalPath(path: string): boolean {
   return path.startsWith('/')
 }
@@ -48,7 +75,6 @@ export function parseRemotePath(value: string): {
       path: v.slice(colon + 1).replace(/^\/+/, '') || '',
     }
   }
-  // Bare name without colon → treat as remote root
   return { mode: 'remote', remote: v, path: '' }
 }
 

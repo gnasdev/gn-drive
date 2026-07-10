@@ -1,14 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useOptimisticList } from '@gnas/ui-shared'
+import { useOptimisticList } from '@/composables/useOptimisticList'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
+import { i18n } from '@/i18n'
 
 export const useSchedulesStore = defineStore('schedules', () => {
   const api = useApi()
   const items = ref<Schedule[]>([])
   const { optimisticUpdate } = useOptimisticList<Schedule>(items, {
-    rollbackMessage: () => 'Failed to update schedule, reverted.',
+    rollbackMessage: () => i18n.global.t('schedules.rollback'),
   })
 
   async function load() {
@@ -20,9 +21,6 @@ export const useSchedulesStore = defineStore('schedules', () => {
     await load()
   }
 
-  // Optimistic: flip the toggle immediately instead of waiting on a
-  // round-trip + full list reload; rolls back with a toast if the server
-  // rejects the change.
   async function enable(id: string) {
     await optimisticUpdate(
       (s) => s.id === id,

@@ -13,168 +13,44 @@ vars:
   LDFLAGS: "-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}"
 
 tasks:
-  # ---------------------------------------------------------------------------
-  # Install
-  # ---------------------------------------------------------------------------
-
   install:
-    summary: Install backend + frontend dependencies
-    cmds:
-      - task: install:be
-      - task: install:fe
-
-  install:be:
-    summary: Install Go module dependencies
-    dir: .
+    summary: Install backend (go mod) + frontend (pnpm) dependencies
     cmds:
       - go mod download
-
-  install:fe:
-    summary: Install frontend (pnpm) dependencies
-    dir: frontend
-    cmds:
-      - pnpm install --frozen-lockfile
-
-  # ---------------------------------------------------------------------------
-  # Build
-  # ---------------------------------------------------------------------------
+      - cd frontend && pnpm install --frozen-lockfile
 
   build:
-    summary: Build web stack (frontend + backend, embedded)
+    summary: Build web stack — Vue 3 frontend embedded into the Go binary
     cmds:
-      - task: build:fe
-      - task: build:be
-
-  build:fe:
-    summary: Build Vue 3 frontend
-    dir: frontend
-    cmds:
-      - pnpm install --frozen-lockfile
-      - pnpm run build
-      - rm -rf ../internal/webui/dist
-      - cp -r dist ../internal/webui/dist
-
-  build:fe:dev:
-    summary: Build Vue 3 frontend (dev mode, with source maps)
-    dir: frontend
-    cmds:
-      - pnpm install
-      - pnpm run build:dev
-      - rm -rf ../internal/webui/dist
-      - cp -r dist ../internal/webui/dist
-
-  build:be:
-    summary: Build Go backend binary
-    dir: .
-    cmds:
+      - cd frontend && pnpm install --frozen-lockfile && pnpm run build
+      - rm -rf internal/webui/dist
+      - cp -r frontend/dist internal/webui/dist
       - go build -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}} ./cmd/gn-drive
       - echo "Built {{.BIN_DIR}}/{{.APP_NAME}} (Version={{.VERSION}} Commit={{.COMMIT}})"
 
-  build:be:dev:
-    summary: Build Go backend (dev, with debug info)
-    dir: .
-    cmds:
-      - go build -o {{.BIN_DIR}}/{{.APP_NAME}}-dev
-      - echo "Built {{.BIN_DIR}}/{{.APP_NAME}}-dev"
-
-  # ---------------------------------------------------------------------------
-  # Run
-  # ---------------------------------------------------------------------------
-
-  run:fg:
-    summary: Run in foreground (auto-port, opens browser)
-    dir: .
-    cmds:
-      - go run ./cmd/gn-drive run
-
-  run:fg:nobrowser:
-    summary: Run in foreground without opening browser
-    dir: .
-    cmds:
-      - go run ./cmd/gn-drive run --no-browser
-
-  run:dev:
+  dev:
     summary: Run dev mode — Vue rebuild on change + Go hot reload (air) in parallel; Go serves Vue dist via SPA route
-    dir: .
     cmds:
       - scripts/dev.sh
 
-  run:dev:fe:
-    summary: Run only the Vue watcher (no Go). Rebuilds internal/webui/dist/ on every change. Use with `go run ./cmd/gn-drive run --no-browser` in another terminal.
-    dir: frontend
-    cmds:
-      - pnpm run build:watch
-
-  run:dev:be:
-    summary: Run only the Go hot reload watcher (air). Pick up .go changes and internal/webui/dist/ rebuilds.
-    dir: .
-    cmds:
-      - "${GOPATH:-$HOME/go}/bin/air"
-
-  run:fe:
-    summary: Run Vite HMR dev server (frontend only, for hot reload)
-    dir: frontend
-    env:
-      GN_DRIVE_DEV_PORT: "53241"
-    cmds:
-      - pnpm run dev
-
   doctor:
     summary: Diagnose environment via gn-drive doctor
-    dir: .
     cmds:
       - go run ./cmd/gn-drive doctor
 
-  # ---------------------------------------------------------------------------
-  # Test / Lint
-  # ---------------------------------------------------------------------------
-
   test:
-    summary: Run all tests
-    cmds:
-      - task: test:be
-      - task: test:fe
-
-  test:be:
-    summary: Run Go backend tests with race detector + coverage
-    dir: .
+    summary: Run backend tests, frontend type-check, and e2e coverage gate
     cmds:
       - go test -race -coverprofile=coverage.out ./...
       - go tool cover -html=coverage.out -o coverage.html
-
-  test:fe:
-    summary: Run Vue 3 frontend type-check
-    dir: frontend
-    cmds:
-      - pnpm run type-check
-
-  test:e2e:
-    summary: Run Puppeteer e2e + coverage gate (≥70% lines on frontend/src)
-    dir: frontend
-    cmds:
-      - pnpm run test:e2e:coverage
+      - cd frontend && pnpm run type-check
+      - cd frontend && pnpm run test:e2e:coverage
 
   lint:
-    summary: Run all linters
-    cmds:
-      - task: lint:be
-      - task: lint:fe
-
-  lint:be:
-    summary: Run golangci-lint on backend
-    dir: .
+    summary: Run backend (golangci-lint) + frontend (ESLint) linters
     cmds:
       - golangci-lint run ./...
-
-  lint:fe:
-    summary: Run ESLint on frontend
-    dir: frontend
-    cmds:
-      - pnpm run lint
-
-  # ---------------------------------------------------------------------------
-  # Cleanup
-  # ---------------------------------------------------------------------------
+      - cd frontend && pnpm run lint
 
   clean:
     summary: Clean build artifacts

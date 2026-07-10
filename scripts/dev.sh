@@ -5,8 +5,9 @@
 #             ../internal/webui/dist/ on every source change.
 # Go side:    `air` watches Go files + internal/webui/dist/ and restarts
 #             the server binary on any change.
-# Browser:    served by the Go binary's SPA route on the auto-port
-#             printed at startup (no separate Vite dev server, no proxy).
+# Browser:    served by the Go binary's SPA route on a fixed dev port
+#             (default 53241, set in .air.toml --port). Fixed so air
+#             restarts do not change the URL. No separate Vite dev server.
 #
 # Both processes are run in the background and their PIDs are tracked so
 # we can shut them down together on Ctrl+C.
@@ -84,10 +85,11 @@ PID_AIR=$!
 
 # --- Wait for either to exit -----------------------------------------
 echo ""
+DEV_PORT="${GN_DRIVE_DEV_PORT:-53241}"
 echo "dev: both watchers up. Edit files to see live reload."
 echo "dev: - Vue source (.vue/.ts in frontend/) → Vite rebuilds dist/ → Go restarts"
 echo "dev: - Go source (.go) → air rebuilds and restarts the server"
-echo "dev: - Open the URL the Go server prints (auto-port, loopback only)"
+echo "dev: - Open http://127.0.0.1:${DEV_PORT}/  (fixed port; air restarts keep this URL)"
 echo "dev: Press Ctrl+C to stop both."
 echo ""
 

@@ -68,14 +68,24 @@ Lưu tại `frontend/SPEC.md` (file này). Cả team tham chiếu khi review.
 - KHÔNG trộn emoji + ảnh placeholder. KHÔNG dùng emoji làm icon.
 - Icon size: 16px (inline), 20px (button), 24px (sidebar nav).
 
-### 3.6 Forbidden
+### 3.6 i18n
+- `vue-i18n` (composition API, `legacy: false`).
+- Locales: `en` (default/fallback), `vi`.
+- Catalog: `src/i18n/locales/{en,vi}.ts`. Persist: `localStorage` key `gn-drive:locale`.
+- Switcher: Settings → Language. Prefer browser `vi*` on first visit when no stored preference.
+- UI copy must go through `t()` / `<i18n-t>`; do not hardcode user-visible English outside catalogs.
+- Confirm/toast/nav labels used by e2e default to English (e2e pins `gn-drive:locale=en`).
+
+### 3.7 Forbidden
 - ❌ em-dash trong UI text
 - ❌ "Quietly trusted by" / "Used at" / "From the field" labels
 - ❌ pills overlay trên ảnh
 - ❌ three-equal feature cards (chỉ dùng 4-tile bento nếu cần, mỗi tile nội dung thật)
 - ❌ Inter font, Google Fonts
 - ❌ emoji làm icon
-- ❌ shadcn-vue copy-paste (plan nói rõ dùng Reka UI primitives hoặc `@nuxt/ui` style composables)
+- ❌ `@gnas/ui-shared` (đã gỡ; dùng `src/components/ui/*` + `src/composables/*` nội bộ)
+- ❌ shadcn-vue copy-paste nguyên bản; chỉ own components Tailwind trong repo
+- ❌ Hardcode UI string ngoài locale catalog (trừ brand "GN Drive", API error từ backend)
 
 ## 4. Pre-Flight Check (binding — required trước merge)
 

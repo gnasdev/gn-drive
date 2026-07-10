@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { PhCalendar, PhPlus, PhTrash, PhPause, PhPlay } from '@phosphor-icons/vue'
 import { useSchedulesStore } from '@/stores/schedules'
 import { useProfilesStore } from '@/stores/profiles'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
 import { SYNC_ACTIONS } from '@/constants/forms'
-import { useConfirmDialog, useToast } from '@gnas/ui-shared'
-import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
-import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
-import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { useToast } from '@/composables/useToast'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import AppSectionLoading from '@/components/ui/SectionLoading.vue'
+import AppAlert from '@/components/ui/Alert.vue'
 
+const { t } = useI18n()
 const store = useSchedulesStore()
 const profiles = useProfilesStore()
 const api = useApi()
@@ -26,7 +29,7 @@ onMounted(async () => {
 
 async function submitAdd() {
   if (!draft.value.profile_name || !draft.value.cron) {
-    toast.error('Profile and cron are required')
+    toast.error(t('schedules.required'))
     return
   }
   await store.add({ ...draft.value, id: crypto.randomUUID() })
@@ -35,48 +38,60 @@ async function submitAdd() {
 }
 
 async function doDelete(id: string) {
-  const ok = await confirmDialog({ title: 'Delete schedule', message: 'Delete this schedule?', confirmText: 'Delete', confirmVariant: 'danger' })
+  const ok = await confirmDialog({
+    title: t('schedules.deleteTitle'),
+    message: t('schedules.deleteMessage'),
+    confirmText: t('common.delete'),
+    confirmVariant: 'danger',
+  })
   if (!ok) return
   await store.remove(id)
 }
 </script>
 
 <template>
-  <div class="schedules-page" data-testid="page-schedules">
-    <header class="page-header">
+  <div class="page-shell-wide" data-testid="page-schedules">
+    <header class="mb-5 flex items-end justify-between gap-4">
       <div>
-        <h1>Schedules</h1>
-        <p class="sub">Cron-based scheduled syncs.</p>
+        <h1 class="page-title">{{ t('schedules.title') }}</h1>
+        <p class="page-sub">{{ t('schedules.sub') }}</p>
       </div>
-      <button class="primary" data-testid="schedules-add" @click="showAdd = !showAdd">
-        <PhPlus :size="16" weight="bold" /> Add schedule
+      <button class="btn-primary" data-testid="schedules-add" @click="showAdd = !showAdd">
+        <PhPlus :size="16" weight="bold" /> {{ t('schedules.add') }}
       </button>
     </header>
 
-    <div v-if="showAdd" class="add-card" data-testid="schedules-add-form">
-      <h3>New schedule</h3>
-      <form @submit.prevent="submitAdd" class="form-grid">
-        <label class="span-2"><span>Profile</span>
-          <select v-model="draft.profile_name" required data-testid="schedules-profile">
-            <option value="" disabled>Select profile</option>
+    <div v-if="showAdd" class="card mb-4 px-5 py-4" data-testid="schedules-add-form">
+      <h3 class="section-label">{{ t('schedules.new') }}</h3>
+      <form class="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-end" @submit.prevent="submitAdd">
+        <label class="field-label md:col-span-2">
+          <span>{{ t('common.profile') }}</span>
+          <select v-model="draft.profile_name" required class="field-input" data-testid="schedules-profile">
+            <option value="" disabled>{{ t('common.selectProfile') }}</option>
             <option v-for="p in profiles.items" :key="p.name" :value="p.name">{{ p.name }}</option>
           </select>
         </label>
-        <label><span>Action</span>
-          <select v-model="draft.action" data-testid="schedules-action">
+        <label class="field-label">
+          <span>{{ t('common.action') }}</span>
+          <select v-model="draft.action" class="field-input" data-testid="schedules-action">
             <option v-for="a in SYNC_ACTIONS" :key="a" :value="a">{{ a }}</option>
           </select>
         </label>
-        <label><span>Cron (5-field standard)</span>
-          <input v-model="draft.cron" placeholder="0 * * * *" required data-testid="schedules-cron" />
+        <label class="field-label">
+          <span>{{ t('schedules.cron') }}</span>
+          <input v-model="draft.cron" placeholder="0 * * * *" required class="field-input" data-testid="schedules-cron" />
         </label>
-        <p class="span-2 hint" style="margin:0;font-size:11px;color:var(--color-text-dim)">
-          Standard 5-field cron (min hour dom mon dow). Example: <code>0 * * * *</code> = every hour.
+        <p class="md:col-span-2 m-0 text-[11px] text-text-dim">
+          <i18n-t keypath="schedules.cronHint" tag="span">
+            <template #ex>
+              <code class="font-mono">0 * * * *</code>
+            </template>
+          </i18n-t>
         </p>
-        <div class="form-actions">
-          <button type="button" class="ghost" @click="showAdd = false">Cancel</button>
-          <button type="submit" class="primary" :disabled="api.loading.value" data-testid="schedules-submit">
-            {{ api.loading.value ? 'Adding…' : 'Add' }}
+        <div class="flex justify-end gap-2 md:col-span-2">
+          <button type="button" class="btn-ghost" @click="showAdd = false">{{ t('common.cancel') }}</button>
+          <button type="submit" class="btn-primary" :disabled="api.loading.value" data-testid="schedules-submit">
+            {{ api.loading.value ? t('common.adding') : t('common.add') }}
           </button>
         </div>
       </form>
@@ -84,36 +99,55 @@ async function doDelete(id: string) {
 
     <AppAlert v-if="api.error.value" type="error">{{ api.error.value }}</AppAlert>
 
-    <div class="table-wrap" v-if="store.items.length > 0 || !store.loading">
-      <table>
+    <div v-if="store.items.length > 0 || !store.loading" class="table-wrap">
+      <table class="data-table">
         <thead>
-          <tr><th>Profile</th><th>Action</th><th>Cron</th><th>Last run</th><th>Next run</th><th>Enabled</th><th></th></tr>
+          <tr>
+            <th>{{ t('schedules.colProfile') }}</th>
+            <th>{{ t('schedules.colAction') }}</th>
+            <th>{{ t('schedules.colCron') }}</th>
+            <th>{{ t('schedules.colLast') }}</th>
+            <th>{{ t('schedules.colNext') }}</th>
+            <th>{{ t('schedules.colEnabled') }}</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody>
-          <tr v-for="s in store.items" :key="s.id">
+          <tr
+            v-for="s in store.items"
+            :key="s.id"
+            :data-testid="`schedule-row-${s.id}`"
+          >
             <td>
-              <div class="cell-name">
+              <div class="flex items-center gap-1.5 text-text-muted">
                 <PhCalendar :size="14" weight="regular" />
-                <span class="mono">{{ s.profile_name }}</span>
+                <span class="font-mono text-text">{{ s.profile_name }}</span>
               </div>
             </td>
             <td><span class="badge">{{ s.action }}</span></td>
-            <td class="mono small">{{ s.cron }}</td>
-            <td class="muted small">{{ s.last_run || '—' }}</td>
-            <td class="muted small">{{ s.next_run || '—' }}</td>
+            <td class="font-mono text-[11px] text-text">{{ s.cron }}</td>
+            <td class="text-[11px] text-text-muted">{{ s.last_run || t('common.empty') }}</td>
+            <td class="text-[11px] text-text-muted">{{ s.next_run || t('common.empty') }}</td>
             <td>
-              <button class="toggle" :class="{ on: s.enabled }" @click="s.enabled ? store.disable(s.id) : store.enable(s.id)">
+              <button
+                class="toggle"
+                :class="{ on: s.enabled }"
+                :data-testid="`schedules-toggle-${s.id}`"
+                @click="s.enabled ? store.disable(s.id) : store.enable(s.id)"
+              >
                 <PhPause v-if="s.enabled" :size="14" weight="bold" />
                 <PhPlay v-else :size="14" weight="bold" />
-                <span>{{ s.enabled ? 'enabled' : 'disabled' }}</span>
+                <span>{{ s.enabled ? t('common.enabled') : t('common.disabled') }}</span>
               </button>
             </td>
-            <td class="actions">
-              <button class="danger small" @click="doDelete(s.id)"><PhTrash :size="14" weight="regular" /></button>
+            <td class="text-right">
+              <button class="danger !p-1.5" :data-testid="`schedules-delete-${s.id}`" @click="doDelete(s.id)">
+                <PhTrash :size="14" weight="regular" />
+              </button>
             </td>
           </tr>
           <tr v-if="store.items.length === 0 && !store.loading">
-            <td colspan="7" class="empty"><EmptyState title="No schedules configured" /></td>
+            <td colspan="7"><EmptyState :title="t('schedules.empty')" /></td>
           </tr>
         </tbody>
       </table>
@@ -121,44 +155,3 @@ async function doDelete(id: string) {
     <div v-else><AppSectionLoading /></div>
   </div>
 </template>
-
-<style scoped>
-.schedules-page { max-width: 1200px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; gap: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
-.page-header .sub { color: var(--color-text-muted); font-size: 13px; margin: 0; }
-.primary { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--color-accent); color: white; border: 0; border-radius: 6px; font-size: 13px; font-weight: 500; }
-.ghost { padding: 6px 10px; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); font-size: 12px; }
-.ghost:hover { background: var(--color-surface-hover); }
-.danger { display: inline-flex; padding: 5px 8px; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text-muted); font-size: 12px; }
-.danger:hover { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
-.danger.small { padding: 5px 8px; }
-
-.add-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
-.add-card h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); letter-spacing: 0.5px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
-.form-grid label { display: flex; flex-direction: column; gap: 4px; }
-.form-grid label span { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
-.form-grid input, .form-grid select { padding: 7px 10px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: 13px; }
-.form-grid input:focus, .form-grid select:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent); }
-.span-2 { grid-column: 1 / -1; }
-.form-actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
-
-.error { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; }
-.table-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
-table { width: 100%; border-collapse: collapse; }
-thead th { text-align: left; padding: 8px 14px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-text-dim); background: color-mix(in srgb, var(--color-surface-hover) 50%, transparent); border-bottom: 1px solid var(--color-border); }
-tbody td { padding: 8px 14px; font-size: 12px; border-top: 1px solid var(--color-border); }
-tbody tr:first-child td { border-top: 0; }
-.cell-name { display: flex; align-items: center; gap: 6px; color: var(--color-text-muted); }
-.mono { font-family: var(--font-mono); color: var(--color-text); }
-.muted { color: var(--color-text-muted); }
-.small { font-size: 11px; }
-.badge { display: inline-block; padding: 1px 6px; background: var(--color-surface-hover); border-radius: 4px; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-muted); }
-.toggle { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: transparent; border: 1px solid var(--color-border); border-radius: 4px; color: var(--color-text-muted); font-size: 11px; }
-.toggle.on { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 30%, transparent); }
-.toggle:hover { background: var(--color-surface-hover); }
-.actions { text-align: right; }
-.empty { text-align: center; color: var(--color-text-dim); padding: 24px; }
-.loading { padding: 24px; color: var(--color-text-muted); text-align: center; }
-</style>

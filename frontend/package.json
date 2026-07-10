@@ -17,15 +17,13 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.1.1",
-    "@gnas/ui-shared": "file:../../gn-ui-shared",
     "@phosphor-icons/vue": "^2.2.1",
     "@tanstack/vue-virtual": "^3.13.31",
     "clsx": "^2.1.0",
-    "naive-ui": "2.44.1",
     "pinia": "^3.0.4",
     "tailwind-merge": "^3.0.0",
     "vue": "^3.5.25",
-    "vue-flow": "^0.1.0",
+    "vue-i18n": "^11.4.6",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

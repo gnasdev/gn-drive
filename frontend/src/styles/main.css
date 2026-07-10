@@ -1,23 +1,10 @@
 @import 'tailwindcss';
-/* Shared UI library: base.css maps --color-app-* Tailwind tokens to the
- * --app-* CSS vars defined below; @source makes Tailwind v4 scan the shared
- * component source so utility classes used there (bg-app-primary, etc.) are
- * generated. Path is relative to THIS file (src/styles/main.css). */
-@import '@gnas/ui-shared/styles/base.css';
-@source '../../../../gn-ui-shared/src';
 
 /* Design tokens for GN Drive.
- * Dark is the default (applied as `html.dark` by the shared theme store, to
- * match @gnas/ui-shared which keys dark mode off the `dark` class on <html>).
+ * Dark is default via class `dark` on <html> (theme store).
  * Light values live in :root; dark overrides live in html.dark.
- *
- * Two token systems coexist:
- *   --color-*  : GN Drive's own palette used by bespoke views (Sidebar, etc.)
- *   --app-*    : the semantic tokens shared components expect.
- * Both are defined for light and dark so the whole UI tracks one toggle.
  */
 :root {
-  /* GN Drive palette (light) */
   --color-bg: #fafafa;
   --color-surface: #ffffff;
   --color-surface-hover: #f4f4f5;
@@ -33,29 +20,16 @@
   --color-completed: #16a34a;
   --color-failed: #dc2626;
 
-  /* Shared component tokens (light) */
-  --app-bg: #fafafa;
-  --app-surface: #ffffff;
-  --app-surface2: #f4f4f5;
-  --app-border: #e4e4e7;
-  --app-primary: #2563eb;
-  --app-primary-fg: #ffffff;
-  --app-fg: #18181b;
-  --app-fg-dim: #71717a;
-  --app-danger: #dc2626;
-  --app-success: #16a34a;
-  --app-warning: #ca8a04;
-  --app-radius: 0.5rem;
-
   --sidebar-width: 240px;
   --topbar-height: 48px;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
 
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 html.dark {
-  /* GN Drive palette (dark) */
   --color-bg: #0e0e10;
   --color-surface: #18181b;
   --color-surface-hover: #27272a;
@@ -70,20 +44,6 @@ html.dark {
   --color-running: #facc15;
   --color-completed: #4ade80;
   --color-failed: #f87171;
-
-  /* Shared component tokens (dark) */
-  --app-bg: #0e0e10;
-  --app-surface: #18181b;
-  --app-surface2: #27272a;
-  --app-border: #2e2e33;
-  --app-primary: #6ea8ff;
-  --app-primary-fg: #0e0e10;
-  --app-fg: #e4e4e7;
-  --app-fg-dim: #9ca3af;
-  --app-danger: #f87171;
-  --app-success: #4ade80;
-  --app-warning: #facc15;
-  --app-radius: 0.5rem;
 
   color-scheme: dark;
 }
@@ -105,6 +65,8 @@ html.dark {
   --color-failed: var(--color-failed);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
 }
 
 html, body {
@@ -137,7 +99,6 @@ a {
   text-decoration: none;
 }
 
-/* Scrollbar (subtle) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -151,4 +112,76 @@ a {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-dim);
+}
+
+/* Shared interactive patterns (kept as class names for e2e + reuse). */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2.5 py-1.5 text-xs text-text transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-danger,
+  button.danger {
+    @apply inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1.5 text-xs text-text-muted transition-colors hover:border-danger/30 hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-icon {
+    @apply flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-text-muted transition-colors hover:border-border hover:bg-surface-hover hover:text-text;
+  }
+  .field-input {
+    @apply w-full rounded-md border border-border bg-bg px-2.5 py-1.5 font-mono text-[13px] text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-60;
+  }
+  .field-label {
+    @apply flex flex-col gap-1;
+  }
+  .field-label > span {
+    @apply text-[11px] font-medium text-text-muted;
+  }
+  .panel-card,
+  .card {
+    @apply rounded-lg border border-border bg-surface;
+  }
+  .page-shell {
+    @apply mx-auto max-w-[1100px];
+  }
+  .page-shell-wide {
+    @apply mx-auto max-w-[1200px];
+  }
+  .page-title {
+    @apply m-0 mb-1 text-[22px] font-semibold text-text;
+  }
+  .page-sub {
+    @apply m-0 text-[13px] text-text-muted;
+  }
+  .section-label {
+    @apply m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted;
+  }
+  .badge {
+    @apply inline-block rounded px-1.5 py-px font-mono text-[11px] text-text-muted bg-surface-hover;
+  }
+  .table-wrap {
+    @apply overflow-hidden rounded-lg border border-border bg-surface;
+  }
+  .data-table {
+    @apply w-full border-collapse;
+  }
+  .data-table thead th {
+    @apply border-b border-border bg-surface-hover/50 px-3.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-text-dim;
+  }
+  .data-table tbody td {
+    @apply border-t border-border px-3.5 py-2 text-[13px];
+  }
+  .data-table tbody tr:first-child td {
+    @apply border-t-0;
+  }
+  button.toggle {
+    @apply inline-flex items-center gap-1 rounded border border-border bg-transparent px-2 py-1 text-[11px] text-text-muted transition-colors hover:bg-surface-hover;
+  }
+  button.toggle.on {
+    @apply border-success/30 text-success;
+  }
+  a.quick-link {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-text transition-colors hover:bg-surface-hover;
+  }
 }

@@ -12,6 +12,7 @@ defineProps<{
 <template>
   <select
     v-model="model"
+    class="field-input"
     :data-testid="testId || 'remote-type'"
     :disabled="disabled"
   >

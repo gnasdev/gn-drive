@@ -8,12 +8,15 @@ import {
   composeRemotePath,
   parseRemotePath,
 } from '@/constants/forms'
+import { cn } from '@/lib/cn'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
     modelValue: string
     remotes: Remote[]
-    /** Base data-testid: local path input uses this; remote mode uses `${testId}-remote` / `${testId}-path`. */
     testId?: string
     label?: string
     required?: boolean
@@ -99,7 +102,7 @@ async function loadBrowse(remotePath: string) {
     browseEntries.value = entries
     browseCursor.value = remotePath
   } catch (e: any) {
-    browseError.value = e?.message ?? 'browse failed'
+    browseError.value = e?.message ?? t('pathField.browseFailed')
     browseEntries.value = []
   } finally {
     browseBusy.value = false
@@ -114,7 +117,6 @@ function parentPath(current: string): string | null {
     if (idx <= 0) return '/'
     return trimmed.slice(0, idx) || '/'
   }
-  // remote:path
   const colon = current.indexOf(':')
   if (colon < 0) return null
   const name = current.slice(0, colon)
@@ -136,7 +138,6 @@ function entryFullPath(e: FileEntry): string {
     if (mode.value === 'local') {
       return e.path.startsWith('/') ? e.path : `${browseCursor.value.replace(/\/+$/, '')}/${e.name}`
     }
-    // rclone may return path relative or full
     if (e.path.includes(':')) return e.path
     const base = browseCursor.value
     if (base.endsWith(':')) return `${base}/${e.name}`
@@ -178,38 +179,42 @@ const pathInputId = computed(() =>
 </script>
 
 <template>
-  <div class="remote-path-field">
-    <div v-if="label" class="field-label">{{ label }}</div>
-    <div class="mode-row">
+  <div class="flex w-full flex-col gap-1.5">
+    <div v-if="label" class="text-[11px] font-medium text-text-muted">{{ label }}</div>
+    <div class="flex gap-1">
       <button
         type="button"
-        class="mode-btn"
-        :class="{ active: mode === 'local' }"
+        :class="cn(
+          'rounded border border-border bg-transparent px-2.5 py-1 text-[11px] text-text-muted',
+          mode === 'local' && 'border-accent bg-accent/15 font-semibold text-accent',
+        )"
         :data-testid="`${testId}-mode-local`"
         @click="setMode('local')"
       >
-        Local
+        {{ t('common.local') }}
       </button>
       <button
         type="button"
-        class="mode-btn"
-        :class="{ active: mode === 'remote' }"
+        :class="cn(
+          'rounded border border-border bg-transparent px-2.5 py-1 text-[11px] text-text-muted',
+          mode === 'remote' && 'border-accent bg-accent/15 font-semibold text-accent',
+        )"
         :data-testid="`${testId}-mode-remote`"
         @click="setMode('remote')"
       >
-        Remote
+        {{ t('common.remote') }}
       </button>
     </div>
 
-    <div class="path-row">
+    <div class="flex flex-wrap items-center gap-1.5">
       <select
         v-if="mode === 'remote'"
         v-model="remoteName"
         :data-testid="remoteSelectId"
-        class="remote-select"
+        class="field-input max-w-[200px] min-w-[140px]"
         @change="emitValue"
       >
-        <option value="" disabled>Select remote</option>
+        <option value="" disabled>{{ t('common.selectRemote') }}</option>
         <option v-for="r in remotes" :key="r.name" :value="r.name">
           {{ r.name }}{{ r.type ? ` (${r.type})` : '' }}
         </option>
@@ -217,110 +222,74 @@ const pathInputId = computed(() =>
       <input
         v-model="pathPart"
         :data-testid="pathInputId"
-        :placeholder="mode === 'local' ? '/absolute/path' : 'folder/path'"
+        :placeholder="mode === 'local' ? t('pathField.absolutePlaceholder') : t('pathField.folderPlaceholder')"
         :required="required"
-        class="path-input"
+        class="field-input min-w-[160px] flex-1"
         @change="emitValue"
         @input="emitValue"
       />
       <button
         type="button"
-        class="ghost browse-btn"
+        class="btn-ghost whitespace-nowrap"
         :disabled="!canBrowse"
         :data-testid="`${testId}-browse`"
-        title="Browse"
+        :title="t('common.browse')"
         @click="openBrowse"
       >
         <PhMagnifyingGlass :size="14" weight="bold" />
-        Browse
+        {{ t('common.browse') }}
       </button>
     </div>
 
-    <div v-if="showBrowse" class="browse-panel" :data-testid="`${testId}-browse-panel`">
-      <div class="browse-head">
-        <button type="button" class="ghost small" :disabled="browseBusy || parentPath(browseCursor) == null" @click="goParent">
-          <PhCaretUp :size="14" weight="bold" /> Up
+    <div
+      v-if="showBrowse"
+      class="mt-1 rounded-md border border-border bg-bg p-2.5"
+      :data-testid="`${testId}-browse-panel`"
+    >
+      <div class="mb-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="btn-ghost !px-2 !py-1 !text-[11px]"
+          :disabled="browseBusy || parentPath(browseCursor) == null"
+          @click="goParent"
+        >
+          <PhCaretUp :size="14" weight="bold" /> {{ t('common.up') }}
         </button>
-        <code class="cursor mono">{{ browseCursor }}</code>
-        <button type="button" class="primary small" :disabled="browseBusy" :data-testid="`${testId}-browse-use`" @click="useBrowsePath">
-          Use path
+        <code class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px]">
+          {{ browseCursor }}
+        </code>
+        <button
+          type="button"
+          class="btn-primary !px-2 !py-1 !text-[11px]"
+          :disabled="browseBusy"
+          :data-testid="`${testId}-browse-use`"
+          @click="useBrowsePath"
+        >
+          {{ t('common.usePath') }}
         </button>
-        <button type="button" class="ghost small" @click="showBrowse = false">Close</button>
+        <button type="button" class="btn-ghost !px-2 !py-1 !text-[11px]" @click="showBrowse = false">
+          {{ t('common.close') }}
+        </button>
       </div>
-      <p v-if="browseError" class="browse-err">{{ browseError }}</p>
-      <p v-else-if="browseBusy" class="browse-muted">Loading…</p>
-      <div v-else class="browse-list">
+      <p v-if="browseError" class="m-0 mb-1.5 text-xs text-danger">{{ browseError }}</p>
+      <p v-else-if="browseBusy" class="m-0 text-xs text-text-dim">{{ t('common.loadingDots') }}</p>
+      <div v-else class="flex max-h-[180px] flex-col gap-0.5 overflow-auto">
         <button
           v-for="e in browseEntries"
           :key="e.path || e.name"
           type="button"
-          class="browse-row"
-          :class="{ dir: e.is_dir }"
+          :class="cn(
+            'flex items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-text',
+            e.is_dir ? 'cursor-pointer hover:bg-surface-hover' : 'cursor-default opacity-70',
+          )"
           @click="onEntryClick(e)"
         >
           <PhFolder v-if="e.is_dir" :size="14" weight="regular" />
           <PhFile v-else :size="14" weight="regular" />
-          <span class="mono">{{ e.name }}</span>
+          <span class="font-mono">{{ e.name }}</span>
         </button>
-        <p v-if="browseEntries.length === 0" class="browse-muted">Empty directory</p>
+        <p v-if="browseEntries.length === 0" class="m-0 text-xs text-text-dim">{{ t('common.emptyDir') }}</p>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.remote-path-field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.field-label { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
-.mode-row { display: flex; gap: 4px; }
-.mode-btn {
-  padding: 4px 10px; font-size: 11px; border-radius: 4px;
-  border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
-}
-.mode-btn.active {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  border-color: var(--color-accent); color: var(--color-accent); font-weight: 600;
-}
-.path-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.remote-select, .path-input {
-  padding: 7px 10px; background: var(--color-bg); border: 1px solid var(--color-border);
-  border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: 13px;
-}
-.remote-select { min-width: 140px; max-width: 200px; }
-.path-input { flex: 1; min-width: 160px; }
-.remote-select:focus, .path-input:focus {
-  outline: none; border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-.ghost {
-  display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px;
-  background: transparent; border: 1px solid var(--color-border); border-radius: 6px;
-  color: var(--color-text); font-size: 12px;
-}
-.ghost:hover:not(:disabled) { background: var(--color-surface-hover); }
-.ghost:disabled { opacity: 0.5; }
-.ghost.small { padding: 4px 8px; font-size: 11px; }
-.primary {
-  display: inline-flex; align-items: center; padding: 4px 10px; background: var(--color-accent);
-  color: white; border: 0; border-radius: 6px; font-size: 11px; font-weight: 500;
-}
-.primary.small { padding: 4px 8px; }
-.browse-btn { white-space: nowrap; }
-
-.browse-panel {
-  margin-top: 4px; padding: 10px; background: var(--color-bg);
-  border: 1px solid var(--color-border); border-radius: 6px;
-}
-.browse-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-.cursor { font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mono { font-family: var(--font-mono); }
-.browse-err { color: var(--color-danger); font-size: 12px; margin: 0 0 6px; }
-.browse-muted { color: var(--color-text-dim); font-size: 12px; margin: 0; }
-.browse-list { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
-.browse-row {
-  display: flex; align-items: center; gap: 6px; padding: 5px 8px; text-align: left;
-  background: transparent; border: 0; border-radius: 4px; color: var(--color-text); font-size: 12px;
-}
-.browse-row.dir { cursor: pointer; }
-.browse-row.dir:hover { background: var(--color-surface-hover); }
-.browse-row:not(.dir) { opacity: 0.7; cursor: default; }
-</style>

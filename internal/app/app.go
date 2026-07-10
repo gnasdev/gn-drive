@@ -44,7 +44,6 @@ type Options struct {
 	ConfigDir         string
 	LogMode           logging.Mode
 	RcloneBinary      string
-	UnlockStdin       bool
 	UnlockPassword    string
 	DevUnlockPassword string
 }
@@ -78,10 +77,6 @@ func New(ctx context.Context, opts Options) (*App, error) {
 
 	// 4a. Unlock if requested
 	switch {
-	case opts.UnlockStdin:
-		if err := authSvc.UnlockFromStdin(); err != nil {
-			return nil, fmt.Errorf("unlock from stdin: %w", err)
-		}
 	case opts.DevUnlockPassword != "":
 		// Development-only auto unlock: set up the master password if the app
 		// has never been configured, then unlock. This is gated by the caller

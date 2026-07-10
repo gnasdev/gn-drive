@@ -68,7 +68,7 @@ describe('full journey', () => {
     const text = await page.$eval('[data-testid="page-dashboard"]', (el) => el.textContent ?? '')
     assert.match(text, /Active tasks/)
     assert.match(text, /Quick links/)
-    await page.click('a.quick-link')
+    await clickTestId(page, 'dashboard-quick-link-profiles')
     await waitForTestId(page, 'page-profiles')
     await collectCoverage(page)
   })
@@ -248,7 +248,7 @@ describe('full journey', () => {
 
     // Run execute button on the card
     await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('.card'))
+      const cards = Array.from(document.querySelectorAll('[data-testid^="board-card-"]'))
       const card = cards.find((c) => c.textContent?.includes(n))
       const btn = card?.querySelector('button[data-testid^="boards-execute-"]') as HTMLButtonElement | null
       btn?.click()
@@ -271,9 +271,10 @@ describe('full journey', () => {
     assert.ok(ok, `board execute should copy board.txt into ${boardDst}`)
 
     await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('.card'))
+      const cards = Array.from(document.querySelectorAll('[data-testid^="board-card-"]'))
       const card = cards.find((c) => c.textContent?.includes(n))
-      ;(card?.querySelector('button.danger') as HTMLButtonElement | null)?.click()
+      const btn = card?.querySelector('button[data-testid^="boards-delete-"]') as HTMLButtonElement | null
+      btn?.click()
     }, name)
     await confirmDialog(page, 'Delete')
     await textAbsent(page, name)
@@ -297,9 +298,10 @@ describe('full journey', () => {
     await clickTestId(page, 'flows-submit')
     await waitForText(page, name)
     await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('.card'))
+      const cards = Array.from(document.querySelectorAll('[data-testid^="flow-card-"]'))
       const card = cards.find((c) => c.textContent?.includes(n))
-      ;(card?.querySelector('button.danger') as HTMLButtonElement | null)?.click()
+      const btn = card?.querySelector('button[data-testid^="flows-delete-"]') as HTMLButtonElement | null
+      btn?.click()
     }, name)
     await confirmDialog(page, 'Delete')
     await textAbsent(page, name)
@@ -320,7 +322,7 @@ describe('full journey', () => {
     const err = await page.$eval('body', (el) => el.textContent ?? '')
     assert.doesNotMatch(err, /invalid cron|expected exactly 6 fields/i)
 
-    const toggle = await page.$('button.toggle')
+    const toggle = await page.$('button[data-testid^="schedules-toggle-"]')
     assert.ok(toggle, 'enable/disable toggle required')
     await toggle.click()
     await new Promise((r) => setTimeout(r, 300))
@@ -328,9 +330,10 @@ describe('full journey', () => {
     await new Promise((r) => setTimeout(r, 300))
 
     await page.evaluate((n: string) => {
-      const rows = Array.from(document.querySelectorAll('tbody tr'))
+      const rows = Array.from(document.querySelectorAll('[data-testid^="schedule-row-"]'))
       const row = rows.find((r) => r.textContent?.includes(n))
-      ;(row?.querySelector('button.danger') as HTMLButtonElement | null)?.click()
+      const btn = row?.querySelector('button[data-testid^="schedules-delete-"]') as HTMLButtonElement | null
+      btn?.click()
     }, profileName)
     await confirmDialog(page, 'Delete')
     await collectCoverage(page)

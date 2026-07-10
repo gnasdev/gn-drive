@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/api/client'
 import {
   PhKey,
@@ -8,8 +9,9 @@ import {
   PhCircleNotch,
   PhStack,
 } from '@phosphor-icons/vue'
-import { SkeletonCard, useSwrCache } from '@gnas/ui-shared'
-import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
+import SkeletonCard from '@/components/ui/SkeletonCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { useSwrCache } from '@/composables/useSwrCache'
 
 interface Profile { name: string; direction: string }
 interface Remote { name: string; type: string }
@@ -26,21 +28,21 @@ interface DashboardOverview {
   stats: HistoryStats | null
 }
 
-// gn-drive is a single-user local tool (unlock via passphrase, no accounts),
-// so the cache scope is a constant rather than a per-user id.
+const { t } = useI18n()
+
 const { data, state: cacheState, error } = useSwrCache<DashboardOverview>({
   namespace: 'gn-drive',
   key: 'dashboard:overview',
   userScope: () => 'local',
   ttlMs: 30_000,
   fetcher: async () => {
-    const [p, r, t, h] = await Promise.all([
+    const [p, r, tsk, h] = await Promise.all([
       api.get<Profile[]>('/api/v1/profiles'),
       api.get<Remote[]>('/api/v1/remotes'),
       api.get<Task[]>('/api/v1/sync/tasks'),
       api.get<HistoryStats>('/api/v1/history/stats'),
     ])
-    return { profiles: p ?? [], remotes: r ?? [], tasks: t ?? [], stats: h ?? null }
+    return { profiles: p ?? [], remotes: r ?? [], tasks: tsk ?? [], stats: h ?? null }
   },
 })
 
@@ -48,103 +50,13 @@ const profiles = computed(() => data.value?.profiles ?? [])
 const remotes = computed(() => data.value?.remotes ?? [])
 const tasks = computed(() => data.value?.tasks ?? [])
 const stats = computed(() => data.value?.stats ?? null)
-const activeTasks = computed(() => tasks.value.filter((t) => t.status === 'running'))
+const activeTasks = computed(() => tasks.value.filter((x) => x.status === 'running'))
 const loadErrorMessage = computed(() => {
   if (!error.value || data.value) return null
-  return (error.value as { message?: string })?.message ?? 'failed to load dashboard'
+  return (error.value as { message?: string })?.message ?? t('dashboard.loadFailed')
 })
 const showSkeleton = computed(() => cacheState.value === 'hydrating' && !data.value)
-</script>
 
-<template>
-  <div class="dashboard" data-testid="page-dashboard">
-    <header class="page-header">
-      <h1>Dashboard</h1>
-      <p class="sub">Overview of profiles, remotes, and recent sync activity.</p>
-    </header>
-
-    <div v-if="loadErrorMessage" class="error">{{ loadErrorMessage }}</div>
-
-    <div v-if="showSkeleton" class="grid">
-      <SkeletonCard :count="4" :show-image="false" />
-    </div>
-
-    <div v-else-if="data" class="grid">
-      <div class="card stat">
-        <div class="stat-head">
-          <PhKey :size="18" weight="regular" />
-          <span class="label">Profiles</span>
-        </div>
-        <div class="value">{{ profiles.length }}</div>
-        <div class="foot">
-          {{ profiles.filter(p => p.direction === 'bi' || p.direction === 'bi-resync').length }} bi-directional
-        </div>
-      </div>
-
-      <div class="card stat">
-        <div class="stat-head">
-          <PhCloud :size="18" weight="regular" />
-          <span class="label">Remotes</span>
-        </div>
-        <div class="value">{{ remotes.length }}</div>
-        <div class="foot">
-          {{ new Set(remotes.map(r => r.type)).size }} unique providers
-        </div>
-      </div>
-
-      <div class="card stat">
-        <div class="stat-head">
-          <PhCircleNotch :size="18" weight="regular" />
-          <span class="label">Active tasks</span>
-        </div>
-        <div class="value">{{ activeTasks.length }}</div>
-        <div class="foot" v-if="activeTasks.length > 0">
-          {{ activeTasks[0].name }} ({{ activeTasks[0].action }})
-        </div>
-        <div class="foot" v-else>idle</div>
-      </div>
-
-      <div class="card stat">
-        <div class="stat-head">
-          <PhStack :size="18" weight="regular" />
-          <span class="label">Total syncs</span>
-        </div>
-        <div class="value">{{ stats?.total_syncs ?? 0 }}</div>
-        <div class="foot">
-          {{ humanBytes(stats?.total_bytes ?? 0) }} transferred
-        </div>
-      </div>
-    </div>
-
-    <section class="section">
-      <h2>Recent activity</h2>
-      <div v-if="stats?.total_syncs === 0">
-        <EmptyState title="No syncs yet" description="Create a profile and a remote, then trigger your first sync." />
-      </div>
-      <div v-else class="muted">Run history is shown on the History page.</div>
-    </section>
-
-    <section class="section">
-      <h2>Quick links</h2>
-      <div class="quick">
-        <RouterLink :to="{ name: 'profiles' }" class="quick-link">
-          <PhKey :size="16" weight="regular" />
-          <span>Manage profiles</span>
-        </RouterLink>
-        <RouterLink :to="{ name: 'remotes' }" class="quick-link">
-          <PhCloud :size="16" weight="regular" />
-          <span>Configure remotes</span>
-        </RouterLink>
-        <RouterLink :to="{ name: 'history' }" class="quick-link">
-          <PhClockCounterClockwise :size="16" weight="regular" />
-          <span>View history</span>
-        </RouterLink>
-      </div>
-    </section>
-  </div>
-</template>
-
-<script lang="ts">
 function humanBytes(n: number): string {
   const k = 1024
   if (n < k) return `${n} B`
@@ -154,111 +66,98 @@ function humanBytes(n: number): string {
 }
 </script>
 
-<style scoped>
-.dashboard {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-.page-header { margin-bottom: 24px; }
-.page-header h1 {
-  font-size: 22px;
-  font-weight: 600;
-  margin: 0 0 4px;
-}
-.sub {
-  color: var(--color-text-muted);
-  font-size: 13px;
-  margin: 0;
-}
-.error {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-.loading {
-  color: var(--color-text-muted);
-  font-size: 13px;
-  padding: 20px 0;
-}
+<template>
+  <div class="page-shell" data-testid="page-dashboard">
+    <header class="mb-6">
+      <h1 class="page-title">{{ t('dashboard.title') }}</h1>
+      <p class="page-sub">{{ t('dashboard.sub') }}</p>
+    </header>
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
-}
+    <div
+      v-if="loadErrorMessage"
+      class="mb-4 rounded-md bg-danger/10 px-3.5 py-2.5 text-[13px] text-danger"
+    >
+      {{ loadErrorMessage }}
+    </div>
 
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 16px;
-}
-.stat-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-.label { text-transform: uppercase; letter-spacing: 0.4px; font-size: 11px; }
-.value {
-  font-size: 28px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono);
-  line-height: 1;
-}
-.foot {
-  font-size: 11px;
-  color: var(--color-text-dim);
-  margin-top: 6px;
-  font-family: var(--font-mono);
-}
+    <div v-if="showSkeleton" class="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+      <SkeletonCard :count="4" :show-image="false" />
+    </div>
 
-.section {
-  margin-top: 24px;
-}
-.section h2 {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-muted);
-  margin: 0 0 12px;
-}
-.empty {
-  background: var(--color-surface);
-  border: 1px dashed var(--color-border);
-  border-radius: 8px;
-  padding: 20px;
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-.muted { color: var(--color-text-dim); font-size: 12px; }
+    <div v-else-if="data" class="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+          <PhKey :size="18" weight="regular" />
+          <span class="text-[11px] uppercase tracking-wide">{{ t('dashboard.profiles') }}</span>
+        </div>
+        <div class="font-mono text-[28px] font-bold leading-none tabular-nums">{{ profiles.length }}</div>
+        <div class="mt-1.5 font-mono text-[11px] text-text-dim">
+          {{ t('dashboard.biDirectional', { n: profiles.filter(p => p.direction === 'bi' || p.direction === 'bi-resync').length }) }}
+        </div>
+      </div>
 
-.quick {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.quick-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text);
-  font-size: 12px;
-  transition: background-color 0.1s;
-}
-.quick-link:hover { background: var(--color-surface-hover); }
-</style>
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+          <PhCloud :size="18" weight="regular" />
+          <span class="text-[11px] uppercase tracking-wide">{{ t('dashboard.remotes') }}</span>
+        </div>
+        <div class="font-mono text-[28px] font-bold leading-none tabular-nums">{{ remotes.length }}</div>
+        <div class="mt-1.5 font-mono text-[11px] text-text-dim">
+          {{ t('dashboard.uniqueProviders', { n: new Set(remotes.map(r => r.type)).size }) }}
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+          <PhCircleNotch :size="18" weight="regular" />
+          <span class="text-[11px] uppercase tracking-wide">{{ t('dashboard.activeTasks') }}</span>
+        </div>
+        <div class="font-mono text-[28px] font-bold leading-none tabular-nums">{{ activeTasks.length }}</div>
+        <div v-if="activeTasks.length > 0" class="mt-1.5 font-mono text-[11px] text-text-dim">
+          {{ activeTasks[0].name }} ({{ activeTasks[0].action }})
+        </div>
+        <div v-else class="mt-1.5 font-mono text-[11px] text-text-dim">{{ t('dashboard.idle') }}</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-muted">
+          <PhStack :size="18" weight="regular" />
+          <span class="text-[11px] uppercase tracking-wide">{{ t('dashboard.totalSyncs') }}</span>
+        </div>
+        <div class="font-mono text-[28px] font-bold leading-none tabular-nums">{{ stats?.total_syncs ?? 0 }}</div>
+        <div class="mt-1.5 font-mono text-[11px] text-text-dim">
+          {{ t('dashboard.transferred', { bytes: humanBytes(stats?.total_bytes ?? 0) }) }}
+        </div>
+      </div>
+    </div>
+
+    <section class="mt-6">
+      <h2 class="section-label">{{ t('dashboard.recentActivity') }}</h2>
+      <div v-if="stats?.total_syncs === 0">
+        <EmptyState
+          :title="t('dashboard.noSyncs')"
+          :description="t('dashboard.noSyncsDesc')"
+        />
+      </div>
+      <div v-else class="text-xs text-text-dim">{{ t('dashboard.historyHint') }}</div>
+    </section>
+
+    <section class="mt-6">
+      <h2 class="section-label">{{ t('dashboard.quickLinks') }}</h2>
+      <div class="flex flex-wrap gap-2">
+        <RouterLink :to="{ name: 'profiles' }" class="quick-link" data-testid="dashboard-quick-link-profiles">
+          <PhKey :size="16" weight="regular" />
+          <span>{{ t('dashboard.manageProfiles') }}</span>
+        </RouterLink>
+        <RouterLink :to="{ name: 'remotes' }" class="quick-link" data-testid="dashboard-quick-link-remotes">
+          <PhCloud :size="16" weight="regular" />
+          <span>{{ t('dashboard.configureRemotes') }}</span>
+        </RouterLink>
+        <RouterLink :to="{ name: 'history' }" class="quick-link" data-testid="dashboard-quick-link-history">
+          <PhClockCounterClockwise :size="16" weight="regular" />
+          <span>{{ t('dashboard.viewHistory') }}</span>
+        </RouterLink>
+      </div>
+    </section>
+  </div>
+</template>

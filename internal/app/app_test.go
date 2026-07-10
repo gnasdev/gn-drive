@@ -61,16 +61,6 @@ func TestNew_ServiceLogMode(t *testing.T) {
 	}
 }
 
-func TestNew_UnlockStdin_EnvNotSet(t *testing.T) {
-	// UnlockStdin=true but env not set → authSvc.UnlockFromStdin returns error.
-	dir := t.TempDir()
-	t.Setenv("GN_DRIVE_PASSWORD", "")
-	_, err := New(context.Background(), Options{ConfigDir: dir, UnlockStdin: true})
-	if err == nil {
-		t.Fatal("expected error when stdin unlock fails")
-	}
-}
-
 func TestNew_UnlockPassword_Wrong(t *testing.T) {
 	dir := t.TempDir()
 	// First app to set up a password.

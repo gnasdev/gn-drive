@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   PhHouse,
   PhKey,
@@ -13,25 +14,28 @@ import {
   PhGearSix,
   PhCircleNotch,
 } from '@phosphor-icons/vue'
+import { cn } from '@/lib/cn'
 
 interface NavItem {
   name: string
-  label: string
+  labelKey: string
   icon: any
-  group?: string
+  group: 'main' | 'data' | 'work' | 'system'
 }
 
+const { t } = useI18n()
+
 const items: NavItem[] = [
-  { name: 'dashboard',  label: 'Dashboard',   icon: PhHouse,           group: 'main' },
-  { name: 'profiles',   label: 'Profiles',    icon: PhKey,             group: 'data' },
-  { name: 'remotes',    label: 'Remotes',     icon: PhCloud,           group: 'data' },
-  { name: 'operations', label: 'Operations',  icon: PhSwap,            group: 'work' },
-  { name: 'boards',     label: 'Boards',      icon: PhSquaresFour,     group: 'work' },
-  { name: 'flows',      label: 'Flows',       icon: PhStack,           group: 'work' },
-  { name: 'schedules',  label: 'Schedules',   icon: PhCalendar,        group: 'work' },
-  { name: 'history',    label: 'History',     icon: PhClockCounterClockwise, group: 'work' },
-  { name: 'service',    label: 'Service',     icon: PhCircleNotch,     group: 'system' },
-  { name: 'settings',   label: 'Settings',    icon: PhGearSix,         group: 'system' },
+  { name: 'dashboard', labelKey: 'nav.dashboard', icon: PhHouse, group: 'main' },
+  { name: 'profiles', labelKey: 'nav.profiles', icon: PhKey, group: 'data' },
+  { name: 'remotes', labelKey: 'nav.remotes', icon: PhCloud, group: 'data' },
+  { name: 'operations', labelKey: 'nav.operations', icon: PhSwap, group: 'work' },
+  { name: 'boards', labelKey: 'nav.boards', icon: PhSquaresFour, group: 'work' },
+  { name: 'flows', labelKey: 'nav.flows', icon: PhStack, group: 'work' },
+  { name: 'schedules', labelKey: 'nav.schedules', icon: PhCalendar, group: 'work' },
+  { name: 'history', labelKey: 'nav.history', icon: PhClockCounterClockwise, group: 'work' },
+  { name: 'service', labelKey: 'nav.service', icon: PhCircleNotch, group: 'system' },
+  { name: 'settings', labelKey: 'nav.settings', icon: PhGearSix, group: 'system' },
 ]
 
 const route = useRoute()
@@ -39,125 +43,54 @@ const current = computed(() => route.name as string)
 const groups = computed(() => {
   const out: Record<string, NavItem[]> = { main: [], data: [], work: [], system: [] }
   for (const it of items) {
-    const g = it.group ?? 'main'
-    out[g] = out[g] || []
-    out[g].push(it)
+    out[it.group].push(it)
   }
   return out
 })
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-mark">GN</div>
-      <div class="brand-text">
-        <div class="brand-name">GN Drive</div>
-        <div class="brand-sub">sync engine</div>
+  <aside
+    class="flex h-dvh w-[var(--sidebar-width)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface"
+  >
+    <div class="flex items-center gap-2.5 border-b border-border p-4">
+      <div
+        class="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-[13px] font-bold tracking-wide text-white"
+      >
+        GN
+      </div>
+      <div class="leading-tight">
+        <div class="text-sm font-semibold">GN Drive</div>
+        <div class="text-[11px] text-text-dim">{{ t('nav.brandSub') }}</div>
       </div>
     </div>
 
-    <nav class="nav">
-      <div v-for="(items, group) in groups" :key="group" class="nav-group">
-        <div v-if="items.length" class="nav-group-label">{{ group }}</div>
+    <nav class="flex-1 overflow-y-auto px-2 py-3">
+      <div v-for="(groupItems, group) in groups" :key="group" class="mb-4">
+        <div
+          v-if="groupItems.length"
+          class="px-3 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-text-dim"
+        >
+          {{ t(`nav.groups.${group}`) }}
+        </div>
         <RouterLink
-          v-for="item in items"
+          v-for="item in groupItems"
           :key="item.name"
           :to="{ name: item.name }"
-          class="nav-item"
-          :class="{ active: current === item.name }"
+          :class="cn(
+            'flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-hover hover:text-text',
+            current === item.name && 'bg-accent/12 text-accent',
+          )"
           :data-testid="`nav-${item.name}`"
         >
           <component :is="item.icon" :size="18" weight="regular" />
-          <span>{{ item.label }}</span>
+          <span>{{ t(item.labelKey) }}</span>
         </RouterLink>
       </div>
     </nav>
 
-    <div class="footer">
-      <span class="version">v1.0.0</span>
+    <div class="border-t border-border px-4 py-3">
+      <span class="font-mono text-[11px] text-text-dim">v1.0.0</span>
     </div>
   </aside>
 </template>
-
-<style scoped>
-.sidebar {
-  width: var(--sidebar-width);
-  flex-shrink: 0;
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-.brand-mark {
-  width: 32px; height: 32px;
-  background: var(--color-accent);
-  color: white;
-  border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-}
-.brand-text { line-height: 1.2; }
-.brand-name { font-weight: 600; font-size: 14px; }
-.brand-sub { color: var(--color-text-dim); font-size: 11px; }
-
-.nav {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 8px;
-}
-
-.nav-group {
-  margin-bottom: 16px;
-}
-.nav-group-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 12px 6px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 12px;
-  border-radius: 6px;
-  color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background-color 0.1s, color 0.1s;
-}
-.nav-item:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
-}
-.nav-item.active {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-}
-
-.footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--color-border);
-}
-.version {
-  color: var(--color-text-dim);
-  font-size: 11px;
-  font-family: var(--font-mono);
-}
-</style>
