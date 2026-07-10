@@ -9,7 +9,7 @@ import (
 	"github.com/gnasdev/gn-drive/internal/rclone"
 )
 
-// fsEntry is the JSON shape the Vue Operations page expects.
+// fsEntry is the JSON shape path browsers (RemotePathField) expect.
 type fsEntry struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`

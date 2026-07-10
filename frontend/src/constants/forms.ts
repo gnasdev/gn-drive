@@ -23,31 +23,35 @@ export const SYNC_ACTIONS = ['pull', 'push', 'bi', 'bi-resync'] as const
 
 export type SyncAction = (typeof SYNC_ACTIONS)[number]
 
-export type OpRisk = 'safe' | 'caution' | 'danger'
+/** Board edge actions (includes one-shot copy). */
+export const BOARD_EDGE_ACTIONS = ['push', 'pull', 'copy', 'bi'] as const
 
-/** Risk level only; copy lives in i18n (syncHelp.*). */
-export const SYNC_ACTION_META: Record<SyncAction, { risk: OpRisk }> = {
-  pull: { risk: 'caution' },
-  push: { risk: 'caution' },
-  bi: { risk: 'caution' },
-  'bi-resync': { risk: 'danger' },
-}
+export type BoardEdgeAction = (typeof BOARD_EDGE_ACTIONS)[number]
 
-/** One-shot file operations available on Operations page. */
-export const FILE_OPS = ['copy', 'move', 'check', 'mkdir', 'purge', 'delete'] as const
+/** Common 5-field cron presets for flow schedule_cron. */
+export const CRON_PRESETS = [
+  { value: '0 * * * *', key: 'everyHour' },
+  { value: '0 */6 * * *', key: 'every6Hours' },
+  { value: '0 0 * * *', key: 'dailyMidnight' },
+  { value: '0 9 * * 1-5', key: 'weekdaysMorning' },
+  { value: '0 0 * * 0', key: 'weeklySunday' },
+] as const
 
-export type FileOpKind = (typeof FILE_OPS)[number]
+export type CronPresetValue = (typeof CRON_PRESETS)[number]['value']
 
-export const FILE_OP_META: Record<
-  FileOpKind,
-  { fields: 'source-dest' | 'path'; risk: OpRisk }
-> = {
-  copy: { fields: 'source-dest', risk: 'safe' },
-  move: { fields: 'source-dest', risk: 'caution' },
-  check: { fields: 'source-dest', risk: 'safe' },
-  mkdir: { fields: 'path', risk: 'safe' },
-  purge: { fields: 'path', risk: 'danger' },
-  delete: { fields: 'path', risk: 'danger' },
+export const HISTORY_STATES = ['running', 'completed', 'failed', 'cancelled'] as const
+
+/** Split composed path into board node remote_name + path. */
+export function composedPathToBoardNode(composed: string): { remote_name: string; path: string } {
+  const p = parseRemotePath(composed)
+  if (p.mode === 'local') {
+    return { remote_name: '', path: p.path.trim() || '/' }
+  }
+  const path = p.path.trim()
+  return {
+    remote_name: p.remote.trim(),
+    path: path ? (path.startsWith('/') ? path : `/${path}`) : '/',
+  }
 }
 
 export function isAbsoluteLocalPath(path: string): boolean {

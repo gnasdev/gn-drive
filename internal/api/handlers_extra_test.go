@@ -18,7 +18,6 @@ import (
 	"github.com/gnasdev/gn-drive/internal/auth"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 	"github.com/gnasdev/gn-drive/internal/rclone"
-	"github.com/gnasdev/gn-drive/internal/service"
 	"github.com/gnasdev/gn-drive/internal/store"
 	"github.com/gnasdev/gn-drive/internal/syncengine"
 )
@@ -196,19 +195,6 @@ func TestHandleSetSettings_StoreError(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
 	}
-}
-
-// TestHandleEnableSchedule_SaveError is not constructible: after the Get
-// succeeds, the Save must fail in the same request. Closing the store
-// before the request makes Get fail (404) before Save is reached.
-func TestHandleEnableSchedule_SaveError(t *testing.T) {
-	t.Skip("cannot construct Get-ok-then-Save-fail sequence in one request")
-}
-
-// TestHandleDisableSchedule_SaveError is not constructible for the same
-// reason as handleEnableSchedule.
-func TestHandleDisableSchedule_SaveError(t *testing.T) {
-	t.Skip("cannot construct Get-ok-then-Save-fail sequence in one request")
 }
 
 // TestHandleUnlock_WrongPassword covers the unlock-failed branch in
@@ -396,14 +382,6 @@ func TestHandleListRemotes_UsageFallback(t *testing.T) {
 	}
 }
 
-// TestHandleServiceStatus_PlatformError covers the platform-error branch in
-// handleServiceStatus by injecting a service.NewManager that returns an error.
-func TestHandleServiceStatus_PlatformError(t *testing.T) {
-	// On darwin, service.NewManager never errors (see service/manager_darwin.go),
-	// so this branch is unreachable on darwin.
-	t.Skip("service.NewManager never errors on darwin")
-}
-
 // TestAuthMiddleware_Locked covers the "app is locked" branch in
 // authMiddleware by setting up the app with a valid password and then
 // NOT unlocking it.
@@ -577,73 +555,6 @@ func TestGenerateToken_Extra(t *testing.T) {
 	}
 }
 
-// fakeServiceManager implements service.Manager for tests.
-type fakeServiceManager struct {
-	installed   bool
-	statusOut   service.Status
-	installErr  error
-	statusErr   error
-}
-
-func (f *fakeServiceManager) Install(spec service.Spec) error   { return f.installErr }
-func (f *fakeServiceManager) Uninstall(spec service.Spec) error { return nil }
-func (f *fakeServiceManager) Start(spec service.Spec) error     { return nil }
-func (f *fakeServiceManager) Stop(spec service.Spec) error      { return nil }
-func (f *fakeServiceManager) Restart(spec service.Spec) error   { return nil }
-func (f *fakeServiceManager) Status(spec service.Spec) (service.Status, error) {
-	return f.statusOut, f.statusErr
-}
-func (f *fakeServiceManager) IsInstalled(spec service.Spec) (bool, error) {
-	return f.installed, nil
-}
-
-// TestHandleServiceStatus_Installed covers the installed branch of
-// handleServiceStatus.
-func TestHandleServiceStatus_Installed(t *testing.T) {
-	orig := serviceNewManagerFn
-	t.Cleanup(func() { serviceNewManagerFn = orig })
-	serviceNewManagerFn = func() (service.Manager, error) {
-		return &fakeServiceManager{
-			installed: true,
-			statusOut: service.Status{Running: true, PID: 1234},
-		}, nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/service/status", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var body map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if installed, _ := body["installed"].(bool); !installed {
-		t.Error("expected installed=true")
-	}
-	if running, _ := body["running"].(bool); !running {
-		t.Error("expected running=true")
-	}
-	if pid, _ := body["pid"].(float64); pid != 1234 {
-		t.Errorf("expected pid=1234, got %v", body["pid"])
-	}
-}
-
-// TestHandleServiceStatus_NewManagerError covers the platform-error branch
-// of handleServiceStatus.
-func TestHandleServiceStatus_NewManagerError(t *testing.T) {
-	orig := serviceNewManagerFn
-	t.Cleanup(func() { serviceNewManagerFn = orig })
-	serviceNewManagerFn = func() (service.Manager, error) {
-		return nil, errors.New("simulated platform error")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/service/status", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
 
 // TestHandleUnlock_TokenError covers the generateTokenRand error branch
 // in handleUnlock.
@@ -688,57 +599,6 @@ func TestHandleSetup_TokenError(t *testing.T) {
 	rr := doRequest(srv, "POST", "/api/v1/auth/setup", body, "")
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleEnableSchedule_SaveError2 covers the Save error branch in
-// handleEnableSchedule by overriding schedulesSaveFn.
-func TestHandleEnableSchedule_SaveError2(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-
-	// Create a schedule first.
-	rr := doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch1", "profile_name": "p1", "action": "push", "cron": "0 0 * * * *", "enabled": false,
-	}, "")
-	if rr.Code != 201 {
-		t.Fatalf("create: %d %s", rr.Code, rr.Body.String())
-	}
-
-	orig := schedulesSaveFn
-	t.Cleanup(func() { schedulesSaveFn = orig })
-	schedulesSaveFn = func(ctx context.Context, r store.ScheduleRepo, s2 *store.Schedule) error {
-		return errors.New("simulated save failure")
-	}
-
-	rr = doRequest(srv, "POST", "/api/v1/schedules/sch1/enable", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleDisableSchedule_SaveError2 covers the Save error branch in
-// handleDisableSchedule by overriding schedulesSaveFn.
-func TestHandleDisableSchedule_SaveError2(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-
-	rr := doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch2", "profile_name": "p1", "action": "push", "cron": "0 0 * * * *", "enabled": true,
-	}, "")
-	if rr.Code != 201 {
-		t.Fatalf("create: %d %s", rr.Code, rr.Body.String())
-	}
-
-	orig := schedulesSaveFn
-	t.Cleanup(func() { schedulesSaveFn = orig })
-	schedulesSaveFn = func(ctx context.Context, r store.ScheduleRepo, s2 *store.Schedule) error {
-		return errors.New("simulated save failure")
-	}
-
-	rr = doRequest(srv, "POST", "/api/v1/schedules/sch2/disable", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

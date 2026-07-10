@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { PhSun, PhMoon, PhLock, PhCircle } from '@phosphor-icons/vue'
+import {
+  PhSun,
+  PhMoon,
+  PhLock,
+  PhCircle,
+  PhCloud,
+  PhGearSix,
+  PhSquaresFour,
+} from '@phosphor-icons/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { api } from '@/api/client'
@@ -14,6 +22,7 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const theme = useThemeStore()
 const router = useRouter()
+const route = useRoute()
 const { confirmDialog } = useConfirmDialog()
 const toast = useToast()
 
@@ -50,13 +59,32 @@ async function onLock() {
     toast.error((e as Error).message)
   }
 }
+
+function goWorkspace() {
+  router.push({ name: 'workspace' })
+}
+
+function goSettings() {
+  router.push({ name: 'settings' })
+}
 </script>
 
 <template>
   <header
-    class="flex h-[var(--topbar-height)] items-center gap-2 border-b border-border bg-surface px-4"
+    class="flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b-2 border-border bg-accent px-4"
+    data-testid="app-topbar"
   >
-    <div class="flex items-center gap-1.5 px-2 text-xs text-text-muted">
+    <button
+      type="button"
+      class="flex items-center gap-2 font-bold text-text"
+      data-testid="nav-workspace"
+      @click="goWorkspace"
+    >
+      <PhCloud :size="22" weight="bold" />
+      <span class="text-lg">GN Drive</span>
+    </button>
+
+    <div class="flex items-center gap-1.5 text-xs font-bold text-text/80">
       <span
         :class="cn(
           'flex',
@@ -77,17 +105,41 @@ async function onLock() {
     <div class="flex-1" />
 
     <button
+      type="button"
+      class="btn-ghost"
+      :class="route.name === 'workspace' && 'bg-text/10'"
+      data-testid="nav-workspace-btn"
+      :title="t('nav.workspace')"
+      @click="goWorkspace"
+    >
+      <PhSquaresFour :size="18" weight="bold" />
+      <span class="hidden sm:inline">{{ t('nav.workspace') }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="btn-ghost"
+      :class="route.name === 'settings' && 'bg-text/10'"
+      data-testid="nav-settings"
+      :title="t('nav.settings')"
+      @click="goSettings"
+    >
+      <PhGearSix :size="18" weight="bold" />
+      <span class="hidden sm:inline">{{ t('nav.settings') }}</span>
+    </button>
+
+    <button
       class="btn-icon"
       :title="t('topbar.theme', { pref: theme.preference })"
       data-testid="theme-toggle"
       @click="theme.setTheme(theme.isDark ? 'light' : 'dark')"
     >
-      <PhSun v-if="theme.isDark" :size="18" weight="regular" />
-      <PhMoon v-else :size="18" weight="regular" />
+      <PhSun v-if="theme.isDark" :size="18" weight="bold" />
+      <PhMoon v-else :size="18" weight="bold" />
     </button>
 
     <button class="btn-icon" :title="t('topbar.lock')" data-testid="lock-button" @click="onLock">
-      <PhLock :size="18" weight="regular" />
+      <PhLock :size="18" weight="bold" />
     </button>
   </header>
 </template>

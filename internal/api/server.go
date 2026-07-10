@@ -46,6 +46,14 @@ type AppDeps struct {
 	Bus         *eventbus.Bus
 	WebUI       http.Handler
 	Service     *service.Writer // non-nil in service mode
+	// Version is the running binary version (shown in /status and used by self-update).
+	Version string
+	// AfterUnlock opens deferred data plane (store/rclone) after web unlock/setup.
+	// Optional; portal mode sets this.
+	AfterUnlock func(ctx context.Context) error
+	// BeforeLock closes the data plane before re-encrypting config on lock.
+	// Optional; portal mode sets this.
+	BeforeLock func() error
 }
 
 // New creates a new Server. The server is not started until Serve is called.
@@ -110,14 +118,6 @@ func (s *Server) apiRouter() chi.Router {
 	r.Delete("/sync/tasks/{id}", s.handleStopTask)
 	r.Get("/sync/tasks/{id}/logs", s.handleTaskLogs)
 
-	// Schedules
-	r.Get("/schedules", s.handleListSchedules)
-	r.Post("/schedules", s.handleCreateSchedule)
-	r.Put("/schedules/{id}", s.handleUpdateSchedule)
-	r.Delete("/schedules/{id}", s.handleDeleteSchedule)
-	r.Post("/schedules/{id}/enable", s.handleEnableSchedule)
-	r.Post("/schedules/{id}/disable", s.handleDisableSchedule)
-
 	// Boards
 	r.Get("/boards", s.handleListBoards)
 	r.Post("/boards", s.handleCreateBoard)
@@ -133,21 +133,12 @@ func (s *Server) apiRouter() chi.Router {
 	r.Put("/flows/{id}", s.handleUpdateFlow)
 	r.Delete("/flows/{id}", s.handleDeleteFlow)
 
-	// History
-	r.Get("/history", s.handleListHistory)
-	r.Get("/history/stats", s.handleHistoryStats)
-
-	// Operations
+	// Operations (filesystem browse for path pickers; one-shot file ops stay API-only)
 	r.Post("/operations", s.handleStartOperation)
 	r.Get("/operations/fs", s.handleBrowseFS)
 
-	// Service
-	r.Get("/service/status", s.handleServiceStatus)
-	r.Post("/service/install", s.handleServiceInstall)
-	r.Post("/service/uninstall", s.handleServiceUninstall)
-	r.Post("/service/start", s.handleServiceStart)
-	r.Post("/service/stop", s.handleServiceStop)
-	r.Post("/service/restart", s.handleServiceRestart)
+	// Self-update (Settings UI)
+	r.Post("/self-update", s.handleSelfUpdate)
 
 	return r
 }

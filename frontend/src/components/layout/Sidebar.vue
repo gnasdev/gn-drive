@@ -9,10 +9,7 @@ import {
   PhSwap,
   PhSquaresFour,
   PhStack,
-  PhCalendar,
-  PhClockCounterClockwise,
   PhGearSix,
-  PhCircleNotch,
 } from '@phosphor-icons/vue'
 import { cn } from '@/lib/cn'
 
@@ -32,9 +29,6 @@ const items: NavItem[] = [
   { name: 'operations', labelKey: 'nav.operations', icon: PhSwap, group: 'work' },
   { name: 'boards', labelKey: 'nav.boards', icon: PhSquaresFour, group: 'work' },
   { name: 'flows', labelKey: 'nav.flows', icon: PhStack, group: 'work' },
-  { name: 'schedules', labelKey: 'nav.schedules', icon: PhCalendar, group: 'work' },
-  { name: 'history', labelKey: 'nav.history', icon: PhClockCounterClockwise, group: 'work' },
-  { name: 'service', labelKey: 'nav.service', icon: PhCircleNotch, group: 'system' },
   { name: 'settings', labelKey: 'nav.settings', icon: PhGearSix, group: 'system' },
 ]
 

@@ -113,10 +113,110 @@ func TestNew_LockedAppWithoutPassword(t *testing.T) {
 	}
 	a1.Auth.Lock()
 	a1.Close()
-	// Second app without unlock — should fail.
+	// CLI (non-portal) without unlock — should fail.
 	_, err = New(context.Background(), Options{ConfigDir: dir})
 	if err == nil {
-		t.Fatal("expected error for locked app")
+		t.Fatal("expected error for locked app without portal mode")
+	}
+}
+
+// TestNew_PortalMode_StartsLocked ensures web portal starts while locked and
+// stays locked until unlock; data plane may open on plaintext or defer.
+func TestNew_PortalMode_StartsLocked(t *testing.T) {
+	dir := t.TempDir()
+	a1, err := New(context.Background(), Options{ConfigDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a1.Auth.SetupPassword("secret-pw-1"); err != nil {
+		t.Fatal(err)
+	}
+	// Lock encrypts; close cleans up.
+	if err := a1.Auth.Lock(); err != nil {
+		t.Fatal(err)
+	}
+	_ = a1.Close()
+
+	// Portal must start even when encrypted+locked.
+	a2, err := New(context.Background(), Options{ConfigDir: dir, PortalMode: true})
+	if err != nil {
+		t.Fatalf("portal start while locked: %v", err)
+	}
+	defer a2.Close()
+	if a2.Auth.IsUnlocked() {
+		t.Error("portal should remain locked until web unlock")
+	}
+	// Encrypted start: store deferred.
+	if a2.Store != nil {
+		t.Error("expected deferred store when config is encrypted")
+	}
+
+	// Unlock + open data plane (same path as HTTP AfterUnlock).
+	if err := a2.Auth.Unlock("secret-pw-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a2.AfterUnlock(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if a2.Store == nil {
+		t.Error("store should open after unlock")
+	}
+}
+
+// TestNew_PortalMode_PlaintextLocked opens store while still locked so the
+// SPA can serve after password entry without re-decrypt delay.
+func TestNew_PortalMode_PlaintextLocked(t *testing.T) {
+	dir := t.TempDir()
+	a1, err := New(context.Background(), Options{ConfigDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a1.Auth.SetupPassword("secret-pw-1"); err != nil {
+		t.Fatal(err)
+	}
+	// Do not Lock — leave plaintext on disk, process "locked" only in memory.
+	// Simulate new process: auth loads as locked, files still plain.
+	_ = a1.Store.Close()
+	a1.Store = nil
+	// Manually mark locked without encrypt: use a fresh app with locked state
+	// by locking without encrypt... Setup leaves unlocked. Force new New after
+	// writing auth as enabled: close with Lock would encrypt. Instead unlock
+	// path: create locked state via Close (encrypts) then decrypt manually...
+	// Simpler: new portal after setup without lock — unlocked true. Skip.
+	// Use auth that is setup, unlocked=false, no .enc: OpenPlaintext path.
+	// Create by: setup, lock (encrypt), unlock (decrypt), then new process
+	// without unlocking (but Close re-encrypts). 
+	// After Unlock files are plain; if we don't Close with Lock... 
+	// Close always Locks. So: Unlock, then don't use Close — just leave files.
+	// a1 is unlocked with plain files. Build a2 simulating restart: auth.New
+	// sees enabled → locked in memory, files plain.
+	// Force a1 not to re-encrypt: call BeforeLock already closed store; skip Auth.Lock
+	// by replacing with portal New on same dir after Unlock without Close encrypt.
+	if err := a1.Auth.Lock(); err != nil {
+		t.Fatal(err)
+	}
+	// Now encrypted. Unlock to get plaintext without closing a1 store wrongly.
+	if err := a1.Auth.Unlock("secret-pw-1"); err != nil {
+		t.Fatal(err)
+	}
+	// Files plain, still "unlocked" in a1. Simulate exit without re-encrypt:
+	// close store only.
+	if a1.Store != nil {
+		_ = a1.Store.Close()
+		a1.Store = nil
+	}
+	// Fresh process: locked flag in auth, plaintext files.
+	a2, err := New(context.Background(), Options{ConfigDir: dir, PortalMode: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a2.Close()
+	if a2.Auth.IsUnlocked() {
+		t.Error("new process should start locked")
+	}
+	// Plaintext → store may already be open for faster post-unlock.
+	if a2.Store == nil {
+		t.Error("expected store open on plaintext locked start")
 	}
 }
 

@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import AppSidebar from '@/components/layout/Sidebar.vue'
 import AppTopbar from '@/components/layout/Topbar.vue'
 import DialogHost from '@/components/ui/DialogHost.vue'
 import ToastHost from '@/components/ui/ToastHost.vue'
@@ -10,19 +9,23 @@ import ToastHost from '@/components/ui/ToastHost.vue'
 const auth = useAuthStore()
 const route = useRoute()
 
+/** Unlocked app uses single-page shell (topbar + main), like desktop v0.4. */
 const showLayout = computed(() => auth.unlocked && route.name !== 'unlock')
 </script>
 
 <template>
-  <div class="flex h-dvh w-full bg-bg">
+  <div class="flex h-dvh w-full flex-col bg-bg-secondary">
     <template v-if="showLayout">
-      <AppSidebar />
-      <div class="flex min-w-0 flex-1 flex-col">
-        <AppTopbar />
-        <main class="flex-1 overflow-auto px-8 py-6">
-          <RouterView />
-        </main>
-      </div>
+      <AppTopbar />
+      <main class="min-h-0 flex-1 overflow-hidden">
+        <!-- KeepAlive preserves Workspace local state (open forms, drafts) when
+             navigating to Settings and back. -->
+        <RouterView v-slot="{ Component }">
+          <KeepAlive :include="['WorkspacePage']">
+            <component :is="Component" />
+          </KeepAlive>
+        </RouterView>
+      </main>
     </template>
     <template v-else>
       <RouterView />

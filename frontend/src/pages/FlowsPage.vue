@@ -5,30 +5,50 @@ import { PhStack, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { useFlowsStore } from '@/stores/flows'
 import type { Flow } from '@/api/types'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { useToast } from '@/composables/useToast'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import AppSectionLoading from '@/components/ui/SectionLoading.vue'
 import AppCheckbox from '@/components/ui/Checkbox.vue'
+import CronField from '@/components/forms/CronField.vue'
 import { cn } from '@/lib/cn'
 
 const { t } = useI18n()
 const store = useFlowsStore()
 const { confirmDialog } = useConfirmDialog()
+const toast = useToast()
 const showAdd = ref(false)
-const draft = ref<Flow>({ id: '', name: '', enabled: false })
+const name = ref('')
+const scheduleCron = ref('')
+const enabled = ref(true)
 
 onMounted(() => store.load())
 
-async function submitAdd() {
-  if (!draft.value.name) return
-  await store.add({ ...draft.value, id: crypto.randomUUID() })
-  showAdd.value = false
-  draft.value = { id: '', name: '', enabled: false }
+function resetForm() {
+  name.value = ''
+  scheduleCron.value = ''
+  enabled.value = true
 }
 
-async function doDelete(id: string, name: string) {
+async function submitAdd() {
+  if (!name.value.trim()) {
+    toast.error(t('flows.nameRequired'))
+    return
+  }
+  const flow: Flow = {
+    id: crypto.randomUUID(),
+    name: name.value.trim(),
+    schedule_cron: scheduleCron.value.trim() || undefined,
+    enabled: enabled.value,
+  }
+  await store.add(flow)
+  showAdd.value = false
+  resetForm()
+}
+
+async function doDelete(id: string, flowName: string) {
   const ok = await confirmDialog({
     title: t('flows.deleteTitle'),
-    message: t('flows.deleteMessage', { name }),
+    message: t('flows.deleteMessage', { name: flowName }),
     confirmText: t('common.delete'),
     confirmVariant: 'danger',
   })
@@ -44,7 +64,11 @@ async function doDelete(id: string, name: string) {
         <h1 class="page-title">{{ t('flows.title') }}</h1>
         <p class="page-sub">{{ t('flows.sub') }}</p>
       </div>
-      <button class="btn-primary" data-testid="flows-add" @click="showAdd = !showAdd">
+      <button
+        class="btn-primary"
+        data-testid="flows-add"
+        @click="showAdd = !showAdd; if (!showAdd) resetForm()"
+      >
         <PhPlus :size="16" weight="bold" /> {{ t('flows.add') }}
       </button>
     </header>
@@ -54,17 +78,18 @@ async function doDelete(id: string, name: string) {
       <form class="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-end" @submit.prevent="submitAdd">
         <label class="field-label md:col-span-2">
           <span>{{ t('common.name') }}</span>
-          <input v-model="draft.name" required class="field-input" data-testid="flows-name" />
+          <input v-model="name" required class="field-input" data-testid="flows-name" />
         </label>
-        <label class="field-label">
-          <span>{{ t('flows.cron') }}</span>
-          <input v-model="draft.schedule_cron" placeholder="0 * * * *" class="field-input" data-testid="flows-cron" />
+        <div class="field-label">
+          <span>{{ t('flows.schedule') }}</span>
+          <CronField v-model="scheduleCron" test-id="flows-cron" allow-none />
+        </div>
+        <label class="flex items-center self-end pb-1">
+          <AppCheckbox v-model="enabled" :label="t('common.enabled')" />
         </label>
-        <label class="flex items-center">
-          <AppCheckbox v-model="draft.enabled" :label="t('common.enabled')" />
-        </label>
+        <p class="m-0 text-[11px] text-text-dim md:col-span-2">{{ t('flows.formHint') }}</p>
         <div class="flex justify-end gap-2 md:col-span-2">
-          <button type="button" class="btn-ghost" @click="showAdd = false">{{ t('common.cancel') }}</button>
+          <button type="button" class="btn-ghost" @click="showAdd = false; resetForm()">{{ t('common.cancel') }}</button>
           <button type="submit" class="btn-primary" data-testid="flows-submit">{{ t('common.add') }}</button>
         </div>
       </form>
@@ -77,10 +102,10 @@ async function doDelete(id: string, name: string) {
           <div>
             <div class="text-sm font-semibold text-text">{{ f.name }}</div>
             <div class="mt-0.5 text-[11px] text-text-muted">
-              {{ t('flows.operationsCount', { n: f.operations?.length || 0 }) }}
-              <span v-if="f.schedule_cron" class="text-text-muted">
-                · {{ t('flows.cronLabel', { cron: f.schedule_cron }) }}
-              </span>
+              <template v-if="f.schedule_cron">
+                {{ t('flows.cronLabel', { cron: f.schedule_cron }) }}
+              </template>
+              <template v-else>{{ t('flows.noSchedule') }}</template>
             </div>
           </div>
         </div>

@@ -79,6 +79,8 @@ echo "dev: starting Vite --watch (foreground output piped to this terminal)…"
 PID_VITE=$!
 
 # --- Start air in background ------------------------------------------
+# Auth portal: process always starts; open the URL and unlock in the web UI.
+# No GN_DRIVE_DEV_PASSWORD required for normal hot reload.
 echo "dev: starting air (Go hot reload)…"
 "$AIR_BIN" &
 PID_AIR=$!
@@ -89,7 +91,7 @@ DEV_PORT="${GN_DRIVE_DEV_PORT:-53241}"
 echo "dev: both watchers up. Edit files to see live reload."
 echo "dev: - Vue source (.vue/.ts in frontend/) → Vite rebuilds dist/ → Go restarts"
 echo "dev: - Go source (.go) → air rebuilds and restarts the server"
-echo "dev: - Open http://127.0.0.1:${DEV_PORT}/  (fixed port; air restarts keep this URL)"
+echo "dev: - Open http://127.0.0.1:${DEV_PORT}/  (unlock in the browser if prompted)"
 echo "dev: Press Ctrl+C to stop both."
 echo ""
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"sync"
 
 	"github.com/gnasdev/gn-drive/internal/api"
 	"github.com/gnasdev/gn-drive/internal/auth"
@@ -37,18 +38,37 @@ type App struct {
 	API         *api.Server
 	Listener    net.Listener    // set by Run()
 	Health      *service.Writer // non-nil when running in service mode
+
+	deps         *api.AppDeps
+	rcloneBinary string
+	portalMode   bool
+	mu           sync.Mutex
 }
 
 // Options configures App construction.
 type Options struct {
-	ConfigDir         string
-	LogMode           logging.Mode
-	RcloneBinary      string
-	UnlockPassword    string
-	DevUnlockPassword string
+	ConfigDir      string
+	LogMode        logging.Mode
+	RcloneBinary   string
+	UnlockPassword string
+	// PortalMode allows the process to start while the master password is
+	// still locked. The HTTP server serves the SPA unlock page; data plane
+	// (store/rclone) opens after successful unlock via the web UI.
+	// Use for `gn-drive run` / --dev. CLI one-shots leave this false.
+	PortalMode bool
+	// Version is the running binary version (ldflags). Empty → "dev".
+	Version string
 }
 
-// New constructs a new App and initializes all services.
+// New constructs a new App and initializes services.
+//
+// With PortalMode (web run):
+//   - Never fails solely because auth is locked.
+//   - Serves unlock UI; store opens after unlock (or immediately if config
+//     is already plaintext on disk).
+//
+// Without PortalMode (CLI / service with --password):
+//   - Requires unlock when auth is configured (via UnlockPassword).
 func New(ctx context.Context, opts Options) (*App, error) {
 	// 1. Config paths
 	cfg := config.Detect()
@@ -70,97 +90,171 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	}
 
 	// 4. Auth
-	authSvc, _ := auth.New(auth.Options{
+	authSvc, err := auth.New(auth.Options{
 		ConfigDir: cfg.ConfigDir,
 		Logger:    log,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
 
-	// 4a. Unlock if requested
-	switch {
-	case opts.DevUnlockPassword != "":
-		// Development-only auto unlock: set up the master password if the app
-		// has never been configured, then unlock. This is gated by the caller
-		// (run --dev + GN_DRIVE_DEV_PASSWORD) and should never be used outside
-		// of local development.
-		if !authSvc.IsSetup() {
-			if err := authSvc.SetupPassword(opts.DevUnlockPassword); err != nil {
-				return nil, fmt.Errorf("dev unlock setup: %w", err)
-			}
-		}
-		if err := authSvc.Unlock(opts.DevUnlockPassword); err != nil {
-			return nil, fmt.Errorf("dev unlock: %w", err)
-		}
-	case opts.UnlockPassword != "":
+	// Optional unlock at process start (service / CI / CLI --password).
+	if opts.UnlockPassword != "" {
 		if err := authSvc.Unlock(opts.UnlockPassword); err != nil {
 			return nil, fmt.Errorf("unlock: %w", err)
 		}
 	}
-	if authSvc.IsSetup() && !authSvc.IsUnlocked() {
-		return nil, fmt.Errorf("auth: app is locked — provide --password or run 'gn-drive run' to unlock via web UI")
+
+	// Non-portal (CLI): require unlocked if master password is configured.
+	if !opts.PortalMode && authSvc.IsSetup() && !authSvc.IsUnlocked() {
+		return nil, fmt.Errorf("auth: app is locked — provide --password")
 	}
 
-	// 5. Store
-	dbPath := filepath.Join(cfg.ConfigDir, "gn-drive.db")
-	st, err := store.New(ctx, dbPath, log)
-	if err != nil {
-		return nil, fmt.Errorf("init store: %w", err)
+	if opts.PortalMode && authSvc.IsSetup() && !authSvc.IsUnlocked() {
+		log.Info("portal: starting locked — unlock via web UI")
 	}
 
-	// 6. Rclone client
-	rcloneCfg := filepath.Join(cfg.ConfigDir, "rclone.conf")
-	rc, err := rclone.New(rclone.Options{
-		BinaryPath: opts.RcloneBinary,
-		ConfigPath: rcloneCfg,
-		Logger:     log,
-	})
-	if err != nil {
-		_ = st.Close()
-		return nil, fmt.Errorf("init rclone: %w", err)
+	ver := opts.Version
+	if ver == "" {
+		ver = "dev"
 	}
 
-	// 7. Sync engine
-	eng := syncengine.New(syncengine.Deps{
+	a := &App{
+		Config:       cfg,
+		EventBus:     bus,
+		Log:          log,
+		Auth:         authSvc,
+		Browser:      browser.New(),
+		rcloneBinary: opts.RcloneBinary,
+		portalMode:   opts.PortalMode,
+	}
+
+	// Engines exist even before store (AttachStore after unlock).
+	a.SyncEngine = syncengine.New(syncengine.Deps{
 		Logger: log,
 		Bus:    bus,
-		Store:  st,
-		Rclone: rc,
+		Store:  nil,
+		Rclone: nil,
 	})
-
-	// 7b. Board DAG engine
-	boardEng := boardengine.New(boardengine.Options{
-		Store:  st,
-		Rclone: rc,
+	a.BoardEngine = boardengine.New(boardengine.Options{
+		Store:  nil,
+		Rclone: nil,
 		Bus:    bus,
 		Log:    log,
 	})
 
-	// 8. Browser opener
-	br := browser.New()
+	// Open data plane now when config is usable (unlocked, not set up, or
+	// locked but still plaintext on disk). Encrypted+locked → defer until
+	// web unlock.
+	if canOpenDataPlane(authSvc) {
+		if err := a.openDataPlane(ctx); err != nil {
+			return nil, err
+		}
+	} else {
+		log.Info("portal: data plane deferred until unlock (encrypted config)")
+	}
 
-	// 9. API server (built but not started)
-	apiServer := api.New(&api.AppDeps{
+	deps := &api.AppDeps{
 		Auth:        authSvc,
-		Store:       st,
-		Rclone:      rc,
-		SyncEngine:  eng,
-		BoardEngine: boardEng,
+		Store:       a.Store,
+		Rclone:      a.Rclone,
+		SyncEngine:  a.SyncEngine,
+		BoardEngine: a.BoardEngine,
 		Bus:         bus,
 		WebUI:       webui.Handler(),
-		Service:     nil, // set by run.go when service mode
-	}, log)
+		Service:     nil,
+		Version:     ver,
+		AfterUnlock: a.AfterUnlock,
+		BeforeLock:  a.BeforeLock,
+	}
+	a.deps = deps
+	a.API = api.New(deps, log)
 
-	return &App{
-		Config:      cfg,
-		EventBus:    bus,
-		Log:         log,
-		Store:       st,
-		Auth:        authSvc,
-		Rclone:      rc,
-		SyncEngine:  eng,
-		BoardEngine: boardEng,
-		Browser:     br,
-		API:         apiServer,
-	}, nil
+	return a, nil
+}
+
+// canOpenDataPlane reports whether sqlite/rclone config files are readable now.
+// Unlocked, never-setup, or locked-with-plaintext all qualify. Locked+encrypted does not.
+func canOpenDataPlane(authSvc *auth.Service) bool {
+	if !authSvc.IsSetup() || authSvc.IsUnlocked() {
+		return true
+	}
+	// Locked: only if no .enc files (previous process left plaintext).
+	return !authSvc.HasEncryptedConfig()
+}
+
+// openDataPlane opens store + rclone and attaches them to engines / API deps.
+func (a *App) openDataPlane(ctx context.Context) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.Store != nil {
+		return nil
+	}
+
+	dbPath := filepath.Join(a.Config.ConfigDir, "gn-drive.db")
+	st, err := store.New(ctx, dbPath, a.Log)
+	if err != nil {
+		return fmt.Errorf("init store: %w", err)
+	}
+
+	rcloneCfg := filepath.Join(a.Config.ConfigDir, "rclone.conf")
+	rc, err := rclone.New(rclone.Options{
+		BinaryPath: a.rcloneBinary,
+		ConfigPath: rcloneCfg,
+		Logger:     a.Log,
+	})
+	if err != nil {
+		_ = st.Close()
+		return fmt.Errorf("init rclone: %w", err)
+	}
+
+	a.Store = st
+	a.Rclone = rc
+	a.SyncEngine.AttachStore(st, rc)
+	a.BoardEngine.Attach(st, rc)
+
+	if a.deps != nil {
+		a.deps.Store = st
+		a.deps.Rclone = rc
+	}
+
+	a.Log.Info("data plane ready", "db", dbPath)
+	return nil
+}
+
+// AfterUnlock is invoked by the HTTP unlock/setup handlers after auth succeeds.
+// It opens the data plane if it was deferred (encrypted start).
+func (a *App) AfterUnlock(ctx context.Context) error {
+	return a.openDataPlane(ctx)
+}
+
+// BeforeLock closes the data plane so auth can re-encrypt config files safely.
+func (a *App) BeforeLock() error {
+	if a == nil {
+		return nil
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.SyncEngine != nil {
+		a.SyncEngine.DetachStore()
+	}
+	if a.BoardEngine != nil {
+		a.BoardEngine.Detach()
+	}
+
+	var errs []error
+	if a.Store != nil {
+		errs = append(errs, a.Store.Close())
+		a.Store = nil
+	}
+	a.Rclone = nil
+	if a.deps != nil {
+		a.deps.Store = nil
+		a.deps.Rclone = nil
+	}
+	return errors.Join(errs...)
 }
 
 // Close gracefully shuts down the app.
@@ -172,8 +266,9 @@ func (a *App) Close() error {
 	if a.EventBus != nil {
 		errs = append(errs, a.EventBus.Close())
 	}
-	if a.Store != nil {
-		errs = append(errs, a.Store.Close())
+	// Close store before encrypt so file handles are released.
+	if err := a.BeforeLock(); err != nil {
+		errs = append(errs, err)
 	}
 	if a.Auth != nil {
 		_ = a.Auth.Lock()

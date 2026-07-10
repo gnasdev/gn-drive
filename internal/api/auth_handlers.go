@@ -9,7 +9,7 @@ import (
 )
 
 // handleUnlock verifies password, derives AES key, decrypts config files,
-// and sets a session cookie.
+// opens the data plane if deferred, and sets a session cookie.
 func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Password string `json:"password"`
@@ -26,6 +26,15 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	if err := s.app.Auth.Unlock(req.Password); err != nil {
 		respondError(w, http.StatusUnauthorized, "unlock_failed", err.Error())
 		return
+	}
+
+	if s.app.AfterUnlock != nil {
+		if err := s.app.AfterUnlock(r.Context()); err != nil {
+			// Roll back unlock so the user can retry cleanly.
+			_ = authLockFn(s.app.Auth)
+			respondError(w, http.StatusInternalServerError, "data_plane", err.Error())
+			return
+		}
 	}
 
 	token, err := generateToken()
@@ -60,6 +69,13 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.app.AfterUnlock != nil {
+		if err := s.app.AfterUnlock(r.Context()); err != nil {
+			respondError(w, http.StatusInternalServerError, "data_plane", err.Error())
+			return
+		}
+	}
+
 	token, err := generateToken()
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "internal", err.Error())
@@ -88,6 +104,14 @@ func (s *Server) handleLock(w http.ResponseWriter, r *http.Request) {
 	// Revoke ALL sessions, not just the caller's: locking the app must
 	// invalidate every outstanding session.
 	sessionClearAll()
+
+	// Close sqlite/rclone before re-encrypt so file handles are released.
+	if s.app.BeforeLock != nil {
+		if err := s.app.BeforeLock(); err != nil {
+			respondError(w, http.StatusInternalServerError, "lock_failed", err.Error())
+			return
+		}
+	}
 
 	if err := authLockFn(s.app.Auth); err != nil {
 		respondError(w, http.StatusInternalServerError, "lock_failed", err.Error())

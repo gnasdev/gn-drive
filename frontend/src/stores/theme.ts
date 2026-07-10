@@ -4,7 +4,8 @@ import { defineStore } from 'pinia'
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'gn-drive:theme'
-const DEFAULT_THEME: ThemePreference = 'dark'
+/** Match desktop v0.4 Solarized Light default. */
+const DEFAULT_THEME: ThemePreference = 'light'
 
 function readStored(): ThemePreference {
   try {

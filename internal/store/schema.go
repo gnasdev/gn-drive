@@ -69,7 +69,6 @@ CREATE INDEX IF NOT EXISTS idx_history_start_time ON history(start_time DESC);
 CREATE TABLE IF NOT EXISTS boards (
     id               TEXT PRIMARY KEY,
     name             TEXT NOT NULL DEFAULT '',
-    description      TEXT NOT NULL DEFAULT '',
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
     schedule_enabled INTEGER NOT NULL DEFAULT 0,

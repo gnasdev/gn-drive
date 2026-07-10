@@ -9,6 +9,8 @@ import {
 } from './browser.js'
 import { loadRuntime } from './env.js'
 
+const HOME_PAGE = 'page-workspace'
+
 /**
  * Ensure this browser context has a valid session cookie.
  *
@@ -35,7 +37,7 @@ export async function ensureSession(page: Page, password?: string): Promise<void
   }
   // Reload so Vue router/auth store pick up unlocked session (cookie alone is not enough).
   await goto(page, '/')
-  await waitForTestId(page, 'page-dashboard')
+  await waitForTestId(page, HOME_PAGE)
 }
 
 export async function unlock(page: Page, password?: string): Promise<void> {
@@ -49,13 +51,13 @@ export async function unlock(page: Page, password?: string): Promise<void> {
       await typeTestId(page, 'unlock-confirm', pwd)
     }
     await clickTestId(page, 'unlock-submit')
-    await waitForTestId(page, 'page-dashboard')
+    await waitForTestId(page, HOME_PAGE)
     return
   }
   // Process already unlocked — still need a cookie for this context.
   await ensureSession(page, pwd)
   await goto(page, '/')
-  await waitForTestId(page, 'page-dashboard')
+  await waitForTestId(page, HOME_PAGE)
 }
 
 export async function ensureUnlocked(page: Page): Promise<void> {
@@ -66,7 +68,7 @@ export async function ensureUnlocked(page: Page): Promise<void> {
   if (unlockForm) {
     await unlock(page)
   } else {
-    await waitForTestId(page, 'page-dashboard')
+    await waitForTestId(page, HOME_PAGE)
   }
   await collectCoverage(page)
 }

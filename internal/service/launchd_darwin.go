@@ -19,6 +19,9 @@ import (
 type LaunchdManager struct{}
 
 // plistTemplate is the launchd plist template.
+// Label must be reverse-DNS (e.g. com.gndrive.app). A bare name like "gn-drive"
+// causes `launchctl bootstrap` to fail with exit status 5 (Input/output error)
+// on modern macOS.
 const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -62,14 +65,16 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 const (
 	userPlistDir   = "Library/LaunchAgents"
 	systemPlistDir = "Library/LaunchDaemons"
-	defaultLabel   = "com.gndrive.app"
+	// defaultLabel is the only Label we register with launchd.
+	// Do not use Spec.Name ("gn-drive") — launchd rejects non reverse-DNS labels
+	// with bootstrap exit 5.
+	defaultLabel = "com.gndrive.app"
+	// legacyAgentName is the broken agent filename/label from earlier builds.
+	legacyAgentName = "gn-drive"
 )
 
 func (m *LaunchdManager) plistPath(spec Spec) (string, error) {
-	label := defaultLabel
-	if spec.Name != "" {
-		label = spec.Name
-	}
+	label := m.label(spec)
 	if spec.Scope == ScopeSystem {
 		return filepath.Join("/", systemPlistDir, label+".plist"), nil
 	}
@@ -80,11 +85,10 @@ func (m *LaunchdManager) plistPath(spec Spec) (string, error) {
 	return filepath.Join(home, userPlistDir, label+".plist"), nil
 }
 
+// label always returns a reverse-DNS launchd Label. Spec.Name is intentionally
+// ignored for launchd (it is still used on other platforms as a display/service name).
 func (m *LaunchdManager) label(spec Spec) string {
-	if spec.Name != "" {
-		return spec.Name
-	}
-	// Fall back to a stable label derived from the binary basename.
+	_ = spec
 	return defaultLabel
 }
 
@@ -112,12 +116,18 @@ var installPlistPathFn = func(m *LaunchdManager, spec Spec) (string, error) {
 var installMkdirAllFn = os.MkdirAll
 
 func (m *LaunchdManager) Install(spec Spec) error {
+	// Drop legacy agent written with Label "gn-drive" (bootstrap always failed).
+	m.cleanupLegacyAgent(spec)
+
 	installed, err := m.IsInstalled(spec)
 	if err != nil {
 		return err
 	}
 	if installed {
-		return fmt.Errorf("%w: %s", ErrAlreadyInstalled, m.plistPathFor(spec))
+		// Allow reinstall after partial failure: unload then rewrite.
+		_ = m.bootout(spec)
+		plistPath, _ := m.plistPath(spec)
+		_ = os.Remove(plistPath)
 	}
 
 	plist, err := renderLaunchdPlist(spec)
@@ -138,12 +148,13 @@ func (m *LaunchdManager) Install(spec Spec) error {
 		return fmt.Errorf("write plist: %w", err)
 	}
 
-	// Bootstrap the service. System-level requires sudo (caller's responsibility).
 	domain := m.domainTarget(spec)
 	if err := runLaunchctl("bootstrap", domain, plistPath); err != nil {
-		// Plist was written; bootstrap failed. Don't remove the plist — the user
-		// can run `launchctl bootstrap` manually or fix permissions and retry.
-		return fmt.Errorf("launchctl bootstrap: %w\nplist written to: %s", err, plistPath)
+		// Stale job with same label can block bootstrap; bootout and retry once.
+		_ = m.bootout(spec)
+		if err2 := runLaunchctl("bootstrap", domain, plistPath); err2 != nil {
+			return fmt.Errorf("launchctl bootstrap: %w\nplist written to: %s", err2, plistPath)
+		}
 	}
 
 	// Enable so it auto-starts on next login/boot.
@@ -153,6 +164,8 @@ func (m *LaunchdManager) Install(spec Spec) error {
 }
 
 func (m *LaunchdManager) Uninstall(spec Spec) error {
+	m.cleanupLegacyAgent(spec)
+
 	installed, err := m.IsInstalled(spec)
 	if err != nil {
 		return err
@@ -161,19 +174,45 @@ func (m *LaunchdManager) Uninstall(spec Spec) error {
 		return nil // idempotent
 	}
 
-	domain := m.domainTarget(spec)
-	label := m.label(spec)
-
-	// Bootout (unload) the service.
-	_ = runLaunchctl("bootout", domain+"/"+label)
-	// Disable.
-	_ = runLaunchctl("disable", domain+"/"+label)
+	_ = m.bootout(spec)
+	_ = runLaunchctl("disable", m.domainTarget(spec)+"/"+m.label(spec))
 
 	plistPath, _ := m.plistPath(spec)
-	if err := os.Remove(plistPath); err != nil {
+	if err := os.Remove(plistPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove plist: %w", err)
 	}
 	return nil
+}
+
+func (m *LaunchdManager) bootout(spec Spec) error {
+	domain := m.domainTarget(spec)
+	label := m.label(spec)
+	// Prefer domain/label form; also try path form for stubborn agents.
+	err1 := runLaunchctl("bootout", domain+"/"+label)
+	if plistPath, err := m.plistPath(spec); err == nil {
+		_ = runLaunchctl("bootout", domain, plistPath)
+	}
+	return err1
+}
+
+// cleanupLegacyAgent removes the broken ~/Library/LaunchAgents/gn-drive.plist
+// that older builds wrote with Label "gn-drive" (rejected by launchd).
+func (m *LaunchdManager) cleanupLegacyAgent(spec Spec) {
+	if spec.Scope == ScopeSystem {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	legacyPath := filepath.Join(home, userPlistDir, legacyAgentName+".plist")
+	if _, err := os.Stat(legacyPath); err != nil {
+		return
+	}
+	domain := m.domainTarget(spec)
+	_ = runLaunchctl("bootout", domain+"/"+legacyAgentName)
+	_ = runLaunchctl("bootout", domain, legacyPath)
+	_ = os.Remove(legacyPath)
 }
 
 func (m *LaunchdManager) Start(spec Spec) error {
@@ -259,20 +298,28 @@ func renderLaunchdPlist(spec Spec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	workdir := filepath.Dir(spec.ExecPath)
+	// Prefer config dir as WorkingDirectory — binary dir may be air's tmp/.
+	workdir := home
+	if spec.ConfigDir != "" {
+		workdir = spec.ConfigDir
+	}
 	logDir := filepath.Join(home, "Library", "Logs", "GNDrive")
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir log dir: %w", err)
 	}
 
-	label := defaultLabel
-	if spec.Name != "" {
-		label = spec.Name
+	execPath := spec.ExecPath
+	if execPath == "" {
+		execPath, _ = os.Executable()
+	}
+	// Resolve symlinks so launchd does not depend on a moving air/tmp path when possible.
+	if resolved, err := filepath.EvalSymlinks(execPath); err == nil && resolved != "" {
+		execPath = resolved
 	}
 
 	r := strings.NewReplacer(
-		"{{LABEL}}", label,
-		"{{EXEC}}", spec.ExecPath,
+		"{{LABEL}}", defaultLabel,
+		"{{EXEC}}", execPath,
 		"{{HOME}}", home,
 		"{{WORKDIR}}", workdir,
 		"{{LOG_DIR}}", logDir,

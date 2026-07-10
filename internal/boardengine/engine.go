@@ -71,6 +71,18 @@ func New(opts Options) *Engine {
 	}
 }
 
+// Attach wires store + rclone after portal unlock.
+func (e *Engine) Attach(st *store.Store, rc SyncExecutor) {
+	e.store = st
+	e.rclone = rc
+}
+
+// Detach drops store/rclone before lock re-encrypts config files.
+func (e *Engine) Detach() {
+	e.store = nil
+	e.rclone = nil
+}
+
 // RunStatus describes an active or recently finished board run.
 type RunStatus struct {
 	RunID   string `json:"run_id"`

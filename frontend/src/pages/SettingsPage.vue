@@ -51,7 +51,11 @@ async function selfUpdate() {
   updateMsg.value = t('settings.checkingUpdate')
   try {
     const r = await fetch('/api/v1/self-update', { method: 'POST', credentials: 'same-origin' })
-    const j = await r.json()
+    const j = await r.json().catch(() => ({} as { output?: string; error?: string }))
+    if (!r.ok) {
+      updateMsg.value = j.error || j.output || `update failed (${r.status})`
+      return
+    }
     updateMsg.value = j.output ?? JSON.stringify(j)
   } catch (e: any) {
     updateMsg.value = e?.message ?? 'update failed'
@@ -73,7 +77,8 @@ function setLang(code: AppLocale) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[800px]" data-testid="page-settings">
+  <div class="h-full overflow-auto py-6">
+  <div class="page-content" data-testid="page-settings">
     <header class="mb-5">
       <h1 class="page-title">{{ t('settings.title') }}</h1>
       <p class="page-sub">{{ t('settings.sub') }}</p>
@@ -210,5 +215,6 @@ function setLang(code: AppLocale) {
         class="mt-3 max-h-[200px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-bg p-2.5 font-mono text-[11px] text-text-muted"
       >{{ updateMsg }}</pre>
     </section>
+  </div>
   </div>
 </template>

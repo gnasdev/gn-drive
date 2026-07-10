@@ -10,55 +10,21 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    name: 'dashboard',
-    component: () => import('@/pages/DashboardPage.vue'),
-  },
-  {
-    path: '/profiles',
-    name: 'profiles',
-    component: () => import('@/pages/ProfilesPage.vue'),
-  },
-  {
-    path: '/remotes',
-    name: 'remotes',
-    component: () => import('@/pages/RemotesPage.vue'),
-  },
-  {
-    path: '/operations',
-    name: 'operations',
-    component: () => import('@/pages/OperationsPage.vue'),
-  },
-  {
-    path: '/boards',
-    name: 'boards',
-    component: () => import('@/pages/BoardsPage.vue'),
-  },
-  {
-    path: '/flows',
-    name: 'flows',
-    component: () => import('@/pages/FlowsPage.vue'),
-  },
-  {
-    path: '/schedules',
-    name: 'schedules',
-    component: () => import('@/pages/SchedulesPage.vue'),
-  },
-  {
-    path: '/history',
-    name: 'history',
-    component: () => import('@/pages/HistoryPage.vue'),
-  },
-  {
-    path: '/service',
-    name: 'service',
-    component: () => import('@/pages/ServicePage.vue'),
+    name: 'workspace',
+    component: () => import('@/pages/WorkspacePage.vue'),
   },
   {
     path: '/settings',
     name: 'settings',
     component: () => import('@/pages/SettingsPage.vue'),
   },
-  // SPA fallback
+  // Legacy multi-page routes → single workspace (pre-Vue desktop model)
+  { path: '/dashboard', redirect: '/' },
+  { path: '/profiles', redirect: '/' },
+  { path: '/remotes', redirect: '/' },
+  { path: '/operations', redirect: '/' },
+  { path: '/boards', redirect: '/' },
+  { path: '/flows', redirect: '/' },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -72,13 +38,11 @@ router.beforeEach(async (to) => {
   if (!auth.initialized) {
     await auth.fetchStatus()
   }
-  // When master password is not configured yet, keep /unlock reachable so
-  // first-run setup works even though the app is open (unlocked=true).
   if (!to.meta.public && !auth.unlocked) {
     return { name: 'unlock' }
   }
   if (to.name === 'unlock' && auth.unlocked && auth.setup) {
-    return { name: 'dashboard' }
+    return { name: 'workspace' }
   }
   return true
 })

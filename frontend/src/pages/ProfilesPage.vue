@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  errorsByField,
+  isProfileDraftValid,
+  validateProfileDraft,
+} from '@/lib/profileValidation'
 import { PhKey, PhPlus, PhTrash, PhArrowRight, PhPencilSimple } from '@phosphor-icons/vue'
 import { useProfilesStore } from '@/stores/profiles'
 import { useRemotesStore } from '@/stores/remotes'
 import type { Profile } from '@/api/types'
-import { SYNC_ACTIONS } from '@/constants/forms'
 import RemotePathField from '@/components/forms/RemotePathField.vue'
+import DirectionField from '@/components/forms/DirectionField.vue'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useToast } from '@/composables/useToast'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import AppSectionLoading from '@/components/ui/SectionLoading.vue'
 import AppAlert from '@/components/ui/Alert.vue'
+import AppCheckbox from '@/components/ui/Checkbox.vue'
 
 const { t } = useI18n()
 const store = useProfilesStore()
@@ -42,6 +48,7 @@ onMounted(async () => {
 function openCreate() {
   formMode.value = 'create'
   draft.value = emptyDraft()
+  resetProfileTouched()
   formOpen.value = true
 }
 
@@ -54,17 +61,43 @@ function openEdit(p: Profile) {
     bandwidth: p.bandwidth ?? 0,
     dry_run: !!p.dry_run,
   }
+  resetProfileTouched()
   formOpen.value = true
+}
+
+type ProfileFieldKey = 'name' | 'from' | 'to' | 'parallel' | 'bandwidth' | 'direction'
+const profileTouched = ref<Partial<Record<ProfileFieldKey, boolean>>>({})
+
+function resetProfileTouched() {
+  profileTouched.value = {}
+}
+
+function touchProfileField(field: ProfileFieldKey) {
+  profileTouched.value = { ...profileTouched.value, [field]: true }
 }
 
 function closeForm() {
   formOpen.value = false
   draft.value = emptyDraft()
+  resetProfileTouched()
+}
+
+const profileErrors = computed(() => validateProfileDraft(draft.value))
+const profileFieldErrors = computed(() => errorsByField(profileErrors.value))
+const profileFormValid = computed(() => isProfileDraftValid(draft.value))
+function fieldError(field: ProfileFieldKey): string | null {
+  if (!profileTouched.value[field]) return null
+  const e = profileFieldErrors.value[field]
+  if (!e) return null
+  return t(`profiles.validation.${e.messageKey}`, e.params ?? {})
 }
 
 async function submitForm() {
-  if (!draft.value.name || !draft.value.from || !draft.value.to) {
-    toast.error(t('profiles.required'))
+  if (!profileFormValid.value) {
+    for (const f of ['name', 'from', 'to', 'parallel', 'bandwidth', 'direction'] as ProfileFieldKey[]) {
+      profileTouched.value[f] = true
+    }
+    profileTouched.value = { ...profileTouched.value }
     return
   }
   try {
@@ -123,54 +156,83 @@ async function doDelete(name: string) {
           <span>{{ t('common.name') }}</span>
           <input
             v-model="draft.name"
-            required
             class="field-input"
             data-testid="profiles-name"
             :readonly="formMode === 'edit'"
-            :class="{ 'cursor-not-allowed opacity-70': formMode === 'edit' }"
+            :class="{ 'cursor-not-allowed opacity-70': formMode === 'edit', 'border-danger': !!fieldError('name') }"
+            @focus="touchProfileField('name')"
           />
+          <p v-if="fieldError('name')" class="field-error">{{ fieldError('name') }}</p>
         </label>
         <label class="field-label">
           <span>{{ t('profiles.direction') }}</span>
-          <select v-model="draft.direction" class="field-input" data-testid="profiles-direction">
-            <option v-for="a in SYNC_ACTIONS" :key="a" :value="a">{{ a }}</option>
-          </select>
+          <DirectionField
+            v-model="draft.direction"
+            :invalid="!!fieldError('direction')"
+            test-id="profiles-direction"
+            @focus="touchProfileField('direction')"
+          />
+          <p v-if="fieldError('direction')" class="field-error">{{ fieldError('direction') }}</p>
         </label>
 
-        <div class="md:col-span-2">
+        <div class="field-label md:col-span-2" @focusin="touchProfileField('from')">
           <RemotePathField
             v-model="draft.from"
             :remotes="remotes.items"
             test-id="profiles-from"
             :label="t('profiles.fromLabel')"
-            required
           />
+          <p v-if="fieldError('from')" class="field-error">{{ fieldError('from') }}</p>
         </div>
-        <div class="md:col-span-2">
+        <div class="field-label md:col-span-2" @focusin="touchProfileField('to')">
           <RemotePathField
             v-model="draft.to"
             :remotes="remotes.items"
             test-id="profiles-to"
             :label="t('profiles.toLabel')"
-            required
           />
+          <p v-if="fieldError('to')" class="field-error">{{ fieldError('to') }}</p>
         </div>
 
         <label class="field-label">
           <span>{{ t('profiles.parallel') }}</span>
-          <input v-model.number="draft.parallel" type="number" min="1" max="64" class="field-input" data-testid="profiles-parallel" />
+          <input
+            v-model.number="draft.parallel"
+            type="number"
+            min="0"
+            max="256"
+            class="field-input"
+            data-testid="profiles-parallel"
+            :class="{ 'border-danger': !!fieldError('parallel') }"
+            @focus="touchProfileField('parallel')"
+          />
+          <p v-if="fieldError('parallel')" class="field-error">{{ fieldError('parallel') }}</p>
         </label>
         <label class="field-label">
           <span>{{ t('profiles.bandwidth') }}</span>
-          <input v-model.number="draft.bandwidth" type="number" min="0" class="field-input" data-testid="profiles-bandwidth" />
+          <input
+            v-model.number="draft.bandwidth"
+            type="number"
+            min="0"
+            class="field-input"
+            data-testid="profiles-bandwidth"
+            :class="{ 'border-danger': !!fieldError('bandwidth') }"
+            @focus="touchProfileField('bandwidth')"
+          />
+          <p v-if="fieldError('bandwidth')" class="field-error">{{ fieldError('bandwidth') }}</p>
         </label>
-        <label class="flex flex-row items-center gap-2 md:col-span-2">
-          <input v-model="draft.dry_run" type="checkbox" class="accent-accent" data-testid="profiles-dry-run" />
-          <span class="text-[13px]">{{ t('profiles.dryRun') }}</span>
-        </label>
+        <div class="flex items-end md:col-span-2">
+          <AppCheckbox v-model="draft.dry_run!" :label="t('profiles.dryRun')" test-id="profiles-dry-run" />
+        </div>
+
         <div class="flex justify-end gap-2 md:col-span-2">
           <button type="button" class="btn-ghost" @click="closeForm">{{ t('common.cancel') }}</button>
-          <button type="submit" class="btn-primary" :disabled="store.loading" data-testid="profiles-submit">
+          <button
+            type="submit"
+            class="btn-primary"
+            :disabled="!profileFormValid || store.loading"
+            data-testid="profiles-submit"
+          >
             {{ store.loading ? t('common.saving') : formMode === 'create' ? t('common.add') : t('common.save') }}
           </button>
         </div>

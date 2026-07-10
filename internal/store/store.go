@@ -434,7 +434,7 @@ func (s *Store) Boards() BoardRepo { return BoardRepo{s: s} }
 
 func (r BoardRepo) List(ctx context.Context) ([]Board, error) {
 	rows, err := r.s.db.QueryContext(ctx,
-		`SELECT id, name, description, created_at, updated_at, schedule_enabled, cron_expr
+		`SELECT id, name, created_at, updated_at, schedule_enabled, cron_expr
 		 FROM boards ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -446,11 +446,11 @@ func (r BoardRepo) List(ctx context.Context) ([]Board, error) {
 		var b Board
 		var schedEnabled int
 		var cron sql.NullString
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt,
+		if err := rows.Scan(&b.ID, &b.Name, &b.CreatedAt, &b.UpdatedAt,
 			&schedEnabled, &cron); err != nil {
 			return nil, err
 		}
-		// Nodes/edges not loaded in Phase 2 (board execution is Phase 3).
+		// Nodes/edges loaded via LoadGraph.
 		boards = append(boards, b)
 	}
 	return boards, rows.Err()
@@ -458,12 +458,12 @@ func (r BoardRepo) List(ctx context.Context) ([]Board, error) {
 
 func (r BoardRepo) Get(ctx context.Context, id string) (*Board, error) {
 	row := r.s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, created_at, updated_at, schedule_enabled, cron_expr
+		`SELECT id, name, created_at, updated_at, schedule_enabled, cron_expr
 		 FROM boards WHERE id = ?`, id)
 	var b Board
 	var schedEnabled int
 	var cron sql.NullString
-	if err := row.Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt,
+	if err := row.Scan(&b.ID, &b.Name, &b.CreatedAt, &b.UpdatedAt,
 		&schedEnabled, &cron); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -522,13 +522,13 @@ func (r BoardRepo) LoadGraph(ctx context.Context, id string) (*Board, error) {
 
 func (r BoardRepo) Save(ctx context.Context, b *Board) error {
 	_, err := r.s.db.ExecContext(ctx,
-		`INSERT INTO boards (id, name, description, schedule_enabled, cron_expr, updated_at)
-		 VALUES (?, ?, ?, ?, ?, datetime('now'))
+		`INSERT INTO boards (id, name, schedule_enabled, cron_expr, updated_at)
+		 VALUES (?, ?, ?, ?, datetime('now'))
 		 ON CONFLICT(id) DO UPDATE SET
-		   name=excluded.name, description=excluded.description,
+		   name=excluded.name,
 		   schedule_enabled=excluded.schedule_enabled, cron_expr=excluded.cron_expr,
 		   updated_at=datetime('now')`,
-		b.ID, b.Name, b.Description, 0, "")
+		b.ID, b.Name, 0, "")
 	return err
 }
 
@@ -542,13 +542,13 @@ func (r BoardRepo) SaveGraph(ctx context.Context, b *Board) error {
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO boards (id, name, description, schedule_enabled, cron_expr, updated_at)
-		 VALUES (?, ?, ?, ?, ?, datetime('now'))
+		`INSERT INTO boards (id, name, schedule_enabled, cron_expr, updated_at)
+		 VALUES (?, ?, ?, ?, datetime('now'))
 		 ON CONFLICT(id) DO UPDATE SET
-		   name=excluded.name, description=excluded.description,
+		   name=excluded.name,
 		   schedule_enabled=excluded.schedule_enabled, cron_expr=excluded.cron_expr,
 		   updated_at=datetime('now')`,
-		b.ID, b.Name, b.Description, 0, ""); err != nil {
+		b.ID, b.Name, 0, ""); err != nil {
 		return err
 	}
 
@@ -601,8 +601,8 @@ func (s *Store) Flows() FlowRepo { return FlowRepo{s: s} }
 
 func (r FlowRepo) List(ctx context.Context) ([]Flow, error) {
 	rows, err := r.s.db.QueryContext(ctx,
-		`SELECT id, name, schedule_enabled, cron_expr, sort_order, created_at, updated_at
-		 FROM flows ORDER BY sort_order`)
+		`SELECT id, name, schedule_enabled, cron_expr, created_at, updated_at
+		 FROM flows ORDER BY sort_order, name`)
 	if err != nil {
 		return nil, err
 	}
@@ -610,33 +610,37 @@ func (r FlowRepo) List(ctx context.Context) ([]Flow, error) {
 
 	var flows []Flow
 	for rows.Next() {
-		var f Flow
-		var schedEnabled int
-		if err := rows.Scan(&f.ID, &f.Name, &schedEnabled, &f.ScheduleCron, &f.Enabled,
-			&f.CreatedAt, &f.UpdatedAt); err != nil {
-			// Enable is bool; reuse field for sort_order in scan then correct
-			continue
+		f, err := scanFlow(rows)
+		if err != nil {
+			return nil, err
 		}
-		_ = schedEnabled
-		flows = append(flows, f)
+		flows = append(flows, *f)
 	}
 	return flows, rows.Err()
 }
 
 func (r FlowRepo) Get(ctx context.Context, id string) (*Flow, error) {
 	row := r.s.db.QueryRowContext(ctx,
-		`SELECT id, name, schedule_enabled, cron_expr, sort_order, created_at, updated_at
-	 FROM flows WHERE id = ?`, id)
-	var f Flow
-	var schedEnabled int
-	var cron, createdAt, updatedAt sql.NullString
-	if err := row.Scan(&f.ID, &f.Name, &schedEnabled, &cron, &f.Enabled,
-		&createdAt, &updatedAt); err != nil {
+		`SELECT id, name, schedule_enabled, cron_expr, created_at, updated_at
+		 FROM flows WHERE id = ?`, id)
+	f, err := scanFlow(row)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
+	return f, nil
+}
+
+func scanFlow(r rowScanner) (*Flow, error) {
+	var f Flow
+	var schedEnabled int
+	var cron, createdAt, updatedAt sql.NullString
+	if err := r.Scan(&f.ID, &f.Name, &schedEnabled, &cron, &createdAt, &updatedAt); err != nil {
+		return nil, err
+	}
+	f.Enabled = schedEnabled != 0
 	if cron.Valid {
 		f.ScheduleCron = cron.String
 	}
@@ -650,7 +654,6 @@ func (r FlowRepo) Get(ctx context.Context, id string) (*Flow, error) {
 }
 
 func (r FlowRepo) Save(ctx context.Context, f *Flow) error {
-	// sort_order is not on the Flow DTO yet; default 0 for new/updated rows.
 	const sortOrder = 0
 	_, err := r.s.db.ExecContext(ctx,
 		`INSERT INTO flows (id, name, schedule_enabled, cron_expr, sort_order, created_at, updated_at)

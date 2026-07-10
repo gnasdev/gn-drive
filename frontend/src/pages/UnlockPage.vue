@@ -32,7 +32,9 @@ async function submit() {
     } else {
       await auth.unlock(password.value)
     }
-    router.push({ name: 'dashboard' })
+    // Route home is `workspace` (single-page shell); use replace so Back
+    // does not return to the unlock form after a successful session.
+    await router.replace({ name: 'workspace' })
   } catch {
     // error already in store
   }

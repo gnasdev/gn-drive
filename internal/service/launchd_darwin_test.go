@@ -17,13 +17,18 @@ func TestRenderLaunchdPlist(t *testing.T) {
 		Name:        "test-svc",
 		ExecPath:    "/usr/local/bin/gn-drive",
 		DisplayName: "Test Service",
+		ConfigDir:   filepath.Join(home, ".config", "gn-drive"),
 	}
 	plist, err := renderLaunchdPlist(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(plist, "test-svc") {
-		t.Error("plist should contain name")
+	// Label must be reverse-DNS, never Spec.Name ("gn-drive" fails bootstrap).
+	if !strings.Contains(plist, defaultLabel) {
+		t.Errorf("plist should contain reverse-DNS label %q", defaultLabel)
+	}
+	if strings.Contains(plist, "<string>test-svc</string>") {
+		t.Error("plist Label must not use Spec.Name")
 	}
 	if !strings.Contains(plist, "/usr/local/bin/gn-drive") {
 		t.Error("plist should contain ExecPath")
@@ -31,22 +36,23 @@ func TestRenderLaunchdPlist(t *testing.T) {
 	if !strings.Contains(plist, home) {
 		t.Error("plist should contain HOME")
 	}
-	// Verify the plist references our binary.
 	if !strings.Contains(plist, "<string>/usr/local/bin/gn-drive</string>") {
 		t.Error("plist should contain binary path in <string>")
 	}
-	// Plist must have valid XML and well-formed key elements.
 	if !strings.Contains(plist, "<plist version=\"1.0\">") {
 		t.Error("plist should have plist root")
 	}
 	if !strings.Contains(plist, "<key>RunAtLoad</key>") {
 		t.Error("plist should have RunAtLoad key")
 	}
+	// WorkingDirectory should prefer ConfigDir, not binary dir.
+	if !strings.Contains(plist, spec.ConfigDir) {
+		t.Error("plist WorkingDirectory should use ConfigDir")
+	}
 }
 
 func TestRenderLaunchdPlist_DefaultLabel(t *testing.T) {
-	// When spec.Name is empty, we fall back to defaultLabel.
-	spec := Spec{ExecPath: "/bin/test"}
+	spec := Spec{ExecPath: "/bin/test", Name: "gn-drive"}
 	plist, err := renderLaunchdPlist(spec)
 	if err != nil {
 		t.Fatal(err)
@@ -54,23 +60,24 @@ func TestRenderLaunchdPlist_DefaultLabel(t *testing.T) {
 	if !strings.Contains(plist, defaultLabel) {
 		t.Errorf("plist should use default label %q", defaultLabel)
 	}
+	if strings.Contains(plist, "<string>gn-drive</string>") {
+		t.Error("Label gn-drive is rejected by launchd bootstrap (exit 5)")
+	}
 }
 
 func TestLaunchdManager_plistPath(t *testing.T) {
 	m := &LaunchdManager{}
-	// User scope.
 	home, _ := os.UserHomeDir()
 	p, err := m.plistPath(Spec{Name: "x", Scope: ScopeUser})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(home, "Library/LaunchAgents/x.plist")
+	want := filepath.Join(home, "Library/LaunchAgents", defaultLabel+".plist")
 	if p != want {
 		t.Errorf("user plistPath = %q, want %q", p, want)
 	}
-	// System scope.
 	p, _ = m.plistPath(Spec{Name: "x", Scope: ScopeSystem})
-	want = filepath.Join("/", "Library/LaunchDaemons/x.plist")
+	want = filepath.Join("/", "Library/LaunchDaemons", defaultLabel+".plist")
 	if p != want {
 		t.Errorf("system plistPath = %q, want %q", p, want)
 	}
@@ -78,8 +85,9 @@ func TestLaunchdManager_plistPath(t *testing.T) {
 
 func TestLaunchdManager_label(t *testing.T) {
 	m := &LaunchdManager{}
-	if got := m.label(Spec{Name: "my-svc"}); got != "my-svc" {
-		t.Errorf("label = %q, want my-svc", got)
+	// Spec.Name must not become the launchd Label.
+	if got := m.label(Spec{Name: "gn-drive"}); got != defaultLabel {
+		t.Errorf("label = %q, want %q", got, defaultLabel)
 	}
 	if got := m.label(Spec{}); got != defaultLabel {
 		t.Errorf("default label = %q, want %q", got, defaultLabel)
@@ -99,12 +107,12 @@ func TestLaunchdManager_IsInstalled(t *testing.T) {
 	if installed {
 		t.Error("expected not installed")
 	}
-	// Create the plist file.
+	// Create the plist file at the fixed reverse-DNS path.
 	plistDir := filepath.Join(dir, "Library/LaunchAgents")
 	if err := os.MkdirAll(plistDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(plistDir, "exists.plist"), []byte("<plist/>"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(plistDir, defaultLabel+".plist"), []byte("<plist/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	installed, err = m.IsInstalled(Spec{Name: "exists", Scope: ScopeUser})
@@ -139,7 +147,12 @@ func TestLaunchdManager_domainTarget(t *testing.T) {
 	}
 }
 
-func TestLaunchdManager_Install_AlreadyInstalled(t *testing.T) {
+func TestLaunchdManager_Install_ReplacesExisting(t *testing.T) {
+	// Reinstall is allowed: bootout + rewrite + bootstrap (idempotent upgrade path).
+	orig := runLaunchctl
+	defer func() { runLaunchctl = orig }()
+	runLaunchctl = func(args ...string) error { return nil }
+
 	m := &LaunchdManager{}
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
@@ -147,12 +160,11 @@ func TestLaunchdManager_Install_AlreadyInstalled(t *testing.T) {
 	if err := os.MkdirAll(plistDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(plistDir, "x.plist"), []byte("<plist/>"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(plistDir, defaultLabel+".plist"), []byte("<plist/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := m.Install(Spec{Name: "x", Scope: ScopeUser})
-	if err == nil {
-		t.Error("expected error for already installed")
+	if err := m.Install(Spec{Name: "x", ExecPath: "/bin/true", Scope: ScopeUser}); err != nil {
+		t.Fatalf("reinstall should succeed: %v", err)
 	}
 }
 
@@ -342,15 +354,16 @@ func TestLaunchdManager_Uninstall_Mocked(t *testing.T) {
 	if err := os.MkdirAll(plistDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	plistPath := filepath.Join(plistDir, "x.plist")
+	plistPath := filepath.Join(plistDir, defaultLabel+".plist")
 	if err := os.WriteFile(plistPath, []byte("<plist/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Uninstall(Spec{Name: "x", Scope: ScopeUser}); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Errorf("expected 2 launchctl calls (bootout+disable), got %d", calls)
+	// bootout (domain/label + domain path) + disable = at least 2
+	if calls < 2 {
+		t.Errorf("expected >=2 launchctl calls, got %d", calls)
 	}
 	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
 		t.Error("plist should be removed after uninstall")
@@ -436,7 +449,7 @@ func TestUninstall_RemoveError(t *testing.T) {
 	dir := t.TempDir()
 	// Create a directory (with contents) where Uninstall will try to remove a
 	// regular file. os.Remove fails on non-empty directories.
-	plistPath := filepath.Join(dir, "Library", "LaunchAgents", "x.plist")
+	plistPath := filepath.Join(dir, "Library", "LaunchAgents", defaultLabel+".plist")
 	if err := os.MkdirAll(plistPath, 0o755); err != nil {
 		t.Fatal(err)
 	}

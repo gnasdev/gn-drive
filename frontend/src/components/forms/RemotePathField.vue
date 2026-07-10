@@ -179,15 +179,24 @@ const pathInputId = computed(() =>
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-1.5">
-    <div v-if="label" class="text-[11px] font-medium text-text-muted">{{ label }}</div>
-    <div class="flex gap-1">
+  <div class="flex w-full flex-col gap-2">
+    <div v-if="label" class="text-[11px] font-bold uppercase tracking-wide text-text-muted">{{ label }}</div>
+
+    <!-- Neo segmented control: Local | Remote -->
+    <div
+      class="inline-flex w-fit border-2 border-border bg-bg shadow-[var(--shadow-neo-sm)]"
+      role="group"
+      :aria-label="t('pathField.modeGroup')"
+    >
       <button
         type="button"
         :class="cn(
-          'rounded border border-border bg-transparent px-2.5 py-1 text-[11px] text-text-muted',
-          mode === 'local' && 'border-accent bg-accent/15 font-semibold text-accent',
+          'min-w-[5.5rem] border-r-2 border-border px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-100',
+          mode === 'local'
+            ? 'bg-accent text-text'
+            : 'bg-bg text-text-muted hover:bg-surface-hover hover:text-text',
         )"
+        :aria-pressed="mode === 'local'"
         :data-testid="`${testId}-mode-local`"
         @click="setMode('local')"
       >
@@ -196,9 +205,12 @@ const pathInputId = computed(() =>
       <button
         type="button"
         :class="cn(
-          'rounded border border-border bg-transparent px-2.5 py-1 text-[11px] text-text-muted',
-          mode === 'remote' && 'border-accent bg-accent/15 font-semibold text-accent',
+          'min-w-[5.5rem] px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-100',
+          mode === 'remote'
+            ? 'bg-accent text-text'
+            : 'bg-bg text-text-muted hover:bg-surface-hover hover:text-text',
         )"
+        :aria-pressed="mode === 'remote'"
         :data-testid="`${testId}-mode-remote`"
         @click="setMode('remote')"
       >
@@ -230,7 +242,7 @@ const pathInputId = computed(() =>
       />
       <button
         type="button"
-        class="btn-ghost whitespace-nowrap"
+        class="btn-secondary whitespace-nowrap !px-2.5 !py-1.5 !text-xs"
         :disabled="!canBrowse"
         :data-testid="`${testId}-browse`"
         :title="t('common.browse')"
@@ -243,19 +255,19 @@ const pathInputId = computed(() =>
 
     <div
       v-if="showBrowse"
-      class="mt-1 rounded-md border border-border bg-bg p-2.5"
+      class="mt-0.5 border-2 border-border bg-bg p-2.5 shadow-[var(--shadow-neo-sm)]"
       :data-testid="`${testId}-browse-panel`"
     >
       <div class="mb-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="btn-ghost !px-2 !py-1 !text-[11px]"
+          class="btn-secondary !px-2 !py-1 !text-[11px]"
           :disabled="browseBusy || parentPath(browseCursor) == null"
           @click="goParent"
         >
           <PhCaretUp :size="14" weight="bold" /> {{ t('common.up') }}
         </button>
-        <code class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px]">
+        <code class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap border-2 border-border bg-bg-secondary px-2 py-1 font-mono text-[11px]">
           {{ browseCursor }}
         </code>
         <button
@@ -267,28 +279,28 @@ const pathInputId = computed(() =>
         >
           {{ t('common.usePath') }}
         </button>
-        <button type="button" class="btn-ghost !px-2 !py-1 !text-[11px]" @click="showBrowse = false">
+        <button type="button" class="btn-secondary !px-2 !py-1 !text-[11px]" @click="showBrowse = false">
           {{ t('common.close') }}
         </button>
       </div>
-      <p v-if="browseError" class="m-0 mb-1.5 text-xs text-danger">{{ browseError }}</p>
+      <p v-if="browseError" class="m-0 mb-1.5 text-xs font-bold text-danger">{{ browseError }}</p>
       <p v-else-if="browseBusy" class="m-0 text-xs text-text-dim">{{ t('common.loadingDots') }}</p>
-      <div v-else class="flex max-h-[180px] flex-col gap-0.5 overflow-auto">
+      <div v-else class="flex max-h-[180px] flex-col gap-0 overflow-auto border-2 border-border">
         <button
           v-for="e in browseEntries"
           :key="e.path || e.name"
           type="button"
           :class="cn(
-            'flex items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-text',
-            e.is_dir ? 'cursor-pointer hover:bg-surface-hover' : 'cursor-default opacity-70',
+            'flex items-center gap-1.5 border-b border-border px-2 py-1.5 text-left text-xs font-medium text-text last:border-b-0',
+            e.is_dir ? 'cursor-pointer hover:bg-accent/30' : 'cursor-default opacity-70',
           )"
           @click="onEntryClick(e)"
         >
-          <PhFolder v-if="e.is_dir" :size="14" weight="regular" />
+          <PhFolder v-if="e.is_dir" :size="14" weight="bold" />
           <PhFile v-else :size="14" weight="regular" />
           <span class="font-mono">{{ e.name }}</span>
         </button>
-        <p v-if="browseEntries.length === 0" class="m-0 text-xs text-text-dim">{{ t('common.emptyDir') }}</p>
+        <p v-if="browseEntries.length === 0" class="m-0 px-2 py-2 text-xs text-text-dim">{{ t('common.emptyDir') }}</p>
       </div>
     </div>
   </div>

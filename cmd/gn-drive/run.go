@@ -54,9 +54,9 @@ Service mode:
 	}
 	cmd.Flags().IntVar(&port, "port", 0, "Bind to a specific port (0 = auto)")
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "Do not open the system browser")
-	cmd.Flags().BoolVar(&devMode, "dev", false, "Development mode (enables debug logging)")
+	cmd.Flags().BoolVar(&devMode, "dev", false, "Development mode (debug-oriented logging; same portal unlock as normal run)")
 	cmd.Flags().BoolVar(&serviceMode, "service", false, "Run as a background service (use 'gn-drive service install' first)")
-	cmd.Flags().StringVar(&password, "password", "", "Unlock with password (for service mode or CI)")
+	cmd.Flags().StringVar(&password, "password", "", "Unlock at process start (service mode / CI). Interactive web run unlocks via the UI instead.")
 	return cmd
 }
 
@@ -132,16 +132,22 @@ func runWithDeps(ctx context.Context, opts runOpts, deps runDeps) error {
 	}
 	defer locker.Release()
 
-	// 3. Init app
+	// 3. Init app — interactive `run` is always a web portal: process starts
+	// even when the master password is locked; the SPA shows unlock. Service
+	// mode still needs --password (or env) at start because there is no UI.
 	appOpts := app.Options{
 		LogMode:        logMode,
 		UnlockPassword: opts.password,
+		Version:        Version,
+		// Portal for foreground web UI. Service mode requires pre-unlock.
+		PortalMode: !opts.serviceMode,
 	}
-	if opts.devMode {
-		if devPwd := os.Getenv("GN_DRIVE_DEV_PASSWORD"); devPwd != "" {
-			appOpts.DevUnlockPassword = devPwd
+	if opts.serviceMode && appOpts.UnlockPassword == "" {
+		if p := os.Getenv("GN_DRIVE_PASSWORD"); p != "" {
+			appOpts.UnlockPassword = p
 		}
 	}
+	_ = opts.devMode // reserved for future dev-only toggles (logging, etc.)
 	a, err := deps.newApp(ctx, appOpts)
 	if err != nil {
 		_ = ln.Close()

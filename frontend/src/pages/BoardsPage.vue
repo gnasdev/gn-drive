@@ -10,6 +10,11 @@ import { useToast } from '@/composables/useToast'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import AppSectionLoading from '@/components/ui/SectionLoading.vue'
 import AppAlert from '@/components/ui/Alert.vue'
+import RemotePathField from '@/components/forms/RemotePathField.vue'
+import {
+  BOARD_EDGE_ACTIONS,
+  composedPathToBoardNode,
+} from '@/constants/forms'
 
 const { t } = useI18n()
 const store = useBoardsStore()
@@ -17,67 +22,86 @@ const remotes = useRemotesStore()
 const { confirmDialog } = useConfirmDialog()
 const toast = useToast()
 const showAdd = ref(false)
-const draft = ref<Board>({ id: '', name: '', description: '', created_at: '', updated_at: '', nodes: [], edges: [] })
-
-const nodeA = ref({ remote_name: '', path: '', label: 'source' })
-const nodeB = ref({ remote_name: '', path: '', label: 'target' })
-const edgeAction = ref('push')
+const name = ref('')
+const sourcePath = ref('')
+const targetPath = ref('')
+const edgeAction = ref('copy')
 const msg = ref<string | null>(null)
 
 onMounted(async () => {
   await Promise.all([store.load(), remotes.load()])
 })
 
+function resetForm() {
+  name.value = ''
+  sourcePath.value = ''
+  targetPath.value = ''
+  edgeAction.value = 'copy'
+}
+
 async function submitAdd() {
-  if (!draft.value.name) return
+  if (!name.value.trim()) {
+    toast.error(t('boards.nameRequired'))
+    return
+  }
+  if (!sourcePath.value.trim() || !targetPath.value.trim()) {
+    toast.error(t('boards.pathsRequired'))
+    return
+  }
+  const src = composedPathToBoardNode(sourcePath.value)
+  const dst = composedPathToBoardNode(targetPath.value)
+  if (!src.path && !src.remote_name) {
+    toast.error(t('boards.pathsRequired'))
+    return
+  }
+  if (!dst.path && !dst.remote_name) {
+    toast.error(t('boards.targetRequired'))
+    return
+  }
+
   const id = crypto.randomUUID()
   const n1: BoardNode = {
     id: crypto.randomUUID(),
-    remote_name: nodeA.value.remote_name.trim(),
-    path: nodeA.value.path.trim() || '/',
-    label: nodeA.value.label || 'source',
+    remote_name: src.remote_name,
+    path: src.path || '/',
+    label: 'source',
     x: 0,
     y: 0,
   }
   const n2: BoardNode = {
     id: crypto.randomUUID(),
-    remote_name: nodeB.value.remote_name.trim(),
-    path: nodeB.value.path.trim() || '/',
-    label: nodeB.value.label || 'target',
+    remote_name: dst.remote_name,
+    path: dst.path || '/',
+    label: 'target',
     x: 200,
     y: 0,
   }
-  const edges: BoardEdge[] = []
-  if (n1.remote_name || n1.path) {
-    if (!(n2.remote_name || n2.path)) {
-      toast.error(t('boards.targetRequired'))
-      return
-    }
-    edges.push({
+  const edges: BoardEdge[] = [
+    {
       id: crypto.randomUUID(),
       source_id: n1.id,
       target_id: n2.id,
-      action: edgeAction.value || 'push',
-    })
-  }
+      action: edgeAction.value || 'copy',
+    },
+  ]
   const board: Board = {
-    ...draft.value,
     id,
-    nodes: edges.length ? [n1, n2] : [],
+    name: name.value.trim(),
+    created_at: '',
+    updated_at: '',
+    nodes: [n1, n2],
     edges,
   }
   await store.add(board)
   showAdd.value = false
-  draft.value = { id: '', name: '', description: '', created_at: '', updated_at: '', nodes: [], edges: [] }
-  nodeA.value = { remote_name: '', path: '', label: 'source' }
-  nodeB.value = { remote_name: '', path: '', label: 'target' }
+  resetForm()
   msg.value = null
 }
 
-async function doDelete(id: string, name: string) {
+async function doDelete(id: string, boardName: string) {
   const ok = await confirmDialog({
     title: t('boards.deleteTitle'),
-    message: t('boards.deleteMessage', { name }),
+    message: t('boards.deleteMessage', { name: boardName }),
     confirmText: t('common.delete'),
     confirmVariant: 'danger',
   })
@@ -106,6 +130,12 @@ async function doStop(id: string) {
     toast.error(e?.message ?? 'stop failed')
   }
 }
+
+function edgeSummary(b: Board): string {
+  const e = b.edges?.[0]
+  if (!e) return t('boards.noEdge')
+  return e.action || '-'
+}
 </script>
 
 <template>
@@ -115,7 +145,7 @@ async function doStop(id: string) {
         <h1 class="page-title">{{ t('boards.title') }}</h1>
         <p class="page-sub">{{ t('boards.sub') }}</p>
       </div>
-      <button class="btn-primary" data-testid="boards-add" @click="showAdd = !showAdd">
+      <button class="btn-primary" data-testid="boards-add" @click="showAdd = !showAdd; if (!showAdd) resetForm()">
         <PhPlus :size="16" weight="bold" /> {{ t('boards.add') }}
       </button>
     </header>
@@ -125,64 +155,43 @@ async function doStop(id: string) {
 
     <div v-if="showAdd" class="card mb-4 px-5 py-4" data-testid="boards-add-form">
       <h3 class="section-label">{{ t('boards.new') }}</h3>
-      <form class="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-end" @submit.prevent="submitAdd">
+      <form class="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start" @submit.prevent="submitAdd">
         <label class="field-label md:col-span-2">
           <span>{{ t('common.name') }}</span>
-          <input v-model="draft.name" required class="field-input" data-testid="boards-name" />
-        </label>
-        <label class="field-label md:col-span-2">
-          <span>{{ t('common.description') }}</span>
-          <input v-model="draft.description" class="field-input" data-testid="boards-description" />
+          <input v-model="name" required class="field-input" data-testid="boards-name" />
         </label>
 
-        <h4 class="md:col-span-2 m-0 text-[11px] font-semibold uppercase tracking-wide text-text-dim">
-          {{ t('boards.edgeSection') }}
-        </h4>
-        <label class="field-label">
-          <span>{{ t('boards.sourceRemote') }}</span>
-          <select v-model="nodeA.remote_name" class="field-input" data-testid="boards-src-remote">
-            <option value="">{{ t('common.localAbsolute') }}</option>
-            <option v-for="r in remotes.items" :key="r.name" :value="r.name">
-              {{ r.name }}{{ r.type ? ` (${r.type})` : '' }}
-            </option>
-          </select>
-        </label>
-        <label class="field-label">
-          <span>{{ t('boards.sourcePath') }}</span>
-          <input v-model="nodeA.path" placeholder="/Backup or abs path" class="field-input" data-testid="boards-src-path" />
-        </label>
-        <label class="field-label">
-          <span>{{ t('boards.targetRemote') }}</span>
-          <select v-model="nodeB.remote_name" class="field-input" data-testid="boards-dst-remote">
-            <option value="">{{ t('common.localAbsolute') }}</option>
-            <option v-for="r in remotes.items" :key="r.name" :value="r.name">
-              {{ r.name }}{{ r.type ? ` (${r.type})` : '' }}
-            </option>
-          </select>
-        </label>
-        <label class="field-label">
-          <span>{{ t('boards.targetPath') }}</span>
-          <input v-model="nodeB.path" placeholder="/Archive or /tmp/dst" class="field-input" data-testid="boards-dst-path" />
-        </label>
+        <div class="md:col-span-2">
+          <RemotePathField
+            v-model="sourcePath"
+            :remotes="remotes.items"
+            test-id="boards-src-path"
+            :label="t('boards.source')"
+            required
+          />
+        </div>
+        <div class="md:col-span-2">
+          <RemotePathField
+            v-model="targetPath"
+            :remotes="remotes.items"
+            test-id="boards-dst-path"
+            :label="t('boards.target')"
+            required
+          />
+        </div>
+
         <label class="field-label">
           <span>{{ t('common.action') }}</span>
           <select v-model="edgeAction" class="field-input" data-testid="boards-edge-action">
-            <option value="push">push</option>
-            <option value="pull">pull</option>
-            <option value="copy">copy</option>
-            <option value="bi">bi</option>
+            <option v-for="a in BOARD_EDGE_ACTIONS" :key="a" :value="a">{{ a }}</option>
           </select>
         </label>
-        <p class="md:col-span-2 m-0 text-[11px] text-text-dim">
-          <i18n-t keypath="boards.edgeHint" tag="span">
-            <template #path>
-              <code class="rounded bg-bg px-1 font-mono">remote:path</code>
-            </template>
-          </i18n-t>
+        <p class="m-0 self-end text-[11px] text-text-dim md:col-span-1">
+          {{ t('boards.actionHint') }}
         </p>
 
         <div class="flex justify-end gap-2 md:col-span-2">
-          <button type="button" class="btn-ghost" @click="showAdd = false">{{ t('common.cancel') }}</button>
+          <button type="button" class="btn-ghost" @click="showAdd = false; resetForm()">{{ t('common.cancel') }}</button>
           <button type="submit" class="btn-primary" data-testid="boards-submit">{{ t('common.add') }}</button>
         </div>
       </form>
@@ -194,12 +203,12 @@ async function doStop(id: string) {
           <PhSquaresFour :size="20" weight="light" />
           <div>
             <div class="text-sm font-semibold text-text">{{ b.name }}</div>
-            <div class="mt-0.5 text-[11px] text-text-muted">{{ b.description || t('boards.noDescription') }}</div>
           </div>
         </div>
         <div class="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2.5">
           <span class="text-[11px] text-text-muted">
             {{ t('boards.nodesEdges', { nodes: b.nodes?.length || 0, edges: b.edges?.length || 0 }) }}
+            · <span class="badge">{{ edgeSummary(b) }}</span>
           </span>
           <div class="flex items-center gap-1">
             <button

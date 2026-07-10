@@ -97,12 +97,47 @@ var makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic s
 
 // handleStatus returns the current app status (auth state + version).
 // Registered as a public route (no auth required).
+//
+// Web session model:
+//   - Unlock/setup mint an HttpOnly session cookie (see handleUnlock).
+//   - On SPA reload the process may still be unlocked while the browser
+//     needs a valid cookie for protected APIs. If crypto is unlocked but
+//     the cookie is missing/expired, mint a fresh session here so reload
+//     does not force the user through the password form again.
+//   - When the process is locked, unlocked stays false (show unlock UI).
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	status := s.app.Auth.Status()
+	ver := s.app.Version
+	if ver == "" {
+		ver = "dev"
+	}
+
+	sessionOK := false
+	if cookie, err := r.Cookie(SessionCookieName); err == nil && cookie != nil && cookie.Value != "" {
+		sessionOK = sessionValid(cookie.Value)
+	}
+	// Process already unlocked (prior unlock in this process) but browser
+	// has no live session — re-issue cookie for this client.
+	if status.Unlocked && !sessionOK {
+		if token, err := generateToken(); err == nil {
+			sessionAdd(token)
+			setSessionCookie(w, token)
+			sessionOK = true
+		}
+	}
+
+	// For the SPA gate: "unlocked" means the user may enter the app.
+	// Require a web session once setup is complete.
+	webUnlocked := status.Unlocked
+	if status.Setup {
+		webUnlocked = status.Unlocked && sessionOK
+	}
+
 	respondJSON(w, http.StatusOK, map[string]any{
 		"setup":    status.Setup,
-		"unlocked": status.Unlocked,
+		"unlocked": webUnlocked,
+		"session":  sessionOK,
 		"lockout":  status.Lockout,
-		"version":  "dev",
+		"version":  ver,
 	})
 }

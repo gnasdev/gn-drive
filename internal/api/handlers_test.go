@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -102,6 +101,52 @@ func doRequest(srv *Server, method, path string, body any, cookie string) *httpt
 }
 
 // --- Auth handlers ----------------------------------------------------
+
+func TestHandleStatus_ResumesSessionWhenUnlocked(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	// Unlock via setup (sets process unlocked + session cookie).
+	rr := doRequest(srv, "POST", "/api/v1/auth/setup", map[string]string{"password": "test-pw-session"}, "")
+	if rr.Code != 201 {
+		t.Fatalf("setup: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// Simulate SPA reload without sending the cookie: process still unlocked.
+	rr = doRequest(srv, "GET", "/api/v1/status", nil, "")
+	if rr.Code != 200 {
+		t.Fatalf("status: %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"unlocked":true`) {
+		t.Fatalf("expected unlocked true after session resume, body=%s", body)
+	}
+	if !strings.Contains(body, `"session":true`) {
+		t.Fatalf("expected session true after resume, body=%s", body)
+	}
+	// Response must Set-Cookie a fresh session.
+	found := false
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == SessionCookieName && c.Value != "" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("status resume must Set-Cookie gn-drive-session")
+	}
+
+	// Cookie from resume must authorize a protected route.
+	var cookie string
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == SessionCookieName {
+			cookie = c.Value
+		}
+	}
+	rr = doRequest(srv, "GET", "/api/v1/profiles", nil, cookie)
+	if rr.Code != 200 {
+		t.Fatalf("profiles with resumed session: %d %s", rr.Code, rr.Body.String())
+	}
+}
 
 func TestHandleStatus_NotSetup(t *testing.T) {
 	srv, cleanup := newTestServer(t)
@@ -466,83 +511,6 @@ func TestSyncHandlers_TaskLogs(t *testing.T) {
 	}
 }
 
-// --- Schedule handlers --------------------------------------------------
-
-func TestScheduleHandlers_CRUD(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-
-	// Create — id is required at the wire level.
-	rr := doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch1", "profile_name": "p1", "action": "push", "cron": "0 0 * * * *", "enabled": true,
-	}, "")
-	if rr.Code != 201 {
-		t.Errorf("create: status = %d, body = %s", rr.Code, rr.Body.String())
-	}
-
-	// List.
-	rr = doRequest(srv, "GET", "/api/v1/schedules", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("list: status = %d", rr.Code)
-	}
-
-	// Update (must include id).
-	rr = doRequest(srv, "PUT", "/api/v1/schedules/sch1", map[string]any{
-		"id": "sch1", "profile_name": "p1", "action": "pull", "cron": "0 0 * * * *", "enabled": false,
-	}, "")
-	if rr.Code != 200 {
-		t.Errorf("update: status = %d, body = %s", rr.Code, rr.Body.String())
-	}
-
-	// Enable.
-	rr = doRequest(srv, "POST", "/api/v1/schedules/sch1/enable", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("enable: status = %d", rr.Code)
-	}
-
-	// Disable.
-	rr = doRequest(srv, "POST", "/api/v1/schedules/sch1/disable", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("disable: status = %d", rr.Code)
-	}
-
-	// Delete.
-	rr = doRequest(srv, "DELETE", "/api/v1/schedules/sch1", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("delete: status = %d", rr.Code)
-	}
-
-	// Delete missing.
-	rr = doRequest(srv, "DELETE", "/api/v1/schedules/missing", nil, "")
-	if rr.Code != 404 {
-		t.Errorf("delete missing: status = %d, want 404", rr.Code)
-	}
-}
-
-func TestScheduleHandlers_CreateBadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("POST", "/api/v1/schedules", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != 400 {
-		t.Errorf("status = %d, want 400", rr.Code)
-	}
-}
-
-func TestScheduleHandlers_UpdateBadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("PUT", "/api/v1/schedules/sch1", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != 400 {
-		t.Errorf("status = %d, want 400", rr.Code)
-	}
-}
-
 // --- Board / Flow / History / Operations handlers ---------------------
 
 func TestBoardHandlers_CRUD(t *testing.T) {
@@ -550,7 +518,7 @@ func TestBoardHandlers_CRUD(t *testing.T) {
 	defer cleanup()
 
 	rr := doRequest(srv, "POST", "/api/v1/boards", map[string]any{
-		"id": "b1", "name": "Board 1", "description": "d",
+		"id": "b1", "name": "Board 1",
 	}, "")
 	if rr.Code != 201 {
 		t.Errorf("create: status = %d, body = %s", rr.Code, rr.Body.String())
@@ -567,7 +535,7 @@ func TestBoardHandlers_CRUD(t *testing.T) {
 	}
 
 	rr = doRequest(srv, "PUT", "/api/v1/boards/b1", map[string]any{
-		"id": "b1", "name": "Board 1 updated", "description": "d",
+		"id": "b1", "name": "Board 1 updated",
 	}, "")
 	if rr.Code != 200 {
 		t.Errorf("update: status = %d", rr.Code)
@@ -685,24 +653,6 @@ func TestFlowHandlers_UpdateBadJSON(t *testing.T) {
 	srv.router.ServeHTTP(rr, req)
 	if rr.Code != 400 {
 		t.Errorf("status = %d, want 400", rr.Code)
-	}
-}
-
-func TestHistoryHandlers_List(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/history", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("status = %d", rr.Code)
-	}
-}
-
-func TestHistoryHandlers_Stats(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/history/stats", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("status = %d", rr.Code)
 	}
 }
 
@@ -1140,223 +1090,13 @@ func TestChiURLParam(t *testing.T) {
 
 var _ store.Profile
 
-// --- service_handlers.go coverage -------------------------------------
 
-// TestServiceSpec ensures the spec helper returns a user-scope spec.
-func TestServiceSpec(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	spec := srv.serviceSpec()
-	if spec.Scope != "user" {
-		t.Errorf("expected user scope, got %q", spec.Scope)
-	}
-}
-
-// TestOwnExecutable returns the running test binary path.
-func TestOwnExecutable(t *testing.T) {
-	exe, err := ownExecutable()
-	if err != nil {
-		t.Fatalf("ownExecutable: %v", err)
-	}
-	if exe == "" {
-		t.Error("ownExecutable returned empty path")
-	}
-}
-
-// TestRunServiceCLI_OwnExecutableError forces ownExe to fail and asserts
-// the error bubbles up.
-func TestRunServiceCLI_OwnExecutableError(t *testing.T) {
-	orig := ownExe
-	defer func() { ownExe = orig }()
-	ownExe = func() (string, error) { return "", errors.New("boom") }
-
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	out, err := srv.runServiceCLI("install")
-	if err == nil {
-		t.Fatal("expected error from ownExecutable")
-	}
-	if out != "" {
-		t.Errorf("expected empty output, got %q", out)
-	}
-}
-
-// TestHandleServiceStatus verifies the status handler returns a payload
-// with platform + scope fields and defaults when nothing is installed.
-func TestHandleServiceStatus(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/service/status", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var body map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := body["platform"]; !ok {
-		t.Error("missing platform field")
-	}
-	if _, ok := body["scope"]; !ok {
-		t.Error("missing scope field")
-	}
-	if _, ok := body["installed"]; !ok {
-		t.Error("missing installed field")
-	}
-}
-
-// TestHandleServiceInstall_Failure covers the error path of the install
-// handler by overriding runServiceCommand to fail.
-func TestHandleServiceInstall_Failure(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "boom", errors.New("rc-failed")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/install", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleServiceInstall_Success covers the success path.
-func TestHandleServiceInstall_Success(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "installed", nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/install", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleServiceUninstall_Success and Failure
-func TestHandleServiceUninstall_Success(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "uninstalled", nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/uninstall", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleServiceUninstall_Failure(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "boom", errors.New("rc-failed")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/uninstall", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleServiceStart_Success and Failure
-func TestHandleServiceStart_Success(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "started", nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/start", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleServiceStart_Failure(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "boom", errors.New("rc-failed")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/start", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleServiceStop_Success and Failure
-func TestHandleServiceStop_Success(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "stopped", nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/stop", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleServiceStop_Failure(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "boom", errors.New("rc-failed")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/stop", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-// TestHandleServiceRestart_Success and Failure
-func TestHandleServiceRestart_Success(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "restarted", nil
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/restart", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleServiceRestart_Failure(t *testing.T) {
-	orig := runServiceCommand
-	defer func() { runServiceCommand = orig }()
-	runServiceCommand = func(exe, action string) (string, error) {
-		return "boom", errors.New("rc-failed")
-	}
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/service/restart", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
 
 // TestCorSHandler_NoOrigin and WithOrigin cover the CORS middleware.
 func TestCorSHandler_NoOrigin(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/service/status", nil, "")
+	rr := doRequest(srv, "GET", "/api/v1/status", nil, "")
 	if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Errorf("expected no CORS header for no origin, got %q", got)
 	}
@@ -1365,7 +1105,7 @@ func TestCorSHandler_NoOrigin(t *testing.T) {
 func TestCorSHandler_WithOrigin(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
-	req := httptest.NewRequest("GET", "/api/v1/service/status", nil)
+	req := httptest.NewRequest("GET", "/api/v1/status", nil)
 	req.Header.Set("Origin", "http://example.com")
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -1377,7 +1117,7 @@ func TestCorSHandler_WithOrigin(t *testing.T) {
 func TestCorSHandler_Options(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
-	req := httptest.NewRequest("OPTIONS", "/api/v1/service/status", nil)
+	req := httptest.NewRequest("OPTIONS", "/api/v1/status", nil)
 	req.Header.Set("Origin", "http://example.com")
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	rr := httptest.NewRecorder()
@@ -1387,140 +1127,6 @@ func TestCorSHandler_Options(t *testing.T) {
 	}
 	if got := rr.Header().Get("Access-Control-Allow-Methods"); got == "" {
 		t.Error("expected Allow-Methods header")
-	}
-}
-
-// --- schedule handlers coverage ---------------------------------------
-
-// TestHandleListSchedules_Empty lists when none exist.
-func TestHandleListSchedules_Empty(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/schedules", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var body any
-	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestHandleCreateSchedule(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	body := map[string]any{
-		"profile_name": "p1",
-		"action":       "push",
-		"cron":         "*/5 * * * *",
-		"enabled":      true,
-	}
-	rr := doRequest(srv, "POST", "/api/v1/schedules", body, "")
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleCreateSchedule_BadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("POST", "/api/v1/schedules", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestHandleUpdateSchedule(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	body := map[string]any{
-		"id":           "sch-1",
-		"profile_name": "p1",
-		"action":       "push",
-		"cron":         "*/10 * * * *",
-		"enabled":      true,
-	}
-	rr := doRequest(srv, "PUT", "/api/v1/schedules/sch-1", body, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleUpdateSchedule_BadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("PUT", "/api/v1/schedules/x", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestHandleDeleteSchedule_NotFound(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "DELETE", "/api/v1/schedules/does-not-exist", nil, "")
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDeleteSchedule_OK(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch-1", "profile_name": "p1", "action": "push", "cron": "* * * * *",
-	}, "")
-	rr := doRequest(srv, "DELETE", "/api/v1/schedules/sch-1", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleEnableSchedule_NotFound(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/schedules/does-not-exist/enable", nil, "")
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleEnableSchedule_OK(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch-1", "profile_name": "p1", "action": "push", "cron": "* * * * *",
-	}, "")
-	rr := doRequest(srv, "POST", "/api/v1/schedules/sch-1/enable", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDisableSchedule_NotFound(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/schedules/does-not-exist/disable", nil, "")
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDisableSchedule_OK(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/schedules", map[string]any{
-		"id": "sch-1", "profile_name": "p1", "action": "push", "cron": "* * * * *",
-	}, "")
-	rr := doRequest(srv, "POST", "/api/v1/schedules/sch-1/disable", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -1584,55 +1190,6 @@ func TestHandleTaskLogs(t *testing.T) {
 	rr := doRequest(srv, "GET", "/api/v1/sync/tasks/x/logs", nil, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-}
-
-// --- history handlers coverage -----------------------------------------
-
-func TestHandleListHistory_Empty(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/history", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleListHistory_WithQuery(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/history?limit=10&offset=0&profile=p1", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleListHistory_BadLimit(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	// negative limit -> defaults to 100, no error.
-	rr := doRequest(srv, "GET", "/api/v1/history?limit=-5&offset=-3", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-}
-
-func TestHandleListHistory_LimitClamp(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	// limit > 1000 should be clamped to 100.
-	rr := doRequest(srv, "GET", "/api/v1/history?limit=99999", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-}
-
-func TestHandleHistoryStats(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/history/stats", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -1927,30 +1484,6 @@ func TestHandleListFlows_DBError(t *testing.T) {
 	}
 }
 
-func TestHandleListSchedules_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/schedules", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleListHistory_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/history", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleHistoryStats_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/history/stats", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
 func TestHandleListRemotes_DBError(t *testing.T) {
 	// ListRemotes uses rclone (not the store), so closing the store doesn't
 	// affect it. The test simply verifies the handler doesn't crash.
@@ -2028,49 +1561,6 @@ func TestHandleUpdateFlow_DBError(t *testing.T) {
 func TestHandleDeleteFlow_DBError(t *testing.T) {
 	srv, _ := closedStoreServer(t)
 	rr := doRequest(srv, "DELETE", "/api/v1/flows/anyid", nil, "")
-	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
-		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleCreateSchedule_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	body := map[string]any{"id": "s1", "profile_name": "p1", "action": "push", "cron": "0 * * * *"}
-	rr := doRequest(srv, "POST", "/api/v1/schedules", body, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleUpdateSchedule_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	body := map[string]any{"id": "s1", "profile_name": "p1", "action": "push", "cron": "0 * * * *"}
-	rr := doRequest(srv, "PUT", "/api/v1/schedules/s1", body, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDeleteSchedule_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "DELETE", "/api/v1/schedules/anyid", nil, "")
-	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
-		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleEnableSchedule_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "POST", "/api/v1/schedules/anyid/enable", nil, "")
-	// Get returns sql.ErrNoRows on closed DB, which is mapped to 404 not_found.
-	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
-		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDisableSchedule_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "POST", "/api/v1/schedules/anyid/disable", nil, "")
 	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
 		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
 	}

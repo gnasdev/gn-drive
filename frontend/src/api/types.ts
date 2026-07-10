@@ -54,18 +54,6 @@ export interface Profile {
   fast_list?: boolean
 }
 
-export interface Schedule {
-  id: string
-  profile_name: string
-  action: string
-  cron: string
-  enabled: boolean
-  last_run?: string
-  next_run?: string
-  last_result?: string
-  created_at?: string
-}
-
 export interface Remote {
   name: string
   type: string
@@ -75,7 +63,6 @@ export interface Remote {
 export interface Board {
   id: string
   name: string
-  description: string
   created_at: string
   updated_at: string
   nodes?: BoardNode[]
@@ -99,6 +86,7 @@ export interface BoardEdge {
   sync_config?: any
 }
 
+/** Named job with optional cron; matches store.Flow (no step operations yet). */
 export interface Flow {
   id: string
   name: string
@@ -106,36 +94,6 @@ export interface Flow {
   enabled: boolean
   created_at?: string
   updated_at?: string
-  operations?: any[]
-}
-
-export interface HistoryEntry {
-  id: string
-  profile_name: string
-  action: string
-  state: string
-  started_at: string
-  finished_at?: string
-  duration_secs: number
-  bytes: number
-  errors: number
-  files: number
-  error_message?: string
-}
-
-export interface HistoryStats {
-  total_syncs: number
-  total_bytes: number
-  total_duration_secs: number
-  total_errors: number
-  by_profile: Record<string, ProfileStats>
-}
-
-export interface ProfileStats {
-  syncs: number
-  bytes: number
-  duration_secs: number
-  errors: number
 }
 
 export interface SyncTask {
@@ -163,21 +121,6 @@ export interface AppStatus {
     is_locked: boolean
     retry_after_secs: number
   }
-}
-
-export interface ServiceStatus {
-  platform: string
-  scope: string
-  installed: boolean
-  running: boolean
-  pid: number
-  web_port: number
-  uptime_secs: number
-  started_at: string
-  last_heartbeat: string
-  last_error: string
-  active_tasks: string[]
-  heartbeat_stale?: boolean
 }
 
 export interface FileEntry {

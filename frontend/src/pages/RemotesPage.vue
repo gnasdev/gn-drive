@@ -18,7 +18,8 @@ const { confirmDialog } = useConfirmDialog()
 const showAdd = ref(false)
 const newName = ref('')
 const newType = ref('local')
-const testResults = ref<Record<string, { ok: boolean; error?: string }>>({})
+type RemoteTestState = { status: 'loading' } | { status: 'ok' } | { status: 'error'; error?: string }
+const testResults = ref<Record<string, RemoteTestState>>({})
 
 onMounted(() => store.load())
 
@@ -35,9 +36,18 @@ async function submitAdd() {
 }
 
 async function doTest(name: string) {
-  testResults.value[name] = { ok: false }
+  testResults.value = { ...testResults.value, [name]: { status: 'loading' } }
   const r = await store.test(name)
-  testResults.value[name] = r
+  testResults.value = {
+    ...testResults.value,
+    [name]: r.ok ? { status: 'ok' } : { status: 'error', error: r.error },
+  }
+}
+
+function testTitle(name: string): string {
+  const st = testResults.value[name]
+  if (st?.status === 'error' && st.error) return st.error
+  return t('remotes.testTitle', { name })
 }
 
 async function doDelete(name: string) {
@@ -116,18 +126,19 @@ async function doDelete(name: string) {
             <td class="whitespace-nowrap text-right">
               <button
                 class="btn-ghost !px-2 !py-1"
-                :title="t('remotes.testTitle', { name: r.name })"
+                :title="testTitle(r.name)"
                 :data-testid="`remotes-test-${r.name}`"
+                :disabled="testResults[r.name]?.status === 'loading'"
                 @click="doTest(r.name)"
               >
-                <template v-if="testResults[r.name]?.ok === true">
+                <template v-if="testResults[r.name]?.status === 'loading'">
+                  <PhSpinner :size="16" class="animate-spin text-text-muted" />
+                </template>
+                <template v-else-if="testResults[r.name]?.status === 'ok'">
                   <PhCheckCircle :size="16" weight="fill" class="text-success" />
                 </template>
-                <template v-else-if="testResults[r.name]?.ok === false && testResults[r.name]?.error">
+                <template v-else-if="testResults[r.name]?.status === 'error'">
                   <PhXCircle :size="16" weight="fill" class="text-danger" />
-                </template>
-                <template v-else-if="store.loading">
-                  <PhSpinner :size="16" class="animate-spin" />
                 </template>
                 <template v-else>{{ t('common.test') }}</template>
               </button>

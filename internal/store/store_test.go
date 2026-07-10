@@ -499,7 +499,7 @@ func TestBoardRepo_SaveGetListDeleteLoadGraph(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	b := &Board{ID: "b1", Name: "Test Board", Description: "d"}
+	b := &Board{ID: "b1", Name: "Test Board"}
 	if err := s.Boards().Save(ctx, b); err != nil {
 		t.Fatal(err)
 	}
@@ -855,9 +855,8 @@ func TestBoardRepo_SaveGraph(t *testing.T) {
 	ctx := context.Background()
 	cfg := json.RawMessage(`{"action":"push","source":"a","dest":"b"}`)
 	b := &Board{
-		ID:          "b1",
-		Name:        "Board",
-		Description: "test",
+		ID:   "b1",
+		Name: "Board",
 		Nodes: []BoardNode{
 			{ID: "n1", RemoteName: "remote1", Path: "/p", Label: "L", X: 1, Y: 2},
 		},

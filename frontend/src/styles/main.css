@@ -1,78 +1,96 @@
 @import 'tailwindcss';
 
-/* Design tokens for GN Drive.
- * Dark is default via class `dark` on <html> (theme store).
- * Light values live in :root; dark overrides live in html.dark.
+/* Solarized NeoBrutalism tokens — port of desktop v0.4.x (pre-Vue multi-page).
+ * Light (default) matches the Wails-era Solarized Light theme.
+ * Dark is a Solarized Dark neo variant for night use.
  */
 :root {
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f4f4f5;
-  --color-border: #e4e4e7;
-  --color-text: #18181b;
-  --color-text-muted: #52525b;
-  --color-text-dim: #71717a;
-  --color-accent: #2563eb;
-  --color-success: #16a34a;
-  --color-warning: #ca8a04;
-  --color-danger: #dc2626;
-  --color-running: #ca8a04;
-  --color-completed: #16a34a;
-  --color-failed: #dc2626;
+  --color-bg: #fdf6e3; /* base3 */
+  --color-bg-secondary: #eee8d5; /* base2 */
+  --color-surface: #fdf6e3;
+  --color-surface-hover: #eee8d5;
+  --color-border: #586e75; /* base01 */
+  --color-border-muted: #93a1a1; /* base1 */
+  --color-text: #073642; /* base02 */
+  --color-text-muted: #586e75; /* base01 */
+  --color-text-dim: #93a1a1; /* base1 */
+  --color-accent: #d5c48c; /* light solarized yellow */
+  --color-accent-strong: #b58900;
+  --color-success: #859900;
+  --color-warning: #b58900;
+  --color-danger: #dc322f;
+  --color-running: #b58900;
+  --color-completed: #859900;
+  --color-failed: #dc322f;
+  --color-shadow: #93a1a1;
+  --color-info: #268bd2;
 
-  --sidebar-width: 240px;
-  --topbar-height: 48px;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  --topbar-height: 3.5rem;
+  /* Readable column for main pages (workspace cards, settings). */
+  --content-max: 56rem; /* 896px — comfortable for neo cards on large screens */
+  --content-max-wide: 68rem; /* 1088px — tables / denser layouts */
+  --radius-md: 0;
+  --radius-lg: 0;
+  --shadow-neo: 3px 3px 0 var(--color-shadow);
+  --shadow-neo-sm: 2px 2px 0 var(--color-shadow);
 
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
 }
 
 html.dark {
-  --color-bg: #0e0e10;
-  --color-surface: #18181b;
-  --color-surface-hover: #27272a;
-  --color-border: #2e2e33;
-  --color-text: #e4e4e7;
-  --color-text-muted: #9ca3af;
-  --color-text-dim: #6b7280;
-  --color-accent: #6ea8ff;
-  --color-success: #4ade80;
-  --color-warning: #facc15;
-  --color-danger: #f87171;
-  --color-running: #facc15;
-  --color-completed: #4ade80;
-  --color-failed: #f87171;
-
+  --color-bg: #002b36; /* base03 */
+  --color-bg-secondary: #073642; /* base02 */
+  --color-surface: #073642;
+  --color-surface-hover: #0a3a47;
+  --color-border: #586e75;
+  --color-border-muted: #657b83;
+  --color-text: #fdf6e3;
+  --color-text-muted: #93a1a1;
+  --color-text-dim: #657b83;
+  --color-accent: #b58900;
+  --color-accent-strong: #d5c48c;
+  --color-success: #859900;
+  --color-warning: #b58900;
+  --color-danger: #dc322f;
+  --color-running: #b58900;
+  --color-completed: #859900;
+  --color-failed: #dc322f;
+  --color-shadow: #001f27;
+  --color-info: #268bd2;
   color-scheme: dark;
 }
 
 @theme inline {
   --color-bg: var(--color-bg);
+  --color-bg-secondary: var(--color-bg-secondary);
   --color-surface: var(--color-surface);
   --color-surface-hover: var(--color-surface-hover);
   --color-border: var(--color-border);
+  --color-border-muted: var(--color-border-muted);
   --color-text: var(--color-text);
   --color-text-muted: var(--color-text-muted);
   --color-text-dim: var(--color-text-dim);
   --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-danger: var(--color-danger);
   --color-running: var(--color-running);
   --color-completed: var(--color-completed);
   --color-failed: var(--color-failed);
+  --color-info: var(--color-info);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
-  background: var(--color-bg);
+  background: var(--color-bg-secondary);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -85,8 +103,11 @@ html, body {
   min-height: 100%;
 }
 
-* {
+*,
+*:focus,
+*:focus-visible {
   box-sizing: border-box;
+  outline: none;
 }
 
 button {
@@ -100,74 +121,129 @@ a {
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 4px;
+  background: var(--color-border-muted);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-dim);
+  background: var(--color-accent-strong);
 }
 
-/* Shared interactive patterns (kept as class names for e2e + reuse). */
+/* Neo + shared interactive patterns */
 @layer components {
+  .neo-card {
+    @apply border-2 border-border bg-surface text-text;
+    box-shadow: var(--shadow-neo);
+  }
+  .neo-inset {
+    @apply border-2 border-border bg-bg;
+  }
+  .neo-header {
+    @apply border-b-2 border-border bg-accent px-3 py-3;
+  }
+  .neo-dashed {
+    @apply border-2 border-dashed border-border-muted bg-bg/50;
+  }
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center gap-1.5 border-2 border-border bg-accent px-3.5 py-1.5 text-[13px] font-bold text-text transition-all duration-100 hover:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
+    box-shadow: var(--shadow-neo-sm);
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 border-2 border-border bg-bg px-3 py-1.5 text-[13px] font-bold text-text transition-all duration-100 hover:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+    box-shadow: var(--shadow-neo-sm);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    box-shadow: none;
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2.5 py-1.5 text-xs text-text transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center gap-1 border-2 border-transparent bg-transparent px-2.5 py-1.5 text-xs font-bold text-text transition-colors hover:bg-text/10 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-danger,
   button.danger {
-    @apply inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1.5 text-xs text-text-muted transition-colors hover:border-danger/30 hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center gap-1 border-2 border-border bg-danger/15 px-2 py-1.5 text-xs font-bold text-danger transition-all duration-100 hover:translate-y-px hover:bg-danger/25 disabled:cursor-not-allowed disabled:opacity-50;
+    box-shadow: var(--shadow-neo-sm);
+  }
+  .btn-danger:hover:not(:disabled),
+  button.danger:hover:not(:disabled) {
+    box-shadow: none;
   }
   .btn-icon {
-    @apply flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-text-muted transition-colors hover:border-border hover:bg-surface-hover hover:text-text;
+    @apply flex h-8 w-8 items-center justify-center border-2 border-transparent bg-transparent text-text transition-colors hover:bg-text/10;
   }
   .field-input {
-    @apply w-full rounded-md border border-border bg-bg px-2.5 py-1.5 font-mono text-[13px] text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-60;
+    @apply box-border h-9 w-full border-2 border-border bg-bg px-2.5 font-mono text-[13px] leading-none text-text disabled:opacity-60;
+    box-shadow: var(--shadow-neo-sm);
+  }
+  /* Native <select> defaults (line-box, appearance) often render taller than
+   * <input type="text"> with the same padding — normalize both to h-9. */
+  select.field-input {
+    @apply appearance-none py-0 pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23586e75' stroke-width='2' stroke-linecap='square'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 12px;
+  }
+  input.field-input {
+    @apply py-0;
   }
   .field-label {
     @apply flex flex-col gap-1;
   }
   .field-label > span {
-    @apply text-[11px] font-medium text-text-muted;
+    @apply text-[11px] font-bold uppercase tracking-wide text-text-muted;
+  }
+  .field-error {
+    @apply m-0 text-[11px] font-bold text-danger;
   }
   .panel-card,
   .card {
-    @apply rounded-lg border border-border bg-surface;
+    @apply border-2 border-border bg-surface;
+    box-shadow: var(--shadow-neo);
+  }
+  /* Centered page column — use inside full-bleed sections so borders can
+   * span the viewport while form/card content stays readable. */
+  .page-content {
+    @apply mx-auto w-full max-w-[var(--content-max)] px-4 md:px-6;
+  }
+  .page-content-wide {
+    @apply mx-auto w-full max-w-[var(--content-max-wide)] px-4 md:px-6;
   }
   .page-shell {
-    @apply mx-auto max-w-[1100px];
+    @apply mx-auto w-full max-w-[var(--content-max)] px-4 md:px-6;
   }
   .page-shell-wide {
-    @apply mx-auto max-w-[1200px];
+    @apply mx-auto w-full max-w-[var(--content-max-wide)] px-4 md:px-6;
   }
   .page-title {
-    @apply m-0 mb-1 text-[22px] font-semibold text-text;
+    @apply m-0 mb-1 text-[22px] font-bold text-text;
   }
   .page-sub {
     @apply m-0 text-[13px] text-text-muted;
   }
   .section-label {
-    @apply m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted;
+    @apply m-0 mb-2 text-xs font-bold uppercase tracking-wide text-text-muted;
   }
   .badge {
-    @apply inline-block rounded px-1.5 py-px font-mono text-[11px] text-text-muted bg-surface-hover;
+    @apply inline-block border-2 border-border bg-bg px-1.5 py-px font-mono text-[11px] font-bold text-text-muted;
   }
   .table-wrap {
-    @apply overflow-hidden rounded-lg border border-border bg-surface;
+    @apply overflow-hidden border-2 border-border bg-surface;
+    box-shadow: var(--shadow-neo);
   }
   .data-table {
     @apply w-full border-collapse;
   }
   .data-table thead th {
-    @apply border-b border-border bg-surface-hover/50 px-3.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-text-dim;
+    @apply border-b-2 border-border bg-bg-secondary px-3.5 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-text-dim;
   }
   .data-table tbody td {
     @apply border-t border-border px-3.5 py-2 text-[13px];
@@ -176,12 +252,25 @@ a {
     @apply border-t-0;
   }
   button.toggle {
-    @apply inline-flex items-center gap-1 rounded border border-border bg-transparent px-2 py-1 text-[11px] text-text-muted transition-colors hover:bg-surface-hover;
+    @apply inline-flex items-center gap-1 border-2 border-border bg-bg px-2 py-1 text-[11px] font-bold text-text-muted transition-colors hover:bg-surface-hover;
   }
   button.toggle.on {
-    @apply border-success/30 text-success;
+    @apply border-success text-success;
+  }
+  /* Utility: hide native control but keep focusable for screen readers */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
   a.quick-link {
-    @apply inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-text transition-colors hover:bg-surface-hover;
+    @apply inline-flex items-center gap-1.5 border-2 border-border bg-surface px-3 py-1.5 text-xs font-bold text-text transition-all hover:translate-y-px;
+    box-shadow: var(--shadow-neo-sm);
   }
 }

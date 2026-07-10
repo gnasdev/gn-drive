@@ -128,12 +128,11 @@ type ProfileStats struct {
 
 // Board represents a board DAG (lightweight in Phase 2).
 type Board struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	// Nodes/edges loaded in Phase 3 when board execution becomes functional.
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	// Nodes/edges loaded when board execution / graph is requested.
 	Nodes []BoardNode `json:"nodes"`
 	Edges []BoardEdge `json:"edges"`
 }
@@ -157,30 +156,16 @@ type BoardEdge struct {
 	SyncConfig json.RawMessage `json:"sync_config"`
 }
 
-// Flow represents a sequential flow.
+// Flow is a named job with optional cron schedule.
+// Maps to table flows: schedule_enabled → Enabled, cron_expr → ScheduleCron.
+// Step operations are not exposed until flow execution is implemented end-to-end.
 type Flow struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	ScheduleCron string `json:"schedule_cron,omitempty"`
 	Enabled      bool   `json:"enabled"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
-	// Operations loaded in Phase 3.
-	Operations []Operation `json:"operations"`
-}
-
-// Operation is a single step in a flow.
-type Operation struct {
-	ID          string `json:"id"`
-	FlowID      string `json:"flow_id"`
-	SortOrder   int    `json:"sort_order"`
-	ProfileID   string `json:"profile_id"`
-	ProfileName string `json:"profile_name"`
-	Action      string `json:"action"`
-	SourceRemote string `json:"source_remote,omitempty"`
-	SourcePath   string `json:"source_path,omitempty"`
-	TargetRemote string `json:"target_remote,omitempty"`
-	TargetPath   string `json:"target_path,omitempty"`
+	CreatedAt    string `json:"created_at,omitempty"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
 }
 
 // DeltaState tracks change-notification state per remote endpoint.

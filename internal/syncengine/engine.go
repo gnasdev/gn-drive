@@ -73,6 +73,21 @@ func New(deps Deps) *Engine {
     }
 }
 
+// AttachStore wires store + rclone after portal unlock (deferred data plane).
+func (e *Engine) AttachStore(st *store.Store, rc SyncClient) {
+	e.store = st
+	e.rclone = rc
+	if e.ctx != nil && st != nil {
+		e.loadSchedules()
+	}
+}
+
+// DetachStore drops store/rclone references before lock re-encrypts files.
+func (e *Engine) DetachStore() {
+	e.store = nil
+	e.rclone = nil
+}
+
 // Start launches the cron scheduler goroutine.
 func (e *Engine) Start(ctx context.Context) error {
 	if e.ctx != nil {

@@ -181,6 +181,43 @@ func (s *Service) IsUnlocked() bool {
 	return s.unlocked
 }
 
+// HasEncryptedConfig reports whether any config files are still encrypted
+// on disk (.enc). Used by dev restarts: when the previous process left
+// plaintext files (skipped re-encrypt), the new process can open without
+// a password.
+func (s *Service) HasEncryptedConfig() bool {
+	for _, name := range []string{"rclone.conf.enc", "gn-drive.db.enc"} {
+		if fileExists(filepath.Join(s.configDir, name)) {
+			return true
+		}
+	}
+	return false
+}
+
+// OpenPlaintextSession marks the app unlocked without a decryption key.
+// Only valid when no .enc files exist (config is already plaintext). Used by
+// --dev hot reload so air restarts do not require re-entering the password.
+// Lock() is a no-op without encKey until the user unlocks with the password.
+func (s *Service) OpenPlaintextSession() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.authData == nil || !s.authData.Enabled {
+		s.unlocked = true
+		return nil
+	}
+	if s.unlocked {
+		return nil
+	}
+	for _, name := range []string{"rclone.conf.enc", "gn-drive.db.enc"} {
+		if fileExists(filepath.Join(s.configDir, name)) {
+			return errors.New("auth: encrypted config present — password required")
+		}
+	}
+	s.unlocked = true
+	s.logger.Info("auth: opened plaintext session (no re-encrypt key; --dev / crash recovery)")
+	return nil
+}
+
 // Status returns the public auth state.
 func (s *Service) Status() Status {
 	s.mu.RLock()
