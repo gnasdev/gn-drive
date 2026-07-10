@@ -1,39 +1,78 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { PhSwap, PhPlay, PhFolder, PhFile, PhArrowLeft } from '@phosphor-icons/vue'
-import { useOperationsStore } from '@/stores/operations'
-import { useApi } from '@/composables/useApi'
+import { onMounted, ref, watch } from 'vue'
+import { PhPlay, PhFolder, PhFile } from '@phosphor-icons/vue'
+import { useOperationsStore, type FileOp } from '@/stores/operations'
+import { useRemotesStore } from '@/stores/remotes'
 import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
+import { useToast } from '@gnas/ui-shared'
+import { SYNC_ACTIONS } from '@/constants/forms'
 
 const store = useOperationsStore()
-const api = useApi()
+const remotes = useRemotesStore()
+const toast = useToast()
 
-const remoteInput = ref('gdrive:/')
+/** '' = free absolute / custom path in remoteInput */
+const selectedRemote = ref('')
+const remoteInput = ref('/')
 const lastTaskId = ref<string | null>(null)
+const opSource = ref('')
+const opDest = ref('')
+const opPath = ref('')
+const selectedOp = ref<FileOp>('copy')
+const syncProfile = ref('')
 
 onMounted(async () => {
-  await store.loadProfiles()
-  await store.loadTasks()
+  await Promise.all([store.loadProfiles(), store.loadTasks(), remotes.load()])
+  if (store.profiles.length > 0) {
+    syncProfile.value = store.profiles[0].name
+  }
+})
+
+watch(selectedRemote, (name) => {
+  if (name) {
+    remoteInput.value = `${name}:`
+  }
 })
 
 async function doBrowse() {
   if (!remoteInput.value) return
-  await store.browse(remoteInput.value)
+  try {
+    await store.browse(remoteInput.value)
+  } catch {
+    // store.error already set
+  }
 }
 
-async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
-  const profileName = prompt(`Profile name to ${action}?`)
-  if (!profileName) return
+async function doStartSync(action: (typeof SYNC_ACTIONS)[number]) {
+  const profileName = syncProfile.value || store.profiles[0]?.name
+  if (!profileName) {
+    toast.error('Create a profile first')
+    return
+  }
   lastTaskId.value = await store.startSync(action, profileName)
   if (lastTaskId.value) {
     setTimeout(() => store.loadTasks(), 500)
   }
 }
+
+async function doFileOp() {
+  try {
+    if (selectedOp.value === 'mkdir' || selectedOp.value === 'purge' || selectedOp.value === 'delete') {
+      await store.runOp(selectedOp.value, { path: opPath.value || opDest.value || opSource.value })
+    } else {
+      await store.runOp(selectedOp.value, { source: opSource.value, dest: opDest.value })
+    }
+    toast.success(store.lastOpResult ?? 'ok')
+    if (remoteInput.value) await store.browse(remoteInput.value)
+  } catch (e: any) {
+    toast.error(e?.message ?? 'operation failed')
+  }
+}
 </script>
 
 <template>
-  <div class="ops-page">
+  <div class="ops-page" data-testid="page-operations">
     <header class="page-header">
       <div>
         <h1>Operations</h1>
@@ -44,19 +83,30 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
     <section class="card">
       <h3>Quick sync</h3>
       <p class="row-help">Trigger a one-shot sync for a profile.</p>
-      <div class="quick-actions">
-        <button class="ghost" @click="doStartSync('pull')"><PhPlay :size="14" weight="bold" /> pull</button>
-        <button class="ghost" @click="doStartSync('push')"><PhPlay :size="14" weight="bold" /> push</button>
-        <button class="ghost" @click="doStartSync('bi')"><PhPlay :size="14" weight="bold" /> bi</button>
-        <button class="ghost" @click="doStartSync('bi-resync')"><PhPlay :size="14" weight="bold" /> bi-resync</button>
+      <div class="browse-bar" style="margin-bottom: 10px">
+        <select v-model="syncProfile" data-testid="ops-sync-profile">
+          <option value="" disabled>Select profile</option>
+          <option v-for="p in store.profiles" :key="p.name" :value="p.name">{{ p.name }}</option>
+        </select>
       </div>
-      <AppAlert v-if="lastTaskId" type="success">Started task <code>{{ lastTaskId }}</code></AppAlert>
+      <div class="quick-actions">
+        <button
+          v-for="a in SYNC_ACTIONS"
+          :key="a"
+          class="ghost"
+          :data-testid="`ops-sync-${a}`"
+          @click="doStartSync(a)"
+        >
+          <PhPlay :size="14" weight="bold" /> {{ a }}
+        </button>
+      </div>
+      <AppAlert v-if="lastTaskId" type="success" data-testid="ops-task-started">Started task <code>{{ lastTaskId }}</code></AppAlert>
     </section>
 
     <section class="card">
       <h3>Active tasks</h3>
       <div v-if="store.tasks.length === 0"><EmptyState title="No active tasks" /></div>
-      <div v-else class="task-list">
+      <div v-else class="task-list" data-testid="ops-task-list">
         <div v-for="t in store.tasks" :key="t.id" class="task">
           <div class="task-name">{{ t.name }} <span class="badge">{{ t.action }}</span></div>
           <div class="task-meta">
@@ -70,21 +120,24 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
     <section class="card">
       <h3>Browse remote</h3>
       <div class="browse-bar">
-        <input v-model="remoteInput" placeholder="remote:/path" @keydown.enter="doBrowse" />
-        <button class="primary" @click="doBrowse" :disabled="store.busy">{{ store.busy ? 'Loading…' : 'Browse' }}</button>
+        <select v-model="selectedRemote" data-testid="ops-browse-remote">
+          <option value="">Custom / absolute</option>
+          <option v-for="r in remotes.items" :key="r.name" :value="r.name">{{ r.name }}{{ r.type ? ` (${r.type})` : '' }}</option>
+        </select>
+        <input v-model="remoteInput" placeholder="remote:/path or /absolute" data-testid="ops-browse-path" @keydown.enter="doBrowse" />
+        <button class="primary" data-testid="ops-browse-submit" @click="doBrowse" :disabled="store.busy">{{ store.busy ? 'Loading…' : 'Browse' }}</button>
       </div>
-      <AppAlert v-if="store.error" type="error">{{ store.error }}</AppAlert>
+      <AppAlert v-if="store.error" type="error" data-testid="ops-browse-error">{{ store.error }}</AppAlert>
       <p class="row-help">
-        Note: file browser requires the backend's <code>/api/v1/operations/fs</code> endpoint
-        to be implemented. Currently returns 501 in Phase 3.
+        Pick a remote or enter an absolute local path (<code>/tmp</code>) or <code>remote:path</code>.
       </p>
-      <div v-if="store.entries.length > 0" class="file-list">
+      <div v-if="store.entries.length > 0" class="file-list" data-testid="ops-browse-list">
         <div class="file-row head">
           <span>Name</span>
           <span>Size</span>
           <span>Modified</span>
         </div>
-        <div v-for="e in store.entries" :key="e.path" class="file-row">
+        <div v-for="e in store.entries" :key="e.path || e.name" class="file-row" data-testid="ops-browse-row">
           <span>
             <PhFolder v-if="e.is_dir" :size="14" weight="regular" />
             <PhFile v-else :size="14" weight="regular" />
@@ -94,6 +147,40 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
           <span class="muted small">{{ e.mod_time }}</span>
         </div>
       </div>
+    </section>
+
+    <section class="card">
+      <h3>File operations</h3>
+      <p class="row-help">One-shot rclone ops: copy, move, check, mkdir, purge, delete.</p>
+      <div class="op-form">
+        <label>
+          <span>Op</span>
+          <select v-model="selectedOp" data-testid="ops-file-op">
+            <option value="copy">copy</option>
+            <option value="move">move</option>
+            <option value="check">check</option>
+            <option value="mkdir">mkdir</option>
+            <option value="purge">purge</option>
+            <option value="delete">delete</option>
+          </select>
+        </label>
+        <label v-if="selectedOp === 'copy' || selectedOp === 'move' || selectedOp === 'check'">
+          <span>Source</span>
+          <input v-model="opSource" placeholder="/tmp/src or remote:path" data-testid="ops-file-source" />
+        </label>
+        <label v-if="selectedOp === 'copy' || selectedOp === 'move' || selectedOp === 'check'">
+          <span>Dest</span>
+          <input v-model="opDest" placeholder="/tmp/dst or remote:path" data-testid="ops-file-dest" />
+        </label>
+        <label v-if="selectedOp === 'mkdir' || selectedOp === 'purge' || selectedOp === 'delete'">
+          <span>Path</span>
+          <input v-model="opPath" placeholder="/tmp/dir or remote:path" data-testid="ops-file-path" />
+        </label>
+        <button class="primary" data-testid="ops-file-run" :disabled="store.busy" @click="doFileOp">
+          {{ store.busy ? 'Running…' : 'Run' }}
+        </button>
+      </div>
+      <AppAlert v-if="store.lastOpResult" type="success" data-testid="ops-file-result">{{ store.lastOpResult }}</AppAlert>
     </section>
   </div>
 </template>
@@ -131,9 +218,17 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
 .muted { color: var(--color-text-muted); }
 .empty { color: var(--color-text-dim); font-size: 12px; padding: 8px 0; }
 
-.browse-bar { display: flex; gap: 6px; margin-bottom: 8px; }
-.browse-bar input { flex: 1; padding: 7px 10px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: 13px; }
-.browse-bar input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent); }
+.browse-bar { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.browse-bar input, .browse-bar select {
+  padding: 7px 10px; background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: 13px;
+}
+.browse-bar input { flex: 1; min-width: 160px; }
+.browse-bar select { min-width: 140px; }
+.browse-bar input:focus, .browse-bar select:focus {
+  outline: none; border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
 .primary { padding: 7px 14px; background: var(--color-accent); color: white; border: 0; border-radius: 6px; font-size: 13px; font-weight: 500; }
 .primary:disabled { opacity: 0.5; }
 
@@ -141,4 +236,15 @@ async function doStartSync(action: 'pull' | 'push' | 'bi' | 'bi-resync') {
 .file-row { display: grid; grid-template-columns: 1fr 100px 180px; gap: 12px; padding: 6px 12px; font-size: 12px; border-top: 1px solid var(--color-border); align-items: center; }
 .file-row.head { font-size: 10px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.4px; border-top: 0; padding: 6px 12px; }
 .file-row span:first-child { display: flex; align-items: center; gap: 6px; }
+
+.op-form { display: grid; grid-template-columns: 120px 1fr 1fr auto; gap: 10px; align-items: end; }
+.op-form label { display: flex; flex-direction: column; gap: 4px; }
+.op-form label span { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
+.op-form input, .op-form select {
+  padding: 7px 10px; background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: 13px;
+}
+@media (max-width: 800px) {
+  .op-form { grid-template-columns: 1fr; }
+}
 </style>

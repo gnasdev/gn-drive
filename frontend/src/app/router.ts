@@ -72,10 +72,12 @@ router.beforeEach(async (to) => {
   if (!auth.initialized) {
     await auth.fetchStatus()
   }
+  // When master password is not configured yet, keep /unlock reachable so
+  // first-run setup works even though the app is open (unlocked=true).
   if (!to.meta.public && !auth.unlocked) {
     return { name: 'unlock' }
   }
-  if (to.name === 'unlock' && auth.unlocked) {
+  if (to.name === 'unlock' && auth.unlocked && auth.setup) {
     return { name: 'dashboard' }
   }
   return true

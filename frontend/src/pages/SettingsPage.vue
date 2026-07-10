@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { PhGearSix, PhSun, PhMoon, PhKey, PhLock, PhDownloadSimple } from '@phosphor-icons/vue'
 import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
@@ -9,6 +10,7 @@ import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 const theme = useThemeStore()
 const auth = useAuthStore()
 const api = useApi()
+const router = useRouter()
 
 const settings = ref<Record<string, string>>({})
 const newPwd = ref('')
@@ -34,9 +36,12 @@ async function changePassword() {
   }
   try {
     await api.post('/api/v1/auth/change-password', { old_password: oldPwd.value, new_password: newPwd.value })
-    msg.value = { kind: 'ok', text: 'Password changed.' }
+    // Backend clears all sessions and re-encrypts; force unlock screen.
+    auth.unlocked = false
+    msg.value = { kind: 'ok', text: 'Password changed. Unlock with the new password.' }
     newPwd.value = ''
     oldPwd.value = ''
+    await router.push({ name: 'unlock' })
   } catch (e: any) {
     msg.value = { kind: 'err', text: e?.message ?? 'change failed' }
   }
@@ -52,16 +57,25 @@ async function selfUpdate() {
     updateMsg.value = e?.message ?? 'update failed'
   }
 }
+
+async function lockApp() {
+  try {
+    await auth.lock()
+    await router.push({ name: 'unlock' })
+  } catch {
+    // error already in store
+  }
+}
 </script>
 
 <template>
-  <div class="settings-page">
+  <div class="settings-page" data-testid="page-settings">
     <header class="page-header">
       <h1>Settings</h1>
       <p class="sub">App preferences, master password, and self-update.</p>
     </header>
 
-    <AppAlert v-if="msg" :type="msg.kind === 'ok' ? 'success' : 'error'">{{ msg.text }}</AppAlert>
+    <AppAlert v-if="msg" :type="msg.kind === 'ok' ? 'success' : 'error'" data-testid="settings-msg">{{ msg.text }}</AppAlert>
 
     <section class="card">
       <h2><PhSun :size="14" weight="bold" /> Appearance</h2>
@@ -71,10 +85,10 @@ async function selfUpdate() {
           <div class="row-help">Dark by default; light via this toggle.</div>
         </div>
         <div class="row-actions">
-          <button class="toggle" :class="{ on: theme.preference === 'dark' }" @click="theme.setTheme('dark')">
+          <button class="toggle" :class="{ on: theme.preference === 'dark' }" data-testid="theme-dark" @click="theme.setTheme('dark')">
             <PhMoon :size="14" weight="bold" /> Dark
           </button>
-          <button class="toggle" :class="{ on: theme.preference === 'light' }" @click="theme.setTheme('light')">
+          <button class="toggle" :class="{ on: theme.preference === 'light' }" data-testid="theme-light" @click="theme.setTheme('light')">
             <PhSun :size="14" weight="bold" /> Light
           </button>
         </div>
@@ -86,15 +100,15 @@ async function selfUpdate() {
       <div class="form-grid">
         <label>
           <span>Current password</span>
-          <input v-model="oldPwd" type="password" autocomplete="current-password" />
+          <input v-model="oldPwd" type="password" autocomplete="current-password" data-testid="settings-old-password" />
         </label>
         <label>
           <span>New password</span>
-          <input v-model="newPwd" type="password" autocomplete="new-password" />
+          <input v-model="newPwd" type="password" autocomplete="new-password" data-testid="settings-new-password" />
         </label>
       </div>
       <div class="form-actions">
-        <button class="primary" :disabled="!oldPwd || !newPwd" @click="changePassword">Change password</button>
+        <button class="primary" :disabled="!oldPwd || !newPwd" data-testid="settings-change-password" @click="changePassword">Change password</button>
       </div>
     </section>
 
@@ -102,7 +116,7 @@ async function selfUpdate() {
       <h2><PhLock :size="14" weight="bold" /> Lock now</h2>
       <p class="row-help">Encrypt config files and require password to unlock.</p>
       <div class="form-actions">
-        <button class="danger" @click="auth.lock()">Lock app</button>
+        <button class="danger" data-testid="settings-lock" @click="lockApp">Lock app</button>
       </div>
     </section>
 

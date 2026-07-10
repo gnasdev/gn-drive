@@ -10,6 +10,7 @@ package rclone
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -532,14 +533,32 @@ func nowUnix() int64 {
 
 // --- File operations -------------------------------------------------------
 
-// ListFiles returns entries at a remote path.
+// ListFiles returns files and directories at a path.
+// remotePath may be "remote:path" or an absolute local filesystem path.
 func (c *Client) ListFiles(ctx context.Context, remotePath string) ([]FileEntry, error) {
-	if !strings.Contains(remotePath, ":") {
-		return nil, errors.New("rclone: remote path must include remote name (e.g. \"gdrive:/folder\")")
+	remotePath = strings.TrimSpace(remotePath)
+	if remotePath == "" {
+		return nil, errors.New("rclone: path is required")
 	}
-	out, err := c.run(ctx, nil, "lsjson", remotePath, "--config", c.config, "--files-only")
+	// Absolute local paths are valid for rclone without a remote section.
+	// Named remotes must use "name:path" form.
+	if !strings.Contains(remotePath, ":") && !strings.HasPrefix(remotePath, "/") {
+		return nil, errors.New("rclone: path must be absolute (/path) or remote:path (e.g. \"gdrive:/folder\")")
+	}
+	// One level only for browser UX. Quiet log level keeps NOTICE (symlinks,
+	// sockets) on stderr; run() only returns stdout so JSON stays clean.
+	out, err := c.run(ctx, nil,
+		"--log-level", "ERROR",
+		"lsjson", remotePath,
+		"--config", c.config,
+		"--max-depth", "1",
+	)
 	if err != nil {
 		return nil, err
+	}
+	out = bytes.TrimSpace(out)
+	if len(out) == 0 {
+		return []FileEntry{}, nil
 	}
 	var entries []FileEntry
 	if err := json.Unmarshal(out, &entries); err != nil {
@@ -593,17 +612,22 @@ type Remote struct {
 }
 
 // ListRemotes returns all remotes in rclone.conf.
+// Types are enriched from `rclone config dump` when available; dump failures
+// leave Type empty so listremotes still succeeds.
 func (c *Client) ListRemotes(ctx context.Context) ([]Remote, error) {
 	// rclone listremotes (no --long flag; format: "remote:")
 	// Exit 2 + Usage message when config is empty/missing — treat as zero remotes.
 	out, err := c.run(ctx, nil, "listremotes", "--config", c.config)
 	if err != nil {
-		outStr := string(out)
-		if strings.Contains(outStr, "Usage:") || strings.Contains(outStr, "Available commands:") {
+		// Empty/missing config often exits non-zero with usage text on stderr
+		// (now separated from stdout). Treat as zero remotes.
+		msg := string(out) + err.Error()
+		if strings.Contains(msg, "Usage:") || strings.Contains(msg, "Available commands:") {
 			return nil, nil
 		}
 		return nil, err
 	}
+	typesByName := c.remoteTypesFromDump(ctx)
 	var remotes []Remote
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
@@ -613,9 +637,33 @@ func (c *Client) ListRemotes(ctx context.Context) ([]Remote, error) {
 		if name == "" {
 			continue
 		}
-		remotes = append(remotes, Remote{Name: name, Type: ""})
+		remotes = append(remotes, Remote{Name: name, Type: typesByName[name]})
 	}
 	return remotes, nil
+}
+
+// remoteTypesFromDump maps remote name → type via `rclone config dump` JSON.
+// Returns an empty map on any failure so callers can still list names.
+func (c *Client) remoteTypesFromDump(ctx context.Context) map[string]string {
+	out, err := c.run(ctx, nil, "config", "dump", "--config", c.config)
+	if err != nil || len(out) == 0 {
+		return map[string]string{}
+	}
+	// dump shape: { "name": { "type": "drive", ... }, ... }
+	var dump map[string]map[string]any
+	if err := json.Unmarshal(out, &dump); err != nil {
+		return map[string]string{}
+	}
+	outMap := make(map[string]string, len(dump))
+	for name, section := range dump {
+		if section == nil {
+			continue
+		}
+		if t, ok := section["type"].(string); ok {
+			outMap[name] = t
+		}
+	}
+	return outMap
 }
 
 // CreateRemote creates a new remote non-interactively.
@@ -649,9 +697,20 @@ func (c *Client) run(ctx context.Context, env []string, args ...string) ([]byte,
 	cmd := exec.CommandContext(ctx, c.rcloneBin, args...)
 	c.mu.Unlock()
 	cmd.Env = append(os.Environ(), env...)
-	out, err := cmd.CombinedOutput()
+	// Keep stdout and stderr separate. CombinedOutput interleaves rclone NOTICE
+	// lines into JSON (lsjson/about), which breaks parsing on local paths with
+	// symlinks/sockets (e.g. "invalid character '/' after array element").
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := stdout.Bytes()
 	if err != nil {
-		return out, fmt.Errorf("rclone %s: %w (%s)", strings.Join(args, " "), err, truncate(string(out), 500))
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = strings.TrimSpace(stdout.String())
+		}
+		return out, fmt.Errorf("rclone %s: %w (%s)", strings.Join(args, " "), err, truncate(msg, 500))
 	}
 	return out, nil
 }

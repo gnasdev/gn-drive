@@ -61,6 +61,7 @@ func newTestServerWithRclone(t *testing.T, rcloneBin string) (*Server, func()) {
 		WebUI:      nil,
 		Rclone:     rc,
 		SyncEngine: eng,
+		// BoardEngine optional for remote-focused tests.
 	}
 	srv := New(deps, log)
 	cleanup := func() {

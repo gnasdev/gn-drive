@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { PhClockCounterClockwise, PhTrash } from '@phosphor-icons/vue'
 import { useHistoryStore } from '@/stores/history'
 import { useConfirmDialog } from '@gnas/ui-shared'
@@ -7,7 +8,21 @@ import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 
 const store = useHistoryStore()
 const { confirmDialog } = useConfirmDialog()
-onMounted(() => store.load())
+// History is capped at 1000 rows server-side; fetch the full cap and let the
+// virtualizer below render only the rows in view instead of paginating.
+onMounted(() => store.load(1000))
+
+const columnsTemplate = '1.2fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 0.8fr 1.2fr'
+
+const scrollParentEl = ref<HTMLElement | null>(null)
+const rowVirtualizer = useVirtualizer(computed(() => ({
+  count: store.entries.length,
+  getScrollElement: () => scrollParentEl.value,
+  estimateSize: () => 33,
+  overscan: 12,
+})))
+const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize())
 
 const totalBytes = computed(() => store.stats?.total_bytes ?? 0)
 const totalDuration = computed(() => store.stats?.total_duration_secs ?? 0)
@@ -41,13 +56,13 @@ async function doClear() {
 </script>
 
 <template>
-  <div class="history-page">
+  <div class="history-page" data-testid="page-history">
     <header class="page-header">
       <div>
         <h1>History</h1>
         <p class="sub">Past sync runs (capped at 1000 rows).</p>
       </div>
-      <button class="danger" @click="doClear"><PhTrash :size="14" weight="regular" /> Clear all</button>
+      <button class="danger" data-testid="history-clear" @click="doClear"><PhTrash :size="14" weight="regular" /> Clear all</button>
     </header>
 
     <div class="stats-grid">
@@ -85,32 +100,40 @@ async function doClear() {
     </div>
 
     <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Profile</th><th>Action</th><th>State</th><th>Bytes</th><th>Files</th><th>Errors</th><th>Duration</th><th>Started</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="e in store.entries" :key="e.id">
-            <td class="mono small">{{ e.profile_name }}</td>
-            <td><span class="badge">{{ e.action }}</span></td>
-            <td><span class="badge" :class="stateColor(e.state)">{{ e.state }}</span></td>
-            <td class="num">{{ formatBytes(e.bytes) }}</td>
-            <td class="num">{{ e.files }}</td>
-            <td class="num" :class="{ danger: e.errors > 0 }">{{ e.errors }}</td>
-            <td class="num">{{ formatDuration(e.duration_secs) }}</td>
-            <td class="muted small">{{ e.started_at }}</td>
-          </tr>
-          <tr v-if="store.entries.length === 0 && !store.loading">
-            <td colspan="8" class="empty">
-              <EmptyState title="No history yet">
-                <template #icon>
-                  <PhClockCounterClockwise :size="32" weight="light" />
-                </template>
-              </EmptyState>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="row head-row" :style="{ gridTemplateColumns: columnsTemplate }">
+        <div>Profile</div><div>Action</div><div>State</div><div>Bytes</div>
+        <div>Files</div><div>Errors</div><div>Duration</div><div>Started</div>
+      </div>
+
+      <EmptyState v-if="store.entries.length === 0 && !store.loading" title="No history yet" class="empty">
+        <template #icon>
+          <PhClockCounterClockwise :size="32" weight="light" />
+        </template>
+      </EmptyState>
+
+      <!--
+        Virtualized: History caps at 1000 rows, so only the ~20 rows in the
+        viewport (+ overscan) are ever mounted, regardless of total count.
+      -->
+      <div v-else ref="scrollParentEl" class="tbody-scroll">
+        <div class="virtual-spacer" :style="{ height: `${totalSize}px` }">
+          <div
+            v-for="vRow in virtualRows"
+            :key="vRow.index"
+            class="row body-row"
+            :style="{ gridTemplateColumns: columnsTemplate, transform: `translateY(${vRow.start}px)` }"
+          >
+            <div class="mono small">{{ store.entries[vRow.index].profile_name }}</div>
+            <div><span class="badge">{{ store.entries[vRow.index].action }}</span></div>
+            <div><span class="badge" :class="stateColor(store.entries[vRow.index].state)">{{ store.entries[vRow.index].state }}</span></div>
+            <div class="num">{{ formatBytes(store.entries[vRow.index].bytes) }}</div>
+            <div class="num">{{ store.entries[vRow.index].files }}</div>
+            <div class="num" :class="{ danger: store.entries[vRow.index].errors > 0 }">{{ store.entries[vRow.index].errors }}</div>
+            <div class="num">{{ formatDuration(store.entries[vRow.index].duration_secs) }}</div>
+            <div class="muted small">{{ store.entries[vRow.index].started_at }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -138,10 +161,16 @@ async function doClear() {
 .by-row .mono { color: var(--color-text); }
 
 .table-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
-table { width: 100%; border-collapse: collapse; }
-thead th { text-align: left; padding: 8px 14px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-text-dim); background: color-mix(in srgb, var(--color-surface-hover) 50%, transparent); border-bottom: 1px solid var(--color-border); }
-tbody td { padding: 8px 14px; font-size: 12px; border-top: 1px solid var(--color-border); }
-tbody tr:first-child td { border-top: 0; }
+
+/* Grid-based rows (not a native <table>) so the virtualizer can absolutely
+   position only the rows in view; head and body share one column template
+   to stay aligned. */
+.row { display: grid; align-items: center; gap: 8px; padding: 0 14px; }
+.head-row { height: 33px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-text-dim); background: color-mix(in srgb, var(--color-surface-hover) 50%, transparent); border-bottom: 1px solid var(--color-border); }
+.tbody-scroll { max-height: 60vh; overflow-y: auto; }
+.virtual-spacer { position: relative; width: 100%; }
+.body-row { position: absolute; top: 0; left: 0; width: 100%; height: 33px; font-size: 12px; border-top: 1px solid var(--color-border); }
+.body-row:first-child { border-top: 0; }
 .mono { font-family: var(--font-mono); }
 .muted { color: var(--color-text-muted); }
 .small { font-size: 11px; }

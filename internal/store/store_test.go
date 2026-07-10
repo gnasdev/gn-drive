@@ -175,10 +175,11 @@ func TestProfileRepo_SaveGetListDelete(t *testing.T) {
 
 	// Save.
 	p := &Profile{
-		Name:     "backup",
-		From:     "remote:src",
-		To:       "remote:dst",
-		Parallel: 4,
+		Name:      "backup",
+		From:      "remote:src",
+		To:        "remote:dst",
+		Direction: "push",
+		Parallel:  4,
 		Bandwidth: 100,
 		IncludedPaths: []string{"*.txt"},
 		ExcludedPaths: []string{"*.tmp"},
@@ -197,6 +198,9 @@ func TestProfileRepo_SaveGetListDelete(t *testing.T) {
 	}
 	if got.From != "remote:src" {
 		t.Errorf("From = %q", got.From)
+	}
+	if got.Direction != "push" {
+		t.Errorf("Direction = %q, want push", got.Direction)
 	}
 	if got.Parallel != 4 {
 		t.Errorf("Parallel = %d", got.Parallel)

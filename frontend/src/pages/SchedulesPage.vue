@@ -2,14 +2,17 @@
 import { onMounted, ref } from 'vue'
 import { PhCalendar, PhPlus, PhTrash, PhPause, PhPlay } from '@phosphor-icons/vue'
 import { useSchedulesStore } from '@/stores/schedules'
+import { useProfilesStore } from '@/stores/profiles'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
+import { SYNC_ACTIONS } from '@/constants/forms'
 import { useConfirmDialog, useToast } from '@gnas/ui-shared'
 import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
 import AppAlert from '@gnas/ui-shared/components/AppAlert.vue'
 
 const store = useSchedulesStore()
+const profiles = useProfilesStore()
 const api = useApi()
 const { confirmDialog } = useConfirmDialog()
 const toast = useToast()
@@ -17,7 +20,9 @@ const toast = useToast()
 const showAdd = ref(false)
 const draft = ref<Schedule>({ id: '', profile_name: '', action: 'pull', cron: '0 * * * *', enabled: true })
 
-onMounted(() => store.load())
+onMounted(async () => {
+  await Promise.all([store.load(), profiles.load()])
+})
 
 async function submitAdd() {
   if (!draft.value.profile_name || !draft.value.cron) {
@@ -37,37 +42,40 @@ async function doDelete(id: string) {
 </script>
 
 <template>
-  <div class="schedules-page">
+  <div class="schedules-page" data-testid="page-schedules">
     <header class="page-header">
       <div>
         <h1>Schedules</h1>
         <p class="sub">Cron-based scheduled syncs.</p>
       </div>
-      <button class="primary" @click="showAdd = !showAdd">
+      <button class="primary" data-testid="schedules-add" @click="showAdd = !showAdd">
         <PhPlus :size="16" weight="bold" /> Add schedule
       </button>
     </header>
 
-    <div v-if="showAdd" class="add-card">
+    <div v-if="showAdd" class="add-card" data-testid="schedules-add-form">
       <h3>New schedule</h3>
       <form @submit.prevent="submitAdd" class="form-grid">
-        <label class="span-2"><span>Profile name</span>
-          <input v-model="draft.profile_name" placeholder="backup" required />
-        </label>
-        <label><span>Action</span>
-          <select v-model="draft.action">
-            <option value="pull">pull</option>
-            <option value="push">push</option>
-            <option value="bi">bi</option>
-            <option value="bi-resync">bi-resync</option>
+        <label class="span-2"><span>Profile</span>
+          <select v-model="draft.profile_name" required data-testid="schedules-profile">
+            <option value="" disabled>Select profile</option>
+            <option v-for="p in profiles.items" :key="p.name" :value="p.name">{{ p.name }}</option>
           </select>
         </label>
-        <label><span>Cron (5-field)</span>
-          <input v-model="draft.cron" placeholder="0 * * * *" required />
+        <label><span>Action</span>
+          <select v-model="draft.action" data-testid="schedules-action">
+            <option v-for="a in SYNC_ACTIONS" :key="a" :value="a">{{ a }}</option>
+          </select>
         </label>
+        <label><span>Cron (5-field standard)</span>
+          <input v-model="draft.cron" placeholder="0 * * * *" required data-testid="schedules-cron" />
+        </label>
+        <p class="span-2 hint" style="margin:0;font-size:11px;color:var(--color-text-dim)">
+          Standard 5-field cron (min hour dom mon dow). Example: <code>0 * * * *</code> = every hour.
+        </p>
         <div class="form-actions">
           <button type="button" class="ghost" @click="showAdd = false">Cancel</button>
-          <button type="submit" class="primary" :disabled="api.loading.value">
+          <button type="submit" class="primary" :disabled="api.loading.value" data-testid="schedules-submit">
             {{ api.loading.value ? 'Adding…' : 'Add' }}
           </button>
         </div>

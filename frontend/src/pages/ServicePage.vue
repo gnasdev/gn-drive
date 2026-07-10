@@ -30,7 +30,7 @@ function logCommand(): string {
 </script>
 
 <template>
-  <div class="service-page">
+  <div class="service-page" data-testid="page-service">
     <header class="page-header">
       <div>
         <h1>Service</h1>

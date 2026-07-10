@@ -30,28 +30,28 @@ async function doDelete(id: string, name: string) {
 </script>
 
 <template>
-  <div class="flows-page">
+  <div class="flows-page" data-testid="page-flows">
     <header class="page-header">
       <div>
         <h1>Flows</h1>
         <p class="sub">Sequential multi-step sync flows.</p>
       </div>
-      <button class="primary" @click="showAdd = !showAdd">
+      <button class="primary" data-testid="flows-add" @click="showAdd = !showAdd">
         <PhPlus :size="16" weight="bold" /> Add flow
       </button>
     </header>
 
-    <div v-if="showAdd" class="add-card">
+    <div v-if="showAdd" class="add-card" data-testid="flows-add-form">
       <h3>New flow</h3>
       <form @submit.prevent="submitAdd" class="form-grid">
-        <label class="span-2"><span>Name</span><input v-model="draft.name" required /></label>
-        <label><span>Cron (optional)</span><input v-model="draft.schedule_cron" placeholder="0 * * * *" /></label>
+        <label class="span-2"><span>Name</span><input v-model="draft.name" required data-testid="flows-name" /></label>
+        <label><span>Cron optional (5-field)</span><input v-model="draft.schedule_cron" placeholder="0 * * * *" data-testid="flows-cron" /></label>
         <label class="checkbox">
           <AppCheckbox v-model="draft.enabled" label="Enabled" />
         </label>
         <div class="form-actions">
           <button type="button" class="ghost" @click="showAdd = false">Cancel</button>
-          <button type="submit" class="primary">Add</button>
+          <button type="submit" class="primary" data-testid="flows-submit">Add</button>
         </div>
       </form>
     </div>

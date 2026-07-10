@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/gnasdev/gn-drive/internal/auth"
+	"github.com/gnasdev/gn-drive/internal/boardengine"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/store"
@@ -59,13 +60,20 @@ func newTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 
+	boardEng := boardengine.New(boardengine.Options{
+		Store:  st,
+		Rclone: rc,
+		Bus:    bus,
+		Log:    log,
+	})
 	deps := &AppDeps{
-		Auth:       authSvc,
-		Store:      st,
-		Bus:        bus,
-		WebUI:      webui.Handler(),
-		Rclone:     rc,
-		SyncEngine: eng,
+		Auth:        authSvc,
+		Store:       st,
+		Bus:         bus,
+		WebUI:       webui.Handler(),
+		Rclone:      rc,
+		SyncEngine:  eng,
+		BoardEngine: boardEng,
 	}
 	srv := New(deps, log)
 	cleanup := func() {
@@ -565,14 +573,16 @@ func TestBoardHandlers_CRUD(t *testing.T) {
 		t.Errorf("update: status = %d", rr.Code)
 	}
 
+	// Empty board (no nodes/edges) should reject execute with 400.
 	rr = doRequest(srv, "POST", "/api/v1/boards/b1/execute", nil, "")
-	if rr.Code != 501 {
-		t.Errorf("execute: status = %d, want 501 (not implemented)", rr.Code)
+	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusOK && rr.Code != http.StatusConflict {
+		t.Errorf("execute: status = %d, body = %s", rr.Code, rr.Body.String())
 	}
 
+	// Stop with no active run → conflict.
 	rr = doRequest(srv, "POST", "/api/v1/boards/b1/stop", nil, "")
-	if rr.Code != 501 {
-		t.Errorf("stop: status = %d, want 501 (not implemented)", rr.Code)
+	if rr.Code != http.StatusConflict && rr.Code != http.StatusOK {
+		t.Errorf("stop: status = %d, body = %s", rr.Code, rr.Body.String())
 	}
 
 	rr = doRequest(srv, "DELETE", "/api/v1/boards/b1", nil, "")
@@ -699,36 +709,49 @@ func TestHistoryHandlers_Stats(t *testing.T) {
 func TestOperationHandlers_Browse(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
-	// Without rclone client, this errors 500. We just check it routes.
-	rr := doRequest(srv, "GET", "/api/v1/operations/fs?remote=test&path=/", nil, "")
-	if rr.Code != 500 && rr.Code != 501 {
+	// Relative non-absolute path without remote: is rejected as bad request.
+	rr := doRequest(srv, "GET", "/api/v1/operations/fs?remote=test", nil, "")
+	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, body = %s", rr.Code, rr.Body.String())
+	}
+	// Absolute local path should reach rclone (200 listing or 400 from rclone).
+	rr = doRequest(srv, "GET", "/api/v1/operations/fs?remote=/tmp", nil, "")
+	if rr.Code != http.StatusOK && rr.Code != http.StatusBadRequest && rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("absolute browse status = %d, body = %s", rr.Code, rr.Body.String())
+	}
+	// Missing remote query is 400.
+	rr = doRequest(srv, "GET", "/api/v1/operations/fs", nil, "")
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("missing remote status = %d, want 400", rr.Code)
 	}
 }
 
 func TestOperationHandlers_Start(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
+	// Missing source/dest for copy → 400.
 	rr := doRequest(srv, "POST", "/api/v1/operations", map[string]any{
-		"op": "copy", "paths": []string{"/a", "/b"},
+		"op": "copy",
 	}, "")
-	// Operations are not yet implemented (501).
-	if rr.Code != 501 {
-		t.Errorf("status = %d, want 501", rr.Code)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400, body = %s", rr.Code, rr.Body.String())
+	}
+	// Unknown op → 400.
+	rr = doRequest(srv, "POST", "/api/v1/operations", map[string]any{"op": "explode"}, "")
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("unknown op status = %d, want 400", rr.Code)
 	}
 }
 
 func TestOperationHandlers_StartBadJSON(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
-	// The handler returns 501 even for bad JSON since operations are
-	// stubbed. We just verify the route exists and responds.
 	req := httptest.NewRequest("POST", "/api/v1/operations", strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
-	if rr.Code != 501 && rr.Code != 400 {
-		t.Errorf("status = %d", rr.Code)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rr.Code)
 	}
 }
 
@@ -1824,21 +1847,22 @@ func TestHandleDeleteBoard_OK(t *testing.T) {
 	}
 }
 
-func TestHandleExecuteBoard_NotImplemented(t *testing.T) {
+func TestHandleExecuteBoard_Empty(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
+	_ = doRequest(srv, "POST", "/api/v1/boards", map[string]any{"id": "b1", "name": "b1"}, "")
 	rr := doRequest(srv, "POST", "/api/v1/boards/b1/execute", nil, "")
-	if rr.Code != http.StatusNotImplemented {
-		t.Errorf("expected 501, got %d", rr.Code)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 empty board, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
-func TestHandleStopBoard_NotImplemented(t *testing.T) {
+func TestHandleStopBoard_NotRunning(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
 	rr := doRequest(srv, "POST", "/api/v1/boards/b1/stop", nil, "")
-	if rr.Code != http.StatusNotImplemented {
-		t.Errorf("expected 501, got %d", rr.Code)
+	if rr.Code != http.StatusConflict {
+		t.Errorf("expected 409 not running, got %d", rr.Code)
 	}
 }
 

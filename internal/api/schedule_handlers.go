@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/gnasdev/gn-drive/internal/store"
+	"github.com/gnasdev/gn-drive/internal/syncengine"
 )
 
 // handleListSchedules returns all schedules.
@@ -21,6 +22,12 @@ func (s *Server) handleListSchedules(w http.ResponseWriter, r *http.Request) {
 	respondOK(w, schedules)
 }
 
+// validateScheduleCron normalizes and validates the cron expression so a
+// schedule is never persisted if the engine cannot register it.
+func validateScheduleCron(expr string) (string, error) {
+	return syncengine.NormalizeCron(expr)
+}
+
 // handleCreateSchedule creates a new schedule.
 func (s *Server) handleCreateSchedule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -31,6 +38,15 @@ func (s *Server) handleCreateSchedule(w http.ResponseWriter, r *http.Request) {
 	}
 	if s2.ID == "" {
 		s2.ID = uuid.New().String()
+	}
+	if s2.Enabled || s2.Cron != "" {
+		norm, err := validateScheduleCron(s2.Cron)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_cron", err.Error())
+			return
+		}
+		// Persist the original user expression; engine normalizes at register time.
+		_ = norm
 	}
 	if err := s.app.Store.Schedules().Save(ctx, &s2); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())
@@ -47,6 +63,12 @@ func (s *Server) handleUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 	if err := parseJSON(r, &s2); err != nil {
 		respondError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
+	}
+	if s2.Enabled || s2.Cron != "" {
+		if _, err := validateScheduleCron(s2.Cron); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_cron", err.Error())
+			return
+		}
 	}
 	if err := s.app.Store.Schedules().Save(ctx, &s2); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())

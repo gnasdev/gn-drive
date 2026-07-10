@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     name                 TEXT PRIMARY KEY,
     from_path            TEXT NOT NULL DEFAULT '',
     to_path              TEXT NOT NULL DEFAULT '',
+    direction            TEXT NOT NULL DEFAULT '',
     included_paths       TEXT NOT NULL DEFAULT '[]',
     excluded_paths       TEXT NOT NULL DEFAULT '[]',
     bandwidth            INTEGER NOT NULL DEFAULT 0,

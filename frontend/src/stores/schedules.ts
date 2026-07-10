@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useOptimisticList } from '@gnas/ui-shared'
 import { useApi } from '@/composables/useApi'
 import type { Schedule } from '@/api/types'
 
 export const useSchedulesStore = defineStore('schedules', () => {
   const api = useApi()
   const items = ref<Schedule[]>([])
+  const { optimisticUpdate } = useOptimisticList<Schedule>(items, {
+    rollbackMessage: () => 'Failed to update schedule, reverted.',
+  })
 
   async function load() {
     items.value = (await api.get<Schedule[]>('/api/v1/schedules')) ?? []
@@ -16,14 +20,23 @@ export const useSchedulesStore = defineStore('schedules', () => {
     await load()
   }
 
+  // Optimistic: flip the toggle immediately instead of waiting on a
+  // round-trip + full list reload; rolls back with a toast if the server
+  // rejects the change.
   async function enable(id: string) {
-    await api.post(`/api/v1/schedules/${id}/enable`)
-    await load()
+    await optimisticUpdate(
+      (s) => s.id === id,
+      (s) => ({ ...s, enabled: true }),
+      () => api.post(`/api/v1/schedules/${id}/enable`),
+    )
   }
 
   async function disable(id: string) {
-    await api.post(`/api/v1/schedules/${id}/disable`)
-    await load()
+    await optimisticUpdate(
+      (s) => s.id === id,
+      (s) => ({ ...s, enabled: false }),
+      () => api.post(`/api/v1/schedules/${id}/disable`),
+    )
   }
 
   async function remove(id: string) {

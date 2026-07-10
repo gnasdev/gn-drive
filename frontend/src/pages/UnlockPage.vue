@@ -38,14 +38,14 @@ async function submit() {
 </script>
 
 <template>
-  <div class="unlock-page">
+  <div class="unlock-page" data-testid="page-unlock">
     <div class="card">
       <div class="brand">
         <div class="mark">GN</div>
         <div class="name">GN Drive</div>
       </div>
 
-      <h1 class="title">
+      <h1 class="title" data-testid="unlock-title">
         {{ mode === 'setup' ? 'Set up master password' : 'Unlock' }}
       </h1>
       <p class="sub">
@@ -58,7 +58,7 @@ async function submit() {
         </template>
       </p>
 
-      <form @submit.prevent="submit" class="form">
+      <form @submit.prevent="submit" class="form" data-testid="unlock-form">
         <label class="field">
           <span>Password</span>
           <input
@@ -67,6 +67,7 @@ async function submit() {
             autofocus
             autocomplete="current-password"
             :disabled="auth.busy"
+            data-testid="unlock-password"
           />
         </label>
 
@@ -77,12 +78,13 @@ async function submit() {
             type="password"
             autocomplete="new-password"
             :disabled="auth.busy"
+            data-testid="unlock-confirm"
           />
         </label>
 
-        <AppAlert v-if="auth.error" type="error">{{ auth.error }}</AppAlert>
+        <AppAlert v-if="auth.error" type="error" data-testid="unlock-error">{{ auth.error }}</AppAlert>
 
-        <button type="submit" class="primary" :disabled="auth.busy || !password">
+        <button type="submit" class="primary" :disabled="auth.busy || !password" data-testid="unlock-submit">
           {{ auth.busy ? '…' : (mode === 'setup' ? 'Set up & unlock' : 'Unlock') }}
         </button>
       </form>

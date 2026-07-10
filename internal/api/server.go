@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/gnasdev/gn-drive/internal/auth"
+	"github.com/gnasdev/gn-drive/internal/boardengine"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/service"
@@ -37,13 +38,14 @@ type Server struct {
 
 // AppDeps holds the services the API needs. Passed in from app.App.
 type AppDeps struct {
-	Auth       *auth.Service
-	Store      *store.Store
-	Rclone     *rclone.Client
-	SyncEngine *syncengine.Engine
-	Bus        *eventbus.Bus
-	WebUI      http.Handler
-	Service    *service.Writer // non-nil in service mode
+	Auth        *auth.Service
+	Store       *store.Store
+	Rclone      *rclone.Client
+	SyncEngine  *syncengine.Engine
+	BoardEngine *boardengine.Engine
+	Bus         *eventbus.Bus
+	WebUI       http.Handler
+	Service     *service.Writer // non-nil in service mode
 }
 
 // New creates a new Server. The server is not started until Serve is called.

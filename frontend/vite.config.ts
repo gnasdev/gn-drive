@@ -2,10 +2,40 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
+import IstanbulPlugin from 'vite-plugin-istanbul'
+import { VitePWA } from 'vite-plugin-pwa'
+
+const coverage = process.env.E2E_COVERAGE === '1'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    vue(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      manifest: false,
+      // Same posture as the other GNAS frontends: emit a self-destroying
+      // worker instead of an active Workbox cache. gn-drive's data (rclone
+      // operations, transfer status) changes continuously, so caching it
+      // would show stale state; this only guards against any previously
+      // installed worker outliving a new deploy.
+      selfDestroying: true,
+    }),
+    ...(coverage
+      ? [
+          IstanbulPlugin({
+            include: 'src/*',
+            exclude: ['node_modules', 'e2e', 'src/api/types.ts'],
+            extension: ['.js', '.ts', '.vue'],
+            requireEnv: false,
+            cypress: false,
+            checkProd: false,
+            forceBuildInstrument: true,
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     // dedupe is critical: @gnas/ui-shared is imported from source, so without
     // deduping these singletons Vite could bundle two copies of Vue/Pinia and

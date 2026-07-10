@@ -171,6 +171,29 @@ exit 0
 	}
 }
 
+// NOTICE lines on stderr used to be interleaved into JSON via CombinedOutput,
+// causing parse errors like: invalid character '/' after array element.
+func TestListFiles_IgnoresStderrNotices(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "rclone-notice")
+	script := `#!/bin/sh
+echo '2026/07/10 13:00:00 NOTICE: home: Can'"'"'t follow symlink without -L/--copy-links' 1>&2
+echo '[{"Name":"Documents","Size":0,"IsDir":true,"Path":"Documents"}]'
+exit 0
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := New(Options{BinaryPath: bin, Logger: noopLogger()})
+	entries, err := c.ListFiles(context.Background(), "/Users/me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name != "Documents" {
+		t.Errorf("entries = %+v", entries)
+	}
+}
+
 func TestMkdir(t *testing.T) {
 	bin := newFakeRclone(t)
 	c, _ := New(Options{BinaryPath: bin, Logger: noopLogger()})

@@ -66,6 +66,7 @@ const groups = computed(() => {
           :to="{ name: item.name }"
           class="nav-item"
           :class="{ active: current === item.name }"
+          :data-testid="`nav-${item.name}`"
         >
           <component :is="item.icon" :size="18" weight="regular" />
           <span>{{ item.label }}</span>

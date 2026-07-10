@@ -1,0 +1,23 @@
+{
+  "all": true,
+  "include": [
+    "src/**/*.{ts,vue}"
+  ],
+  "exclude": [
+    "src/api/types.ts",
+    "e2e/**",
+    "**/*.d.ts",
+    "node_modules/**"
+  ],
+  "extension": [".js", ".ts", ".vue"],
+  "reporter": ["text", "lcov", "json-summary"],
+  "report-dir": "coverage",
+  "temp-dir": ".nyc_output",
+  "check-coverage": true,
+  "lines": 70,
+  "statements": 70,
+  "branches": 50,
+  "functions": 60,
+  "sourceMap": true,
+  "instrument": false
+}

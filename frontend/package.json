@@ -10,26 +10,36 @@
     "build:watch": "vite build --watch --mode development --sourcemap",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "test:e2e": "node scripts/e2e-run.mjs",
+    "test:e2e:coverage": "E2E_COVERAGE=1 node scripts/e2e-run.mjs --coverage",
+    "test:e2e:headed": "HEADED=1 node scripts/e2e-run.mjs"
   },
   "dependencies": {
-    "@gnas/ui-shared": "file:../../gn-ui-shared",
-    "vue": "^3.5.25",
-    "vue-router": "^4.6.4",
-    "pinia": "^3.0.4",
-    "naive-ui": "2.44.1",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^3.0.0",
-    "@phosphor-icons/vue": "^2.2.1",
     "@fontsource-variable/geist": "^5.1.1",
-    "vue-flow": "^0.1.0"
+    "@gnas/ui-shared": "file:../../gn-ui-shared",
+    "@phosphor-icons/vue": "^2.2.1",
+    "@tanstack/vue-virtual": "^3.13.31",
+    "clsx": "^2.1.0",
+    "naive-ui": "2.44.1",
+    "pinia": "^3.0.4",
+    "tailwind-merge": "^3.0.0",
+    "vue": "^3.5.25",
+    "vue-flow": "^0.1.0",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.2.1",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^26.1.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "nyc": "^18.0.0",
+    "puppeteer": "^25.3.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.23.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.7",
+    "vite-plugin-istanbul": "^9.0.1",
+    "vite-plugin-pwa": "^1.2.0",
     "vue-tsc": "^2.2.0"
   }
 }

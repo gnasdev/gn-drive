@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { computed } from 'vue'
 import { api } from '@/api/client'
 import {
   PhKey,
@@ -8,6 +8,7 @@ import {
   PhCircleNotch,
   PhStack,
 } from '@phosphor-icons/vue'
+import { SkeletonCard, useSwrCache } from '@gnas/ui-shared'
 import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 
 interface Profile { name: string; direction: string }
@@ -18,47 +19,57 @@ interface HistoryStats {
   total_bytes: number
   total_errors: number
 }
+interface DashboardOverview {
+  profiles: Profile[]
+  remotes: Remote[]
+  tasks: Task[]
+  stats: HistoryStats | null
+}
 
-const profiles = ref<Profile[]>([])
-const remotes = ref<Remote[]>([])
-const tasks = ref<Task[]>([])
-const stats = ref<HistoryStats | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
-
-onMounted(async () => {
-  try {
+// gn-drive is a single-user local tool (unlock via passphrase, no accounts),
+// so the cache scope is a constant rather than a per-user id.
+const { data, state: cacheState, error } = useSwrCache<DashboardOverview>({
+  namespace: 'gn-drive',
+  key: 'dashboard:overview',
+  userScope: () => 'local',
+  ttlMs: 30_000,
+  fetcher: async () => {
     const [p, r, t, h] = await Promise.all([
       api.get<Profile[]>('/api/v1/profiles'),
       api.get<Remote[]>('/api/v1/remotes'),
       api.get<Task[]>('/api/v1/sync/tasks'),
       api.get<HistoryStats>('/api/v1/history/stats'),
     ])
-    profiles.value = p ?? []
-    remotes.value = r ?? []
-    tasks.value = t ?? []
-    stats.value = h ?? null
-  } catch (e: any) {
-    error.value = e?.message ?? 'failed to load dashboard'
-  } finally {
-    loading.value = false
-  }
+    return { profiles: p ?? [], remotes: r ?? [], tasks: t ?? [], stats: h ?? null }
+  },
 })
 
+const profiles = computed(() => data.value?.profiles ?? [])
+const remotes = computed(() => data.value?.remotes ?? [])
+const tasks = computed(() => data.value?.tasks ?? [])
+const stats = computed(() => data.value?.stats ?? null)
 const activeTasks = computed(() => tasks.value.filter((t) => t.status === 'running'))
+const loadErrorMessage = computed(() => {
+  if (!error.value || data.value) return null
+  return (error.value as { message?: string })?.message ?? 'failed to load dashboard'
+})
+const showSkeleton = computed(() => cacheState.value === 'hydrating' && !data.value)
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="dashboard" data-testid="page-dashboard">
     <header class="page-header">
       <h1>Dashboard</h1>
       <p class="sub">Overview of profiles, remotes, and recent sync activity.</p>
     </header>
 
-    <div v-if="error" class="error">{{ error }}</div>
-    <div v-if="loading" class="loading">Loading…</div>
+    <div v-if="loadErrorMessage" class="error">{{ loadErrorMessage }}</div>
 
-    <div v-else class="grid">
+    <div v-if="showSkeleton" class="grid">
+      <SkeletonCard :count="4" :show-image="false" />
+    </div>
+
+    <div v-else-if="data" class="grid">
       <div class="card stat">
         <div class="stat-head">
           <PhKey :size="18" weight="regular" />

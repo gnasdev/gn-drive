@@ -63,12 +63,17 @@ async function onLock() {
 
     <div class="spacer" />
 
-    <button class="icon-btn" :title="`theme: ${theme.preference}`" @click="theme.setTheme(theme.isDark ? 'light' : 'dark')">
+    <button
+      class="icon-btn"
+      :title="`theme: ${theme.preference}`"
+      data-testid="theme-toggle"
+      @click="theme.setTheme(theme.isDark ? 'light' : 'dark')"
+    >
       <PhSun v-if="theme.isDark" :size="18" weight="regular" />
       <PhMoon v-else :size="18" weight="regular" />
     </button>
 
-    <button class="icon-btn" title="Lock" @click="onLock">
+    <button class="icon-btn" title="Lock" data-testid="lock-button" @click="onLock">
       <PhLock :size="18" weight="regular" />
     </button>
   </header>

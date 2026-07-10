@@ -11,6 +11,7 @@ import (
 
 	"github.com/gnasdev/gn-drive/internal/api"
 	"github.com/gnasdev/gn-drive/internal/auth"
+	"github.com/gnasdev/gn-drive/internal/boardengine"
 	"github.com/gnasdev/gn-drive/internal/browser"
 	"github.com/gnasdev/gn-drive/internal/config"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
@@ -24,17 +25,18 @@ import (
 
 // App holds all application services.
 type App struct {
-	Config     *config.Paths
-	EventBus   *eventbus.Bus
-	Log        *slog.Logger
-	Store      *store.Store
-	Auth       *auth.Service
-	Rclone     *rclone.Client
-	SyncEngine *syncengine.Engine
-	Browser    *browser.Opener
-	API        *api.Server
-	Listener   net.Listener    // set by Run()
-	Health     *service.Writer // non-nil when running in service mode
+	Config      *config.Paths
+	EventBus    *eventbus.Bus
+	Log         *slog.Logger
+	Store       *store.Store
+	Auth        *auth.Service
+	Rclone      *rclone.Client
+	SyncEngine  *syncengine.Engine
+	BoardEngine *boardengine.Engine
+	Browser     *browser.Opener
+	API         *api.Server
+	Listener    net.Listener    // set by Run()
+	Health      *service.Writer // non-nil when running in service mode
 }
 
 // Options configures App construction.
@@ -129,30 +131,40 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		Rclone: rc,
 	})
 
+	// 7b. Board DAG engine
+	boardEng := boardengine.New(boardengine.Options{
+		Store:  st,
+		Rclone: rc,
+		Bus:    bus,
+		Log:    log,
+	})
+
 	// 8. Browser opener
 	br := browser.New()
 
 	// 9. API server (built but not started)
 	apiServer := api.New(&api.AppDeps{
-		Auth:       authSvc,
-		Store:      st,
-		Rclone:     rc,
-		SyncEngine: eng,
-		Bus:        bus,
-		WebUI:      webui.Handler(),
-		Service:    nil, // set by run.go when service mode
+		Auth:        authSvc,
+		Store:       st,
+		Rclone:      rc,
+		SyncEngine:  eng,
+		BoardEngine: boardEng,
+		Bus:         bus,
+		WebUI:       webui.Handler(),
+		Service:     nil, // set by run.go when service mode
 	}, log)
 
 	return &App{
-		Config:     cfg,
-		EventBus:   bus,
-		Log:        log,
-		Store:      st,
-		Auth:       authSvc,
-		Rclone:     rc,
-		SyncEngine: eng,
-		Browser:    br,
-		API:        apiServer,
+		Config:      cfg,
+		EventBus:    bus,
+		Log:         log,
+		Store:       st,
+		Auth:        authSvc,
+		Rclone:      rc,
+		SyncEngine:  eng,
+		BoardEngine: boardEng,
+		Browser:     br,
+		API:         apiServer,
 	}, nil
 }
 

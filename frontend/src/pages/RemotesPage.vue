@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { PhCloud, PhPlus, PhTrash, PhCheckCircle, PhXCircle, PhSpinner } from '@phosphor-icons/vue'
 import { useRemotesStore } from '@/stores/remotes'
 import { useApi } from '@/composables/useApi'
+import RemoteTypeSelect from '@/components/forms/RemoteTypeSelect.vue'
 import { useConfirmDialog } from '@gnas/ui-shared'
 import EmptyState from '@gnas/ui-shared/components/EmptyState.vue'
 import AppSectionLoading from '@gnas/ui-shared/components/AppSectionLoading.vue'
@@ -26,7 +27,7 @@ async function submitAdd() {
     showAdd.value = false
     newName.value = ''
     newType.value = 'local'
-  } catch (e) {
+  } catch {
     // api.error already set
   }
 }
@@ -45,31 +46,31 @@ async function doDelete(name: string) {
 </script>
 
 <template>
-  <div class="remotes-page">
+  <div class="remotes-page" data-testid="page-remotes">
     <header class="page-header">
       <div>
         <h1>Remotes</h1>
         <p class="sub">rclone remotes in <code>rclone.conf</code>.</p>
       </div>
-      <button class="primary" @click="showAdd = !showAdd">
+      <button class="primary" data-testid="remotes-add" @click="showAdd = !showAdd">
         <PhPlus :size="16" weight="bold" /> Add remote
       </button>
     </header>
 
-    <div v-if="showAdd" class="add-card">
+    <div v-if="showAdd" class="add-card" data-testid="remotes-add-form">
       <h3>New remote</h3>
       <form @submit.prevent="submitAdd" class="add-form">
         <label>
           <span>Name</span>
-          <input v-model="newName" placeholder="gdrive" required />
+          <input v-model="newName" placeholder="gdrive" required data-testid="remotes-name" />
         </label>
         <label>
           <span>Type</span>
-          <input v-model="newType" placeholder="drive, s3, local, sftp..." required />
+          <RemoteTypeSelect v-model="newType" test-id="remotes-type" />
         </label>
         <div class="add-actions">
           <button type="button" class="ghost" @click="showAdd = false">Cancel</button>
-          <button type="submit" class="primary" :disabled="api.loading.value">
+          <button type="submit" class="primary" :disabled="api.loading.value" data-testid="remotes-submit">
             {{ api.loading.value ? 'Adding…' : 'Add' }}
           </button>
         </div>
@@ -98,7 +99,7 @@ async function doDelete(name: string) {
             </td>
             <td><span class="badge">{{ r.type || 'unknown' }}</span></td>
             <td class="actions">
-              <button class="ghost small" @click="doTest(r.name)" :title="`Test ${r.name}`">
+              <button class="ghost small" @click="doTest(r.name)" :title="`Test ${r.name}`" :data-testid="`remotes-test-${r.name}`">
                 <template v-if="testResults[r.name]?.ok === true">
                   <PhCheckCircle :size="16" weight="fill" class="ok" />
                 </template>
@@ -112,7 +113,7 @@ async function doDelete(name: string) {
                   Test
                 </template>
               </button>
-              <button class="danger small" @click="doDelete(r.name)" :title="`Delete ${r.name}`">
+              <button class="danger small" @click="doDelete(r.name)" :title="`Delete ${r.name}`" :data-testid="`remotes-delete-${r.name}`">
                 <PhTrash :size="14" weight="regular" />
               </button>
             </td>
@@ -204,7 +205,8 @@ async function doDelete(name: string) {
 }
 .add-form label { display: flex; flex-direction: column; gap: 4px; }
 .add-form label span { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
-.add-form input {
+.add-form input,
+.add-form :deep(select) {
   padding: 7px 10px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -212,8 +214,10 @@ async function doDelete(name: string) {
   color: var(--color-text);
   font-family: var(--font-mono);
   font-size: 13px;
+  width: 100%;
 }
-.add-form input:focus {
+.add-form input:focus,
+.add-form :deep(select:focus) {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);

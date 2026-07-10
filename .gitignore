@@ -10,6 +10,9 @@
 # Frontend
 /frontend/dist
 /frontend/node_modules
+/frontend/coverage
+/frontend/.nyc_output
+/frontend/e2e/.runtime.json
 
 # Internal embedded frontend
 /internal/webui/dist

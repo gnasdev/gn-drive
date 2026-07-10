@@ -214,7 +214,7 @@ func (r ProfileRepo) Save(ctx context.Context, p *Profile) error {
 		return errors.New("profile: name is required")
 	}
 	_, err := r.s.db.ExecContext(ctx, profileUpsertSQL,
-		p.Name, p.From, p.To,
+		p.Name, p.From, p.To, p.Direction,
 		marshalStringSlice(p.IncludedPaths), marshalStringSlice(p.ExcludedPaths),
 		p.Bandwidth, p.Parallel, p.BackupPath, p.CachePath,
 		p.MinSize, p.MaxSize, p.FilterFromFile, p.ExcludeIfPresent,
@@ -650,6 +650,8 @@ func (r FlowRepo) Get(ctx context.Context, id string) (*Flow, error) {
 }
 
 func (r FlowRepo) Save(ctx context.Context, f *Flow) error {
+	// sort_order is not on the Flow DTO yet; default 0 for new/updated rows.
+	const sortOrder = 0
 	_, err := r.s.db.ExecContext(ctx,
 		`INSERT INTO flows (id, name, schedule_enabled, cron_expr, sort_order, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, COALESCE(NULLIF(?, ''), datetime('now')), datetime('now'))
@@ -657,7 +659,7 @@ func (r FlowRepo) Save(ctx context.Context, f *Flow) error {
 		   name=excluded.name, schedule_enabled=excluded.schedule_enabled,
 		   cron_expr=excluded.cron_expr, sort_order=excluded.sort_order,
 		   updated_at=datetime('now')`,
-		f.ID, f.Name, boolToInt(f.Enabled), nullableString(f.ScheduleCron), f.Enabled, f.CreatedAt)
+		f.ID, f.Name, boolToInt(f.Enabled), nullableString(f.ScheduleCron), sortOrder, f.CreatedAt)
 	return err
 }
 
@@ -736,6 +738,7 @@ func (s *Store) migrateProfilesNewColumns(ctx context.Context) {
 		"ALTER TABLE profiles ADD COLUMN check_access INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE profiles ADD COLUMN conflict_loser TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE profiles ADD COLUMN conflict_suffix TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE profiles ADD COLUMN direction TEXT NOT NULL DEFAULT ''",
 	}
 	for _, ddl := range cols {
 		// Silently ignore "duplicate column" errors — ALTER TABLE ADD COLUMN is idempotent in spirit.

@@ -148,6 +148,12 @@ tasks:
     cmds:
       - pnpm run type-check
 
+  test:e2e:
+    summary: Run Puppeteer e2e + coverage gate (≥70% lines on frontend/src)
+    dir: frontend
+    cmds:
+      - pnpm run test:e2e:coverage
+
   lint:
     summary: Run all linters
     cmds:

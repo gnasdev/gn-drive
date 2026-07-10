@@ -201,6 +201,9 @@ func (e *Engine) ActiveTasks(ctx context.Context) ([]TaskSnapshot, error) {
 // RegisterSchedule adds or updates a cron job for a schedule. If a job
 // for this schedule ID already exists, it is removed and re-registered
 // with the new cron expression (or skipped when disabled).
+//
+// Cron expressions may be 5-field (UI) or 6-field (seconds-aware). They are
+// normalized via NormalizeCron before registration.
 func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
     if sch == nil {
         return
@@ -216,7 +219,12 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
     if !sch.Enabled || sch.Cron == "" {
         return
     }
-    id, err := e.cron.AddFunc(sch.Cron, func() {
+    expr, err := NormalizeCron(sch.Cron)
+    if err != nil {
+        e.log.Warn("cron: add func failed", "schedule", sch.ID, "err", err)
+        return
+    }
+    id, err := e.cron.AddFunc(expr, func() {
         e.triggerSchedule(sch)
     })
     if err != nil {
@@ -224,7 +232,7 @@ func (e *Engine) RegisterSchedule(ctx context.Context, sch *store.Schedule) {
         return
     }
     e.schedule[sch.ID] = id
-    e.log.Info("cron: registered", "schedule", sch.ID, "cron", sch.Cron)
+    e.log.Info("cron: registered", "schedule", sch.ID, "cron", expr)
 }
 
 // triggerSchedule runs the body of a cron-fired schedule: log, publish the
