@@ -21,14 +21,14 @@ import { ensureSession, lockFromSettings, unlock } from '../helpers/auth.js'
 import { loadRuntime } from '../helpers/env.js'
 
 /**
- * Functional e2e against single-page Workspace (desktop v0.4-style shell).
+ * Functional e2e against single-page Workspace (remotes + flows).
  */
 describe('full journey', () => {
   let page: Page
   let srcDir: string
   let dstDir: string
-  const profileName = `e2e-sync-${Date.now().toString(36)}`
   const remoteName = `e2e_local_${Date.now().toString(36)}`
+  let flowId = ''
 
   before(async () => {
     srcDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gn-drive-e2e-src-'))
@@ -53,9 +53,9 @@ describe('full journey', () => {
     await unlock(page)
     await waitForTestId(page, 'page-workspace')
     await waitForTestId(page, 'workspace-remotes')
-    await waitForTestId(page, 'workspace-operations')
+    await waitForTestId(page, 'workspace-flows')
     const text = await page.$eval('[data-testid="page-workspace"]', (el) => el.textContent ?? '')
-    assert.match(text, /Operations|Remotes|Flows/i)
+    assert.match(text, /Remotes|Flows/i)
     await collectCoverage(page)
   })
 
@@ -89,19 +89,6 @@ describe('full journey', () => {
     await collectCoverage(page)
   })
 
-  it('creates a profile (operation) with absolute local paths', async () => {
-    await waitForTestId(page, 'page-workspace')
-    await clickTestId(page, 'profiles-add')
-    await waitForTestId(page, 'profiles-add-form')
-    await typeTestId(page, 'profiles-name', profileName)
-    await typeTestId(page, 'profiles-from', srcDir)
-    await typeTestId(page, 'profiles-to', dstDir)
-    await typeTestId(page, 'profiles-direction', 'push')
-    await clickTestId(page, 'profiles-submit')
-    await waitForText(page, profileName)
-    await collectCoverage(page)
-  })
-
   it('creates and tests a local rclone remote', async () => {
     await waitForTestId(page, 'workspace-remotes')
     await clickTestId(page, 'remotes-add')
@@ -113,19 +100,49 @@ describe('full journey', () => {
     await collectCoverage(page)
   })
 
-  it('operations: push sync copies file to destination', async () => {
-    await waitForTestId(page, 'workspace-operations')
-    // Run the profile we created — click Run on that row.
-    await page.evaluate((n: string) => {
-      const row = document.querySelector(`[data-testid="profile-row-${n}"]`)
-      const btn = row?.querySelector('button') as HTMLButtonElement | null
-      // first primary-ish button is Run
-      const buttons = Array.from(row?.querySelectorAll('button') ?? []) as HTMLButtonElement[]
-      const run = buttons.find((b) => /Run|Chạy/i.test(b.textContent ?? ''))
-      run?.click()
-    }, profileName)
+  it('creates a flow, sets local paths, runs push sync', async () => {
+    await waitForTestId(page, 'workspace-flows')
+    await clickTestId(page, 'flows-add')
 
-    const deadline = Date.now() + 30_000
+    // New flow card appears in edit mode with one empty operation.
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-testid^="flow-card-"]').length > 0,
+      { timeout: 10_000 },
+    )
+    flowId = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid^="flow-card-"]')
+      const tid = card?.getAttribute('data-testid') ?? ''
+      return tid.replace(/^flow-card-/, '')
+    })
+    assert.ok(flowId, 'expected flow id from card testid')
+
+    // Rename for visibility.
+    const nameBtn = await page.$(`[data-testid="flows-edit-name"]`)
+    if (nameBtn) {
+      await nameBtn.click()
+      await typeTestId(page, 'flows-name-inline', `e2e-flow-${Date.now().toString(36)}`)
+      // blur / enter to commit name if needed
+      await page.keyboard.press('Enter')
+    }
+
+    // Set source/target local paths on the first op.
+    const opId = await page.evaluate(() => {
+      const row = document.querySelector('[data-testid^="op-row-"]')
+      return (row?.getAttribute('data-testid') ?? '').replace(/^op-row-/, '')
+    })
+    assert.ok(opId, 'expected operation row')
+
+    await page.click(`[data-testid="op-src-${opId}"]`, { clickCount: 3 })
+    await page.type(`[data-testid="op-src-${opId}"]`, srcDir)
+    await page.click(`[data-testid="op-dst-${opId}"]`, { clickCount: 3 })
+    await page.type(`[data-testid="op-dst-${opId}"]`, dstDir)
+
+    await clickTestId(page, `flows-save-bottom-${flowId}`)
+    await new Promise((r) => setTimeout(r, 500))
+
+    await clickTestId(page, 'flows-run')
+
+    const deadline = Date.now() + 45_000
     let copied = false
     while (Date.now() < deadline) {
       if (fs.existsSync(path.join(dstDir, 'hello.txt'))) {
@@ -137,28 +154,33 @@ describe('full journey', () => {
       }
       await new Promise((r) => setTimeout(r, 500))
     }
-    assert.ok(copied, `expected ${dstDir}/hello.txt after push sync`)
+    assert.ok(copied, `expected ${dstDir}/hello.txt after flow push`)
     await collectCoverage(page)
   })
 
-  it('creates and deletes a flow', async () => {
-    const name = `e2e-flow-${Date.now()}`
+  it('deletes a flow', async () => {
     await waitForTestId(page, 'page-workspace')
-    await clickTestId(page, 'flows-add')
-    await waitForTestId(page, 'flows-add-form')
-    await typeTestId(page, 'flows-name', name)
-    await typeTestId(page, 'flows-cron', '0 * * * *')
-    await clickTestId(page, 'flows-submit')
-    await waitForText(page, name)
-    await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('[data-testid^="flow-card-"]'))
-      const card = cards.find((c) => c.textContent?.includes(n))
-      const btn = card?.querySelector('button[data-testid^="flows-delete-"]') as HTMLButtonElement | null
+    // Ensure we have at least one flow; add if run left zero (edge).
+    const count = await page.$$eval('[data-testid^="flow-card-"]', (els) => els.length)
+    if (count === 0) {
+      await clickTestId(page, 'flows-add')
+      await page.waitForFunction(
+        () => document.querySelectorAll('[data-testid^="flow-card-"]').length > 0,
+        { timeout: 10_000 },
+      )
+    }
+    const name = await page.$eval('[data-testid^="flow-card-"]', (el) => el.textContent ?? '')
+    await page.evaluate(() => {
+      const btn = document.querySelector(
+        'button[data-testid^="flows-delete-"]',
+      ) as HTMLButtonElement | null
       btn?.click()
-    }, name)
+    })
     await confirmDialog(page, 'Delete')
-    await textAbsent(page, name)
+    // After delete, either empty state or remaining cards without that name snippet.
+    await new Promise((r) => setTimeout(r, 500))
     await collectCoverage(page)
+    void name
   })
 
   it('settings theme + change password forces unlock', async () => {

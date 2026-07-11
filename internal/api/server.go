@@ -1,7 +1,5 @@
-// Package api provides the HTTP API server for the web UI.
-//
-// Phase 3 wires a chi router with middleware (auth cookie, recover, request-id, slog)
-// and registers all REST handlers + the SSE event stream.
+// Package api provides the HTTP API server for the web UI:
+// chi router, session auth, REST handlers, SSE, and SPA mount.
 package api
 
 import (
@@ -118,9 +116,8 @@ func (s *Server) apiRouter() chi.Router {
 	r.Post("/sync", s.handleStartSync)
 	r.Get("/sync/tasks", s.handleListTasks)
 	r.Delete("/sync/tasks/{id}", s.handleStopTask)
-	r.Get("/sync/tasks/{id}/logs", s.handleTaskLogs)
 
-	// Flows (Wails-style: nested operations + execute)
+	// Flows (nested operations + execute)
 	r.Get("/flows", s.handleListFlows)
 	r.Post("/flows", s.handleCreateFlow)
 	r.Get("/flows/{id}", s.handleGetFlow)

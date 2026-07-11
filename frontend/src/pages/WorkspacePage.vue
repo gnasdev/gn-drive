@@ -534,6 +534,7 @@ function scheduleLabel(f: Flow): string {
             v-for="r in remotes.items"
             :key="r.name"
             class="neo-inset flex items-center gap-2 px-2.5 py-1.5"
+            :data-testid="`remote-chip-${r.name}`"
           >
             <span class="font-bold text-sm">{{ r.name }}</span>
             <span class="text-[11px] text-text-dim">{{ r.type }}</span>
@@ -559,6 +560,7 @@ function scheduleLabel(f: Flow): string {
         </AppAlert>
 
         <!-- FLOWS (primary) -->
+        <div data-testid="workspace-flows">
         <div class="flex items-end justify-between gap-3">
           <div>
             <h2 class="m-0 flex items-center gap-2 text-lg font-bold">
@@ -578,7 +580,7 @@ function scheduleLabel(f: Flow): string {
           </button>
         </div>
 
-        <!-- Wails flow-card layout -->
+        <!-- Flow cards -->
         <section
           v-for="(f, fi) in flows.items"
           :key="f.id"
@@ -970,6 +972,7 @@ function scheduleLabel(f: Flow): string {
         </div>
 
         <p v-if="loading" class="text-center text-sm text-text-muted">{{ t('common.loading') }}…</p>
+        </div>
       </div>
     </div>
   </div>

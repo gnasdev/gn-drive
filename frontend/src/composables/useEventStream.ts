@@ -1,9 +1,8 @@
 /**
  * Subscribe to backend SSE (/api/v1/events) and fan out sync / flow topics
- * into Pinia stores so the Workspace UI updates live during operations.
+ * into the flows Pinia store so the Workspace UI updates live during runs.
  */
 import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
-import { useOperationsStore } from '@/stores/operations'
 import { useFlowsStore } from '@/stores/flows'
 
 const SYNC_TOPICS = ['sync:started', 'sync:progress', 'sync:completed', 'sync:failed'] as const
@@ -18,7 +17,6 @@ export type UseEventStreamOptions = {
 }
 
 export function useEventStream(opts: UseEventStreamOptions = {}) {
-  const ops = useOperationsStore()
   const flows = useFlowsStore()
   const connected = ref(false)
   let es: EventSource | null = null
@@ -50,7 +48,6 @@ export function useEventStream(opts: UseEventStreamOptions = {}) {
       return
     }
     if ((SYNC_TOPICS as readonly string[]).includes(topic)) {
-      ops.applySyncEvent(topic, data)
       // Flow path-sync uses busyKey profile_id = `${flowId}:${opId}`.
       flows.applySyncProgress(topic, data)
       return

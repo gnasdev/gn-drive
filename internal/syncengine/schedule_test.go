@@ -119,6 +119,74 @@ func TestUnregisterAfterStopIsNoop(t *testing.T) {
 	e.UnregisterSchedule("sched-5")
 }
 
+type stubFlowExec struct {
+	mu    sync.Mutex
+	calls []string
+	err   error
+}
+
+func (s *stubFlowExec) Execute(ctx context.Context, flowID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, flowID)
+	return s.err
+}
+
+func TestSyncFlowSchedule_RegisterAndUnregister(t *testing.T) {
+	e := makeEngine(t)
+	fe := &stubFlowExec{}
+	e.SetFlowExecutor(fe)
+
+	f := &store.Flow{
+		ID:              "flow-1",
+		ScheduleEnabled: true,
+		ScheduleCron:    "0 * * * *",
+	}
+	e.SyncFlowSchedule(f)
+	id := FlowScheduleID("flow-1")
+	if _, ok := e.schedule[id]; !ok {
+		t.Fatal("expected flow schedule registered")
+	}
+
+	// Disable → unregister
+	f.ScheduleEnabled = false
+	e.SyncFlowSchedule(f)
+	if _, ok := e.schedule[id]; ok {
+		t.Fatal("disabled flow schedule should be removed")
+	}
+
+	// Re-enable and delete via UnregisterFlowSchedule
+	f.ScheduleEnabled = true
+	e.SyncFlowSchedule(f)
+	e.UnregisterFlowSchedule("flow-1")
+	if _, ok := e.schedule[id]; ok {
+		t.Fatal("unregister should remove flow schedule")
+	}
+}
+
+func TestTriggerFlowSchedule_CallsExecutor(t *testing.T) {
+	e := makeEngine(t)
+	fe := &stubFlowExec{}
+	e.SetFlowExecutor(fe)
+	e.triggerFlowSchedule("flow-xyz")
+	fe.mu.Lock()
+	defer fe.mu.Unlock()
+	if len(fe.calls) != 1 || fe.calls[0] != "flow-xyz" {
+		t.Fatalf("calls = %v", fe.calls)
+	}
+}
+
+func TestSyncFlowSchedule_NoExecutorSkips(t *testing.T) {
+	e := makeEngine(t)
+	// flowExec nil
+	e.SyncFlowSchedule(&store.Flow{
+		ID: "f1", ScheduleEnabled: true, ScheduleCron: "0 * * * *",
+	})
+	if _, ok := e.schedule[FlowScheduleID("f1")]; ok {
+		t.Fatal("should not register without flow executor")
+	}
+}
+
 // Compile-time guard: ensure we don't accidentally regress the package
 // signature used by cmd/gn-drive/run.go.
 var _ = time.Now

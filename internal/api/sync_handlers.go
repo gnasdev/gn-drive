@@ -60,8 +60,4 @@ func (s *Server) handleStopTask(w http.ResponseWriter, r *http.Request) {
 	respondOK(w, map[string]bool{"ok": true})
 }
 
-// handleTaskLogs returns log lines since a sequence number.
-// Not implemented in Phase 3 — returns empty.
-func (s *Server) handleTaskLogs(w http.ResponseWriter, r *http.Request) {
-	respondOK(w, []any{})
-}
+

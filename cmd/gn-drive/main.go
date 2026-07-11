@@ -1,7 +1,4 @@
 // Package main is the entry point for the gn-drive CLI.
-//
-// Phase 1: cobra root with subcommand stubs.
-// Phase 2+: subcommands become fully functional.
 package main
 
 import (

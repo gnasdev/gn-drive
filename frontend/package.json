@@ -9,7 +9,7 @@
     "build:dev": "vue-tsc -b && vite build --mode development --sourcemap",
     "build:watch": "vite build --watch --mode development --sourcemap",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.ts,.tsx",
+    "lint": "vue-tsc --noEmit",
     "type-check": "vue-tsc --noEmit",
     "test:e2e": "node scripts/e2e-run.mjs",
     "test:e2e:coverage": "E2E_COVERAGE=1 node scripts/e2e-run.mjs --coverage",

@@ -1,7 +1,5 @@
-// Package syncengine provides the sync orchestration engine.
-//
-// Phase 3: cron scheduler, active task registry, goroutine-based sync execution,
-// event emission via eventbus. Delta watcher deferred to Phase 6.
+// Package syncengine provides the sync orchestration engine:
+// task registry, profile and flow cron schedules, and event emission.
 package syncengine
 
 import (
@@ -20,6 +18,20 @@ import (
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/store"
 )
+
+// flowSchedulePrefix namespaces cron IDs for flow schedules (vs profile schedules).
+const flowSchedulePrefix = "flow:"
+
+// FlowScheduleID returns the cron map key for a flow.
+func FlowScheduleID(flowID string) string {
+	return flowSchedulePrefix + strings.TrimSpace(flowID)
+}
+
+// FlowExecutor runs a scheduled flow. Implemented by flowengine.Engine;
+// kept as an interface to avoid an import cycle.
+type FlowExecutor interface {
+	Execute(ctx context.Context, flowID string) error
+}
 
 // ErrNotRunning is returned when the engine is stopped.
 var ErrNotRunning = errors.New("syncengine: engine is not running")
@@ -49,6 +61,7 @@ type Engine struct {
 	bus      *eventbus.Bus
 	store    *store.Store
 	rclone   SyncClient
+	flowExec FlowExecutor
 	cron     *cron.Cron
 	cronMu   sync.Mutex
 	schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
@@ -89,6 +102,11 @@ func New(deps Deps) *Engine {
         rclone: deps.Rclone,
         running: make(map[string]struct{}),
     }
+}
+
+// SetFlowExecutor wires the flow runner used by flow cron schedules.
+func (e *Engine) SetFlowExecutor(fe FlowExecutor) {
+	e.flowExec = fe
 }
 
 // AttachStore wires store + rclone after portal unlock (deferred data plane).
@@ -365,15 +383,91 @@ func (e *Engine) removeLocked(id string) {
 }
 
 func (e *Engine) loadSchedules() {
-    ctx := context.Background()
-    schedules, err := e.store.Schedules().List(ctx)
-    if err != nil {
-        e.log.Warn("syncengine: load schedules", "err", err)
-        return
-    }
-    for i := range schedules {
-        e.RegisterSchedule(ctx, &schedules[i])
-    }
+	ctx := context.Background()
+	schedules, err := e.store.Schedules().List(ctx)
+	if err != nil {
+		e.log.Warn("syncengine: load schedules", "err", err)
+	} else {
+		for i := range schedules {
+			e.RegisterSchedule(ctx, &schedules[i])
+		}
+	}
+	e.loadFlowSchedules(ctx)
+}
+
+func (e *Engine) loadFlowSchedules(ctx context.Context) {
+	if e.store == nil {
+		return
+	}
+	flows, err := e.store.Flows().List(ctx)
+	if err != nil {
+		e.log.Warn("syncengine: load flow schedules", "err", err)
+		return
+	}
+	for i := range flows {
+		e.SyncFlowSchedule(&flows[i])
+	}
+}
+
+// SyncFlowSchedule registers or removes a flow's cron job from its persisted fields.
+// Safe to call before Start (no-op until cron exists) and after flow save/delete.
+func (e *Engine) SyncFlowSchedule(f *store.Flow) {
+	if f == nil || strings.TrimSpace(f.ID) == "" {
+		return
+	}
+	id := FlowScheduleID(f.ID)
+	enabled := f.ScheduleEnabled || f.Enabled
+	cronExpr := strings.TrimSpace(f.ScheduleCron)
+	if cronExpr == "" {
+		cronExpr = strings.TrimSpace(f.CronExpr)
+	}
+
+	e.cronMu.Lock()
+	defer e.cronMu.Unlock()
+	if e.cron == nil {
+		return
+	}
+	e.removeLocked(id)
+	if !enabled || cronExpr == "" || e.flowExec == nil {
+		return
+	}
+	expr, err := NormalizeCron(cronExpr)
+	if err != nil {
+		e.log.Warn("cron: flow schedule invalid", "flow", f.ID, "err", err)
+		return
+	}
+	flowID := f.ID
+	entryID, err := e.cron.AddFunc(expr, func() {
+		e.triggerFlowSchedule(flowID)
+	})
+	if err != nil {
+		e.log.Warn("cron: flow add func failed", "flow", f.ID, "err", err)
+		return
+	}
+	e.schedule[id] = entryID
+	e.log.Info("cron: registered flow", "flow", f.ID, "cron", expr)
+}
+
+// UnregisterFlowSchedule removes a flow's cron entry (e.g. on delete).
+func (e *Engine) UnregisterFlowSchedule(flowID string) {
+	e.UnregisterSchedule(FlowScheduleID(flowID))
+}
+
+func (e *Engine) triggerFlowSchedule(flowID string) {
+	e.log.Info("cron: triggering flow", "flow", flowID)
+	e.bus.Publish(eventbus.TopicScheduleTriggered, eventbus.ScheduleTriggeredEvent{
+		ScheduleID: FlowScheduleID(flowID),
+		ProfileID:  flowID,
+		Action:     "flow",
+	})
+	if e.flowExec == nil {
+		e.log.Warn("cron: flow executor not set", "flow", flowID)
+		return
+	}
+	if err := e.flowExec.Execute(context.Background(), flowID); err != nil {
+		// Already running is expected when a long flow overlaps the next tick.
+		e.log.Warn("cron: flow execute", "flow", flowID, "err", err)
+	}
 }
 
 func (e *Engine) runSync(t *Task, p *store.Profile, action string) {

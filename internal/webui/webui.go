@@ -1,6 +1,4 @@
-// Package webui serves the embedded frontend assets.
-//
-// Phase 3: placeholder HTML. Phase 5 replaces dist/ with the Vue 3 build.
+// Package webui serves the embedded Vue SPA (//go:embed all:dist).
 package webui
 
 import (

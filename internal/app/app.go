@@ -150,6 +150,8 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		Bus:   bus,
 		Log:   log,
 	})
+	// Flow cron jobs call FlowEngine.Execute (interface to avoid import cycle).
+	a.SyncEngine.SetFlowExecutor(a.FlowEngine)
 
 	// Open data plane now when config is usable (unlocked, not set up, or
 	// locked but still plaintext on disk). Encrypted+locked → defer until

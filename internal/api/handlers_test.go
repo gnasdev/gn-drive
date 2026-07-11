@@ -494,12 +494,13 @@ func TestSyncHandlers_StopTask(t *testing.T) {
 	}
 }
 
-func TestSyncHandlers_TaskLogs(t *testing.T) {
+func TestSyncHandlers_TaskLogsRemoved(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
+	// Task log endpoint was a no-op stub; route removed in cleanup.
 	rr := doRequest(srv, "GET", "/api/v1/sync/tasks/x/logs", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("task logs: status = %d", rr.Code)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("task logs: want 404, got %d", rr.Code)
 	}
 }
 
@@ -1092,12 +1093,12 @@ func TestHandleStopTask(t *testing.T) {
 	}
 }
 
-func TestHandleTaskLogs(t *testing.T) {
+func TestHandleTaskLogs_Gone(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
 	rr := doRequest(srv, "GET", "/api/v1/sync/tasks/x/logs", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rr.Code)
 	}
 }
 

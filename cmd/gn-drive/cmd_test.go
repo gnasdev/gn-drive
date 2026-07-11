@@ -676,8 +676,11 @@ exit 2
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
+	cfg := t.TempDir()
 	a, err := app.New(context.Background(), app.Options{
-		LogMode: logging.ModeForeground,
+		ConfigDir:    cfg,
+		LogMode:      logging.ModeForeground,
+		RcloneBinary: bin,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -713,7 +716,10 @@ exit 0
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	a, err := app.New(context.Background(), app.Options{LogMode: logging.ModeForeground})
+	cfg := t.TempDir()
+	a, err := app.New(context.Background(), app.Options{
+		ConfigDir: cfg, LogMode: logging.ModeForeground, RcloneBinary: bin,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -738,7 +744,10 @@ exit 0
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	a, err := app.New(context.Background(), app.Options{LogMode: logging.ModeForeground})
+	cfg := t.TempDir()
+	a, err := app.New(context.Background(), app.Options{
+		ConfigDir: cfg, LogMode: logging.ModeForeground, RcloneBinary: bin,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -763,7 +772,10 @@ exit 0
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	a, err := app.New(context.Background(), app.Options{LogMode: logging.ModeForeground})
+	cfg := t.TempDir()
+	a, err := app.New(context.Background(), app.Options{
+		ConfigDir: cfg, LogMode: logging.ModeForeground, RcloneBinary: bin,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -98,9 +98,11 @@ func (s *Server) handleCreateFlow(w http.ResponseWriter, r *http.Request) {
 	}
 	got, _ := s.app.Store.Flows().Get(ctx, f.ID)
 	if got != nil {
+		s.syncFlowCron(got)
 		respondCreated(w, got)
 		return
 	}
+	s.syncFlowCron(&f)
 	respondCreated(w, f)
 }
 
@@ -130,9 +132,11 @@ func (s *Server) handleUpdateFlow(w http.ResponseWriter, r *http.Request) {
 	}
 	got, err := s.app.Store.Flows().Get(ctx, f.ID)
 	if err != nil {
+		s.syncFlowCron(&f)
 		respondOK(w, f)
 		return
 	}
+	s.syncFlowCron(got)
 	respondOK(w, got)
 }
 
@@ -156,7 +160,18 @@ func (s *Server) handleDeleteFlow(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "delete_error", err.Error())
 		return
 	}
+	if s.app.SyncEngine != nil {
+		s.app.SyncEngine.UnregisterFlowSchedule(id)
+	}
 	respondOK(w, map[string]bool{"ok": true})
+}
+
+// syncFlowCron updates the in-process cron entry for a flow after save.
+func (s *Server) syncFlowCron(f *store.Flow) {
+	if s.app.SyncEngine == nil || f == nil {
+		return
+	}
+	s.app.SyncEngine.SyncFlowSchedule(f)
 }
 
 // handleExecuteFlow starts sequential execution of a flow's operations.

@@ -11,9 +11,9 @@ import (
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	settings := make(map[string]string)
+	// Desktop tray/login keys are legacy (no UI); keep theme/debug/notifications.
 	keys := []string{
 		"theme", "notifications_enabled", "debug_mode",
-		"minimize_to_tray", "start_at_login",
 	}
 	for _, key := range keys {
 		val, err := s.app.Store.Settings().Get(ctx, key)
