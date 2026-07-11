@@ -17,7 +17,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/gnasdev/gn-drive/internal/auth"
-	"github.com/gnasdev/gn-drive/internal/boardengine"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/store"
@@ -59,12 +58,6 @@ func newTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 
-	boardEng := boardengine.New(boardengine.Options{
-		Store:  st,
-		Rclone: rc,
-		Bus:    bus,
-		Log:    log,
-	})
 	deps := &AppDeps{
 		Auth:        authSvc,
 		Store:       st,
@@ -72,7 +65,6 @@ func newTestServer(t *testing.T) (*Server, func()) {
 		WebUI:       webui.Handler(),
 		Rclone:      rc,
 		SyncEngine:  eng,
-		BoardEngine: boardEng,
 	}
 	srv := New(deps, log)
 	cleanup := func() {
@@ -511,91 +503,7 @@ func TestSyncHandlers_TaskLogs(t *testing.T) {
 	}
 }
 
-// --- Board / Flow / History / Operations handlers ---------------------
-
-func TestBoardHandlers_CRUD(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-
-	rr := doRequest(srv, "POST", "/api/v1/boards", map[string]any{
-		"id": "b1", "name": "Board 1",
-	}, "")
-	if rr.Code != 201 {
-		t.Errorf("create: status = %d, body = %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(srv, "GET", "/api/v1/boards", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("list: status = %d", rr.Code)
-	}
-
-	rr = doRequest(srv, "GET", "/api/v1/boards/b1", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("get: status = %d", rr.Code)
-	}
-
-	rr = doRequest(srv, "PUT", "/api/v1/boards/b1", map[string]any{
-		"id": "b1", "name": "Board 1 updated",
-	}, "")
-	if rr.Code != 200 {
-		t.Errorf("update: status = %d", rr.Code)
-	}
-
-	// Empty board (no nodes/edges) should reject execute with 400.
-	rr = doRequest(srv, "POST", "/api/v1/boards/b1/execute", nil, "")
-	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusOK && rr.Code != http.StatusConflict {
-		t.Errorf("execute: status = %d, body = %s", rr.Code, rr.Body.String())
-	}
-
-	// Stop with no active run → conflict.
-	rr = doRequest(srv, "POST", "/api/v1/boards/b1/stop", nil, "")
-	if rr.Code != http.StatusConflict && rr.Code != http.StatusOK {
-		t.Errorf("stop: status = %d, body = %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(srv, "DELETE", "/api/v1/boards/b1", nil, "")
-	if rr.Code != 200 {
-		t.Errorf("delete: status = %d", rr.Code)
-	}
-
-	rr = doRequest(srv, "DELETE", "/api/v1/boards/missing", nil, "")
-	if rr.Code != 404 {
-		t.Errorf("delete missing: status = %d, want 404", rr.Code)
-	}
-}
-
-func TestBoardHandlers_GetMissing(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/boards/missing", nil, "")
-	if rr.Code != 404 {
-		t.Errorf("status = %d, want 404", rr.Code)
-	}
-}
-
-func TestBoardHandlers_CreateBadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("POST", "/api/v1/boards", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != 400 {
-		t.Errorf("status = %d, want 400", rr.Code)
-	}
-}
-
-func TestBoardHandlers_UpdateBadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("PUT", "/api/v1/boards/b1", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != 400 {
-		t.Errorf("status = %d, want 400", rr.Code)
-	}
-}
+// --- Flow / Operations handlers -----------------------------------------
 
 func TestFlowHandlers_CRUD(t *testing.T) {
 	srv, cleanup := newTestServer(t)
@@ -1310,118 +1218,6 @@ func TestHandleDeleteRemote(t *testing.T) {
 	}
 }
 
-// --- board handlers coverage ------------------------------------------
-
-func TestHandleListBoards_Empty(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/boards", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleCreateBoard(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	body := map[string]any{"name": "b1"}
-	rr := doRequest(srv, "POST", "/api/v1/boards", body, "")
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleCreateBoard_BadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("POST", "/api/v1/boards", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestHandleUpdateBoard(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/boards", map[string]any{"id": "b1", "name": "b1"}, "")
-	body := map[string]any{"id": "b1", "name": "b1-updated"}
-	rr := doRequest(srv, "PUT", "/api/v1/boards/b1", body, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleUpdateBoard_BadJSON(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	req := httptest.NewRequest("PUT", "/api/v1/boards/x", strings.NewReader("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestHandleGetBoard_NotFound(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "GET", "/api/v1/boards/does-not-exist", nil, "")
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleGetBoard_OK(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/boards", map[string]any{"id": "b1", "name": "b1"}, "")
-	rr := doRequest(srv, "GET", "/api/v1/boards/b1", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDeleteBoard_NotFound(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "DELETE", "/api/v1/boards/does-not-exist", nil, "")
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDeleteBoard_OK(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/boards", map[string]any{"id": "b1", "name": "b1"}, "")
-	rr := doRequest(srv, "DELETE", "/api/v1/boards/b1", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleExecuteBoard_Empty(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	_ = doRequest(srv, "POST", "/api/v1/boards", map[string]any{"id": "b1", "name": "b1"}, "")
-	rr := doRequest(srv, "POST", "/api/v1/boards/b1/execute", nil, "")
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 empty board, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleStopBoard_NotRunning(t *testing.T) {
-	srv, cleanup := newTestServer(t)
-	defer cleanup()
-	rr := doRequest(srv, "POST", "/api/v1/boards/b1/stop", nil, "")
-	if rr.Code != http.StatusConflict {
-		t.Errorf("expected 409 not running, got %d", rr.Code)
-	}
-}
 
 func TestHandleTestRemote(t *testing.T) {
 	srv, cleanup := newTestServer(t)
@@ -1450,14 +1246,6 @@ func closedStoreServer(t *testing.T) (*Server, *httptest.ResponseRecorder) {
 		t.Fatal(err)
 	}
 	return srv, httptest.NewRecorder()
-}
-
-func TestHandleListBoards_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/boards", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
 }
 
 func TestHandleListProfiles_DBError(t *testing.T) {
@@ -1492,24 +1280,6 @@ func TestHandleListRemotes_DBError(t *testing.T) {
 	// 200 if rclone succeeds, 500 if rclone fails — both are OK.
 	if rr.Code < 200 || rr.Code >= 600 {
 		t.Errorf("unexpected status: %d", rr.Code)
-	}
-}
-
-func TestHandleGetBoard_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/boards/anyid", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleGetBoard_NotFound_DBError(t *testing.T) {
-	// With closed store, Get returns error, but if the error matches
-	// ErrNotFound we still get 404. Otherwise 500.
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "GET", "/api/v1/boards/x", nil, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -1561,32 +1331,6 @@ func TestHandleUpdateFlow_DBError(t *testing.T) {
 func TestHandleDeleteFlow_DBError(t *testing.T) {
 	srv, _ := closedStoreServer(t)
 	rr := doRequest(srv, "DELETE", "/api/v1/flows/anyid", nil, "")
-	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
-		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleCreateBoard_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	body := map[string]any{"id": "b1", "name": "b1"}
-	rr := doRequest(srv, "POST", "/api/v1/boards", body, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleUpdateBoard_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	body := map[string]any{"id": "b1", "name": "b1"}
-	rr := doRequest(srv, "PUT", "/api/v1/boards/b1", body, "")
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestHandleDeleteBoard_DBError(t *testing.T) {
-	srv, _ := closedStoreServer(t)
-	rr := doRequest(srv, "DELETE", "/api/v1/boards/anyid", nil, "")
 	if rr.Code != http.StatusInternalServerError && rr.Code != http.StatusNotFound {
 		t.Errorf("expected 500 or 404, got %d: %s", rr.Code, rr.Body.String())
 	}

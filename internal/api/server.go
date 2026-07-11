@@ -20,8 +20,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/gnasdev/gn-drive/internal/auth"
-	"github.com/gnasdev/gn-drive/internal/boardengine"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
+	"github.com/gnasdev/gn-drive/internal/flowengine"
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/service"
 	"github.com/gnasdev/gn-drive/internal/store"
@@ -41,8 +41,8 @@ type AppDeps struct {
 	Auth        *auth.Service
 	Store       *store.Store
 	Rclone      *rclone.Client
-	SyncEngine  *syncengine.Engine
-	BoardEngine *boardengine.Engine
+	SyncEngine *syncengine.Engine
+	FlowEngine *flowengine.Engine
 	Bus         *eventbus.Bus
 	WebUI       http.Handler
 	Service     *service.Writer // non-nil in service mode
@@ -69,7 +69,9 @@ func New(deps *AppDeps, log *slog.Logger) *Server {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(slogMiddleware(log))
-	r.Use(middleware.Compress(5, "text/html", "text/plain", "application/json", "text/event-stream"))
+	// Do NOT compress text/event-stream — gzip buffers SSE frames and the UI
+	// never sees live flow/sync progress until the connection ends.
+	r.Use(middleware.Compress(5, "text/html", "text/plain", "application/json"))
 	r.Use(corsMiddleware)
 
 	// Static files (SPA fallback to webui)
@@ -118,20 +120,14 @@ func (s *Server) apiRouter() chi.Router {
 	r.Delete("/sync/tasks/{id}", s.handleStopTask)
 	r.Get("/sync/tasks/{id}/logs", s.handleTaskLogs)
 
-	// Boards
-	r.Get("/boards", s.handleListBoards)
-	r.Post("/boards", s.handleCreateBoard)
-	r.Get("/boards/{id}", s.handleGetBoard)
-	r.Put("/boards/{id}", s.handleUpdateBoard)
-	r.Delete("/boards/{id}", s.handleDeleteBoard)
-	r.Post("/boards/{id}/execute", s.handleExecuteBoard)
-	r.Post("/boards/{id}/stop", s.handleStopBoard)
-
-	// Flows
+	// Flows (Wails-style: nested operations + execute)
 	r.Get("/flows", s.handleListFlows)
 	r.Post("/flows", s.handleCreateFlow)
+	r.Get("/flows/{id}", s.handleGetFlow)
 	r.Put("/flows/{id}", s.handleUpdateFlow)
 	r.Delete("/flows/{id}", s.handleDeleteFlow)
+	r.Post("/flows/{id}/execute", s.handleExecuteFlow)
+	r.Post("/flows/{id}/stop", s.handleStopFlow)
 
 	// Operations (filesystem browse for path pickers; one-shot file ops stay API-only)
 	r.Post("/operations", s.handleStartOperation)

@@ -3,14 +3,14 @@
 # Single-process CLI + Vue 3 web UI. One binary per platform, with the
 # frontend embedded via go:embed. See Taskfile.yml for the local equivalent
 # of every step below.
-name: Build & Release
+#
+# Runs only on version tags (v*.*.*), not on ordinary branch/PR pushes.
+name: Release
 
 on:
   push:
     tags:
       - "v*.*.*"
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write

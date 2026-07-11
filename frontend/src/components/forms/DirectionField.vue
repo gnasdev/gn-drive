@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /**
- * Profile direction select with inline help for the active option
- * (push / pull / bi / bi-resync).
+ * Profile direction select: push | bi | bi-resync only.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { SYNC_ACTIONS, type SyncAction } from '@/constants/forms'
+import {
+  PROFILE_DIRECTIONS,
+  normalizeProfileDirection,
+  type ProfileDirection,
+} from '@/constants/forms'
 
 const model = defineModel<string>({ default: 'push' })
 
@@ -22,7 +25,7 @@ const emit = defineEmits<{
 
 const { t, te } = useI18n()
 
-const selected = computed(() => (model.value || 'push') as SyncAction)
+const selected = computed(() => normalizeProfileDirection(model.value))
 
 const helpTitle = computed(() => {
   const key = `syncHelp.${selected.value}.title`
@@ -34,7 +37,7 @@ const helpBody = computed(() => {
   return te(key) ? t(key) : ''
 })
 
-function optionLabel(a: SyncAction): string {
+function optionLabel(a: ProfileDirection): string {
   const key = `profiles.directionOptions.${a}`
   return te(key) ? t(key) : a
 }
@@ -43,14 +46,15 @@ function optionLabel(a: SyncAction): string {
 <template>
   <div class="flex flex-col gap-1.5">
     <select
-      v-model="model"
+      :value="selected"
       class="field-input"
       :class="invalid && 'border-danger'"
       :disabled="disabled"
       :data-testid="testId || 'profiles-direction'"
       @focus="emit('focus')"
+      @change="model = ($event.target as HTMLSelectElement).value"
     >
-      <option v-for="a in SYNC_ACTIONS" :key="a" :value="a">
+      <option v-for="a in PROFILE_DIRECTIONS" :key="a" :value="a">
         {{ optionLabel(a) }}
       </option>
     </select>

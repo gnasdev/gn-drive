@@ -31,17 +31,19 @@ func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start gn-drive in foreground or service mode",
-		Long: `Start the sync engine and web UI in the foreground, or as a background service.
+		Long: fmt.Sprintf(`Start the sync engine and web UI in the foreground, or as a background service.
 
 Foreground (default):
   $ gn-drive run
-  Opens browser automatically, serves on an auto-assigned loopback port.
+  Opens browser automatically, serves on http://127.0.0.1:%d/ (static port).
   Press Ctrl+C to stop.
+
+  Override with --port if needed (still loopback-only).
 
 Service mode:
   $ gn-drive run --service
   Runs as a background daemon managed by your OS init system (systemd/launchd/SCM).
-  No browser opens. Logs go to journalctl / log show / Event Viewer.`,
+  No browser opens. Logs go to journalctl / log show / Event Viewer.`, ports.DefaultPort),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), runOpts{
 				port:        port,
@@ -52,7 +54,7 @@ Service mode:
 			})
 		},
 	}
-	cmd.Flags().IntVar(&port, "port", 0, "Bind to a specific port (0 = auto)")
+	cmd.Flags().IntVar(&port, "port", ports.DefaultPort, fmt.Sprintf("Loopback TCP port (default %d; static, not auto)", ports.DefaultPort))
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "Do not open the system browser")
 	cmd.Flags().BoolVar(&devMode, "dev", false, "Development mode (debug-oriented logging; same portal unlock as normal run)")
 	cmd.Flags().BoolVar(&serviceMode, "service", false, "Run as a background service (use 'gn-drive service install' first)")

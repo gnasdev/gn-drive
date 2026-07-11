@@ -77,7 +77,7 @@ function setLang(code: AppLocale) {
 </script>
 
 <template>
-  <div class="h-full overflow-auto py-6">
+  <div class="h-full min-h-0 overflow-auto py-6">
   <div class="page-content" data-testid="page-settings">
     <header class="mb-5">
       <h1 class="page-title">{{ t('settings.title') }}</h1>

@@ -6,10 +6,18 @@ import {
   isProfileDraftValid,
   validateProfileDraft,
 } from '@/lib/profileValidation'
-import { PhKey, PhPlus, PhTrash, PhArrowRight, PhPencilSimple } from '@phosphor-icons/vue'
+import {
+  PhKey,
+  PhPlus,
+  PhTrash,
+  PhArrowRight,
+  PhArrowsLeftRight,
+  PhPencilSimple,
+} from '@phosphor-icons/vue'
 import { useProfilesStore } from '@/stores/profiles'
 import { useRemotesStore } from '@/stores/remotes'
 import type { Profile } from '@/api/types'
+import { normalizeProfileDirection } from '@/constants/forms'
 import RemotePathField from '@/components/forms/RemotePathField.vue'
 import DirectionField from '@/components/forms/DirectionField.vue'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
@@ -56,13 +64,19 @@ function openEdit(p: Profile) {
   formMode.value = 'edit'
   draft.value = {
     ...p,
-    direction: p.direction || 'push',
+    // Coerce legacy values (e.g. pull) to a valid profile direction.
+    direction: normalizeProfileDirection(p.direction),
     parallel: p.parallel || 4,
     bandwidth: p.bandwidth ?? 0,
     dry_run: !!p.dry_run,
   }
   resetProfileTouched()
   formOpen.value = true
+}
+
+function directionLabel(d?: string): string {
+  const n = normalizeProfileDirection(d)
+  return t(`profiles.directionOptions.${n}`)
 }
 
 type ProfileFieldKey = 'name' | 'from' | 'to' | 'parallel' | 'bandwidth' | 'direction'
@@ -264,9 +278,26 @@ async function doDelete(name: string) {
               </div>
             </td>
             <td class="max-w-[200px] truncate font-mono text-[11px] text-text" :title="p.from">{{ p.from }}</td>
-            <td class="text-center text-text-dim"><PhArrowRight :size="12" weight="bold" /></td>
+            <td
+              class="text-center text-text-dim"
+              :title="directionLabel(p.direction)"
+            >
+              <PhArrowsLeftRight
+                v-if="
+                  normalizeProfileDirection(p.direction) === 'bi' ||
+                  normalizeProfileDirection(p.direction) === 'bi-resync'
+                "
+                :size="12"
+                weight="bold"
+              />
+              <PhArrowRight v-else :size="12" weight="bold" />
+            </td>
             <td class="max-w-[200px] truncate font-mono text-[11px] text-text" :title="p.to">{{ p.to }}</td>
-            <td><span class="badge">{{ p.direction || '-' }}</span></td>
+            <td>
+              <span class="badge" :title="normalizeProfileDirection(p.direction)">
+                {{ directionLabel(p.direction) }}
+              </span>
+            </td>
             <td class="text-right font-mono text-text-muted">{{ p.parallel }}</td>
             <td class="text-right font-mono text-text-muted">{{ p.bandwidth > 0 ? p.bandwidth + 'M' : '∞' }}</td>
             <td class="whitespace-nowrap text-right">

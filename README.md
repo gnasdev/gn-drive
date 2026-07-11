@@ -8,7 +8,7 @@ A local-only sync engine and web UI for cloud storage synchronization powered by
 ## Features
 
 - **Multi-Cloud Sync** — Google Drive, Dropbox, OneDrive, iCloud Drive, Yandex Disk, Google Photos, and [any rclone-supported provider](https://rclone.org/docs/)
-- **Sync Profiles** — pull / push / bi-sync / bi-resync with bandwidth limits, parallel transfers, include/exclude patterns, and bisync conflict resolution
+- **Sync Profiles** — one-way (push), two-way (bi), and two-way resync with bandwidth limits, parallel transfers, include/exclude patterns, and bisync conflict resolution
 - **Schedules** — Cron-based automated sync (`robfig/cron/v3`)
 - **Boards** — DAG-based multi-step workflows (topological execution)
 - **Flows** — Sequential operations with embedded profile config
@@ -57,8 +57,11 @@ gn-drive version
 # Diagnose environment
 gn-drive doctor
 
-# Run in foreground (auto-port, opens browser)
+# Run in foreground (http://127.0.0.1:53241/, opens browser)
 gn-drive run
+
+# Override port if 53241 is taken
+gn-drive run --port 54000
 
 # Run without opening browser
 gn-drive run --no-browser

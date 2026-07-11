@@ -86,10 +86,14 @@ html.dark {
   --radius-lg: var(--radius-lg);
 }
 
+/* App shell owns the viewport; page content (main / workspace) scrolls.
+ * Do not let document body scroll — nested overflow-auto regions handle it. */
 html,
 body {
   height: 100%;
+  max-height: 100%;
   margin: 0;
+  overflow: hidden;
   background: var(--color-bg-secondary);
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -100,7 +104,9 @@ body {
 }
 
 #app {
-  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 *,
@@ -143,6 +149,11 @@ a {
   }
   .neo-inset {
     @apply border-2 border-border bg-bg;
+  }
+  /* Nested raised card (e.g. flow operation) — hard offset shadow on surface */
+  .neo-op-card {
+    @apply border-2 border-border bg-surface text-text;
+    box-shadow: var(--shadow-neo);
   }
   .neo-header {
     @apply border-b-2 border-border bg-accent px-3 py-3;

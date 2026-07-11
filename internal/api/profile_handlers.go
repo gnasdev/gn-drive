@@ -2,7 +2,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -49,6 +51,10 @@ func (s *Server) handleCreateProfile(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "missing_name", "profile name is required")
 		return
 	}
+	if err := validateProfileDirection(&p); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_direction", err.Error())
+		return
+	}
 	if err := s.app.Store.Profiles().Save(ctx, &p); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())
 		return
@@ -65,12 +71,33 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	if err := validateProfileDirection(&p); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_direction", err.Error())
+		return
+	}
 	if err := s.app.Store.Profiles().Save(ctx, &p); err != nil {
 		respondError(w, http.StatusInternalServerError, "save_error", err.Error())
 		return
 	}
 	s.app.Bus.Publish(eventbus.TopicStateChanged, eventbus.StateChangedEvent{})
 	respondOK(w, p)
+}
+
+// validateProfileDirection enforces push | bi | bi-resync (empty → push).
+func validateProfileDirection(p *store.Profile) error {
+	if p == nil {
+		return nil
+	}
+	dir := strings.TrimSpace(p.Direction)
+	if dir == "" {
+		p.Direction = store.ProfileDirectionPush
+		return nil
+	}
+	if !store.IsValidProfileDirection(dir) {
+		return fmt.Errorf("direction must be one of: push, bi, bi-resync")
+	}
+	p.Direction = dir
+	return nil
 }
 
 // handleDeleteProfile deletes a profile.

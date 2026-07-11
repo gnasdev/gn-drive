@@ -8,7 +8,7 @@ All notable changes to GN Drive will be documented in this file.
 
 - **Single-process CLI + Vue 3 web UI** is the only supported runtime. The Wails v3 desktop app (Angular 21) has been removed.
 - One binary, one process, one port. Sync engine, HTTP API, and Vue SPA share the process. No IPC, no JSON-RPC, no separate daemon.
-- Loopback-only binding (`127.0.0.1`) with auto-port. CORS restricted to `localhost` and `127.0.0.1`.
+- Loopback-only binding (`127.0.0.1`) on static port **53241** (IANA dynamic range; override with `--port`). CORS restricted to `localhost` and `127.0.0.1`.
 - 10 CLI subcommands: `run`, `service`, `sync`, `board`, `profile`, `remote`, `self-update`, `version`, `doctor`, `completion`.
 - HTTP API at `/api/v1` (45+ endpoints) with chi router + SSE event stream.
 - 11 Vue 3 routes: Unlock, Dashboard, Profiles, Remotes, Operations, Boards, Flows, Schedules, History, Service, Settings.

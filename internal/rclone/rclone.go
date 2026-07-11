@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Action represents a sync direction.
@@ -102,6 +103,17 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 	return strings.TrimSpace(first), nil
 }
 
+// FileTransfer is one file's live status (Wails FileTransferInfo).
+type FileTransfer struct {
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	Bytes    int64   `json:"bytes"`
+	Progress float64 `json:"progress"` // 0-100
+	Status   string  `json:"status"`   // transferring | completed | failed | checking | checked | pending
+	Speed    float64 `json:"speed,omitempty"`
+	Error    string  `json:"error,omitempty"`
+}
+
 // Stats describes progress during a sync operation.
 type Stats struct {
 	Bytes          int64   `json:"bytes"`
@@ -113,10 +125,13 @@ type Stats struct {
 	Checks         int64   `json:"checks"`
 	ChecksTotal    int64   `json:"checks_total"`
 	Deletes        int64   `json:"deletes"`
+	Renames        int64   `json:"renames"`
 	Speed          float64 `json:"speed_bps"`
 	ETA            int64   `json:"eta_secs"`
 	CurrentFile    string  `json:"current_file,omitempty"`
 	LastUpdate     int64   `json:"last_update_unix"`
+	// FileTransfers is the per-file list for the status panel (capped).
+	FileTransfers []FileTransfer `json:"file_transfers,omitempty"`
 }
 
 // SyncResult is the outcome of a sync operation.
@@ -145,22 +160,62 @@ type SyncConfig struct {
 	StatsInterval string
 }
 
-// ProfileFlags are the rclone flags a profile can set.
-// Mirrors a subset of store.Profile relevant to runtime.
+// ProfileFlags are the rclone flags a profile / flow SyncConfig can set.
+// Mirrors Wails SyncConfig fields relevant to the CLI shell-out.
 type ProfileFlags struct {
-	Bandwidth         string
-	Transfers         int
-	Checkers          int
-	TpsLimit          float64
-	MinAge            string
-	MaxAge            string
-	MinSize           string
-	MaxSize           string
-	ExcludeIfPresent  string
-	MaxDelete         int
-	DryRun            bool
-	UseListR          bool
+	Bandwidth          string
+	Transfers          int
+	Checkers           int
+	TpsLimit           float64
+	MinAge             string
+	MaxAge             string
+	MinSize            string
+	MaxSize            string
+	ExcludeIfPresent   string
+	MaxDelete          int
+	DryRun             bool
+	UseListR           bool
 	NoUnicodeNormalize bool
+
+	// Filters (Wails includedPaths / excludedPaths)
+	Includes []string
+	Excludes []string
+
+	// Performance
+	MultiThreadStreams int
+	BufferSize         string
+	Retries            int
+	LowLevelRetries    int
+	MaxDuration        string
+	RetriesSleep       string
+	ConnTimeout        string
+	IoTimeout          string
+	OrderBy            string
+	CheckFirst         bool
+
+	// Safety / comparison
+	Immutable           bool
+	MaxTransfer         string
+	MaxDeleteSize       string
+	Suffix              string
+	SuffixKeepExtension bool
+	BackupDir           string
+	SizeOnly            bool
+	UpdateMode          bool
+	IgnoreExisting      bool
+	DeleteExcluded      bool
+	MaxDepth            int
+
+	// Sync (push)
+	DeleteTiming string // before|during|after
+
+	// Bisync
+	ConflictResolve string
+	ConflictLoser   string
+	ConflictSuffix  string
+	Resilient       bool
+	MaxLock         string
+	CheckAccess     bool
 }
 
 // --- Sync / BiSync / Copy / Move / Check ----------------------------------
@@ -174,7 +229,31 @@ func (c *Client) Sync(ctx context.Context, cfg SyncConfig, onProgress func(Stats
 	if cleanup != "" {
 		defer os.Remove(cleanup)
 	}
-	return c.execute(ctx, args, onProgress, cfg.StatsInterval)
+	// Seed the Pending tab with real file names from the data source while
+	// rclone runs. Without this the UI only sees transferring/completed names
+	// (or a synthetic "(N pending)" count) and the Pending tab looks empty.
+	seedPath := pendingSeedPath(cfg)
+	return c.execute(ctx, args, onProgress, seedPath)
+}
+
+// pendingSeedPath picks which endpoint to list for the Pending file tab.
+// Push/copy/move list Source; pull lists Dest (truth side that feeds Source).
+func pendingSeedPath(cfg SyncConfig) string {
+	src, dst := cfg.Source, cfg.Dest
+	if src == "" || dst == "" {
+		if cfg.SourceRemote != "" && cfg.SourcePath != "" {
+			src = cfg.SourceRemote + ":" + cfg.SourcePath
+		}
+		if cfg.DestRemote != "" && cfg.DestPath != "" {
+			dst = cfg.DestRemote + ":" + cfg.DestPath
+		}
+	}
+	switch cfg.Action {
+	case ActionPull:
+		return dst
+	default:
+		return src
+	}
 }
 
 func (c *Client) buildArgs(cfg SyncConfig) (args []string, cleanup string, err error) {
@@ -196,10 +275,12 @@ func (c *Client) buildArgs(cfg SyncConfig) (args []string, cleanup string, err e
 
 	switch cfg.Action {
 	case ActionPull:
-		// Pull: dst = local cache, src = remote. Download from remote to local.
-		args = append([]string{"sync", src, dst, "--update"}, base...)
+		// Pull: one-way Dest → Source. Callers keep From/Source and To/Dest as
+		// fixed path slots; pull reverses data flow so Dest is the truth and
+		// Source is updated (e.g. From=local, To=remote → download remote→local).
+		args = append([]string{"sync", dst, src, "--update"}, base...)
 	case ActionPush:
-		// Push: src = local, dst = remote. Upload from local to remote.
+		// Push: one-way Source → Dest (e.g. From=local, To=remote → upload).
 		args = append([]string{"sync", src, dst, "--update"}, base...)
 	case ActionBi:
 		// Incremental bidirectional sync. bisync relies on the listings stored
@@ -283,6 +364,105 @@ func profileToFlags(p *ProfileFlags) []string {
 	if p.NoUnicodeNormalize {
 		f = append(f, "--no-unicode-normalization")
 	}
+	for _, inc := range p.Includes {
+		if s := strings.TrimSpace(inc); s != "" {
+			f = append(f, "--include", s)
+		}
+	}
+	for _, exc := range p.Excludes {
+		if s := strings.TrimSpace(exc); s != "" {
+			f = append(f, "--exclude", s)
+		}
+	}
+	if p.MultiThreadStreams > 0 {
+		f = append(f, "--multi-thread-streams", strconv.Itoa(p.MultiThreadStreams))
+	}
+	if p.BufferSize != "" {
+		f = append(f, "--buffer-size", p.BufferSize)
+	}
+	if p.Retries > 0 {
+		f = append(f, "--retries", strconv.Itoa(p.Retries))
+	}
+	if p.LowLevelRetries > 0 {
+		f = append(f, "--low-level-retries", strconv.Itoa(p.LowLevelRetries))
+	}
+	if p.MaxDuration != "" {
+		f = append(f, "--max-duration", p.MaxDuration)
+	}
+	if p.RetriesSleep != "" {
+		f = append(f, "--retries-sleep", p.RetriesSleep)
+	}
+	if p.ConnTimeout != "" {
+		f = append(f, "--contimeout", p.ConnTimeout)
+	}
+	if p.IoTimeout != "" {
+		f = append(f, "--timeout", p.IoTimeout)
+	}
+	if p.OrderBy != "" {
+		f = append(f, "--order-by", p.OrderBy)
+	}
+	if p.CheckFirst {
+		f = append(f, "--check-first")
+	}
+	if p.Immutable {
+		f = append(f, "--immutable")
+	}
+	if p.MaxTransfer != "" {
+		f = append(f, "--max-transfer", p.MaxTransfer)
+	}
+	if p.MaxDeleteSize != "" {
+		f = append(f, "--max-delete-size", p.MaxDeleteSize)
+	}
+	if p.Suffix != "" {
+		f = append(f, "--suffix", p.Suffix)
+	}
+	if p.SuffixKeepExtension {
+		f = append(f, "--suffix-keep-extension")
+	}
+	if p.BackupDir != "" {
+		f = append(f, "--backup-dir", p.BackupDir)
+	}
+	if p.SizeOnly {
+		f = append(f, "--size-only")
+	}
+	if p.UpdateMode {
+		f = append(f, "--update")
+	}
+	if p.IgnoreExisting {
+		f = append(f, "--ignore-existing")
+	}
+	if p.DeleteExcluded {
+		f = append(f, "--delete-excluded")
+	}
+	if p.MaxDepth > 0 {
+		f = append(f, "--max-depth", strconv.Itoa(p.MaxDepth))
+	}
+	switch strings.ToLower(strings.TrimSpace(p.DeleteTiming)) {
+	case "before":
+		f = append(f, "--delete-before")
+	case "after":
+		f = append(f, "--delete-after")
+	case "during":
+		f = append(f, "--delete-during")
+	}
+	if p.ConflictResolve != "" {
+		f = append(f, "--conflict-resolve", p.ConflictResolve)
+	}
+	if p.ConflictLoser != "" {
+		f = append(f, "--conflict-loser", p.ConflictLoser)
+	}
+	if p.ConflictSuffix != "" {
+		f = append(f, "--conflict-suffix", p.ConflictSuffix)
+	}
+	if p.Resilient {
+		f = append(f, "--resilient")
+	}
+	if p.MaxLock != "" {
+		f = append(f, "--max-lock", p.MaxLock)
+	}
+	if p.CheckAccess {
+		f = append(f, "--check-access")
+	}
 	return f
 }
 
@@ -301,7 +481,7 @@ var newExecCommand = func(ctx context.Context, name string, args ...string) exec
 	return exec.CommandContext(ctx, name, args...)
 }
 
-func (c *Client) execute(ctx context.Context, args []string, onProgress func(Stats), _ string) (*SyncResult, error) {
+func (c *Client) execute(ctx context.Context, args []string, onProgress func(Stats), seedPath string) (*SyncResult, error) {
 	c.mu.Lock()
 	cmd := newExecCommand(ctx, c.rcloneBin, args...)
 	c.mu.Unlock()
@@ -321,37 +501,90 @@ func (c *Client) execute(ctx context.Context, args []string, onProgress func(Sta
 
 	result := &SyncResult{StartedAt: nowUnix(), ExitCode: -1}
 
-	// Drain stderr.
-	var stderrBuf strings.Builder
-	stderrDone := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(&stderrBuf, stderr)
-		close(stderrDone)
-	}()
+	// rclone --use-json-log writes progress/stats to STDERR (not stdout).
+	// Older text --stats lines may appear on either stream. Parse both.
+	// fileTrack accumulates per-file status from object lines + stats.transferring
+	// so the UI can show processing / completed / failed / pending (Wails tabs).
+	var (
+		statsMu   sync.Mutex
+		stats     Stats
+		fileTrack = newFileTransferTracker()
+		stderrBuf strings.Builder
+		wg        sync.WaitGroup
+	)
 
-	// Parse --stats-one-line: lines like
-	//   "2025/01/15 10:00:00 INFO  : ... TRANSFER: 1.024k/2.048k ..."
-	// We extract numbers opportunistically; --json-stats would be richer
-	// but is only available in rclone 1.61+ and adds noise.
-	stats := Stats{}
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			// Prefer rclone's structured JSON stats (--use-json-log); fall
-			// back to the legacy one-line text parser for non-JSON lines.
+	emitProgress := func() {
+		// Caller must hold statsMu. snap is a value copy; FileTransfers is
+		// deep-copied so onProgress can retain the slice after unlock.
+		stats.FileTransfers = fileTrack.snapshot(stats.FilesTotal)
+		snap := stats
+		snap.LastUpdate = nowUnix()
+		if n := len(stats.FileTransfers); n > 0 {
+			snap.FileTransfers = make([]FileTransfer, n)
+			copy(snap.FileTransfers, stats.FileTransfers)
+		} else {
+			snap.FileTransfers = nil
+		}
+		if onProgress != nil {
+			onProgress(snap)
+		}
+	}
+
+	// Concurrent seed: list source files as pending so the Pending tab has
+	// real names before transfers start. Cap + timeout keep large trees from
+	// stalling the run. Failures are non-fatal (log-only). Own WaitGroup so a
+	// slow list cannot delay stream drain beyond cancel-after-exit.
+	var seedWG sync.WaitGroup
+	seedCtx, seedCancel := context.WithCancel(ctx)
+	defer seedCancel()
+	if seedPath != "" {
+		seedWG.Add(1)
+		go func() {
+			defer seedWG.Done()
+			listCtx, cancel := context.WithTimeout(seedCtx, 20*time.Second)
+			defer cancel()
+			entries, err := c.listFilesForPending(listCtx, seedPath, maxTrackedFiles)
+			if err != nil || len(entries) == 0 {
+				return
+			}
+			statsMu.Lock()
+			fileTrack.seedPending(entries)
+			emitProgress()
+			statsMu.Unlock()
+		}()
+	}
+
+	consume := func(r io.Reader, capture *strings.Builder) {
+		defer wg.Done()
+		sc := bufio.NewScanner(r)
+		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for sc.Scan() {
+			line := sc.Text()
+			if capture != nil {
+				capture.WriteString(line)
+				capture.WriteByte('\n')
+			}
+			statsMu.Lock()
+			// Prefer structured JSON stats; fall back to text TRANSFER lines.
 			if !parseJSONStatsLine(line, &stats) {
 				parseStatsLine(line, &stats)
 			}
-			if onProgress != nil {
-				stats.LastUpdate = nowUnix()
-				onProgress(stats)
-			}
+			// Always try per-file event extraction (object lines + transferring[]).
+			ingestJSONLogLine(line, &stats, fileTrack)
+			emitProgress()
+			statsMu.Unlock()
 		}
-	}()
+	}
 
-	<-stderrDone
+	wg.Add(2)
+	go consume(stdout, nil)
+	go consume(stderr, &stderrBuf)
+	wg.Wait()
+	// Stop pending seed once rclone streams end so Wait is not blocked by
+	// a long remote listing after the transfer already finished.
+	seedCancel()
+	seedWG.Wait()
+
 	if err := cmd.Wait(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -359,13 +592,19 @@ func (c *Client) execute(ctx context.Context, args []string, onProgress func(Sta
 		}
 		result.Stderr = stderrBuf.String()
 		result.EndedAt = nowUnix()
+		statsMu.Lock()
+		stats.FileTransfers = fileTrack.snapshot(stats.FilesTotal)
 		result.Stats = stats
+		statsMu.Unlock()
 		return result, fmt.Errorf("rclone: %w (stderr: %s)", err, truncate(stderrBuf.String(), 500))
 	}
 
 	result.ExitCode = 0
 	result.EndedAt = nowUnix()
+	statsMu.Lock()
+	stats.FileTransfers = fileTrack.snapshot(stats.FilesTotal)
 	result.Stats = stats
+	statsMu.Unlock()
 	return result, nil
 }
 
@@ -379,13 +618,145 @@ type jsonLogStats struct {
 	Checks         int64    `json:"checks"`
 	TotalChecks    int64    `json:"totalChecks"`
 	Deletes        int64    `json:"deletes"`
+	Renames        int64    `json:"renames"`
 	Errors         int64    `json:"errors"`
 	Speed          float64  `json:"speed"`
 	Eta            *float64 `json:"eta"`
+	// Transferring is present on some rclone versions during active transfers.
+	Transferring []jsonTransferring `json:"transferring"`
+}
+
+type jsonTransferring struct {
+	Name       string  `json:"name"`
+	Size       int64   `json:"size"`
+	Bytes      int64   `json:"bytes"`
+	Percentage int     `json:"percentage"`
+	Speed      float64 `json:"speed"`
 }
 
 type jsonLogLine struct {
-	Stats *jsonLogStats `json:"stats"`
+	Level  string        `json:"level"`
+	Stats  *jsonLogStats `json:"stats"`
+	Object string        `json:"object"`
+	Msg    string        `json:"msg"`
+	Size   int64         `json:"size"`
+}
+
+// maxTrackedFiles caps the per-file list shipped to the UI (Wails uses 100).
+const maxTrackedFiles = 150
+
+// fileTransferTracker accumulates per-file status from CLI JSON logs.
+type fileTransferTracker struct {
+	byName map[string]*FileTransfer
+	order  []string // insertion order for stable UI
+}
+
+func newFileTransferTracker() *fileTransferTracker {
+	return &fileTransferTracker{byName: make(map[string]*FileTransfer)}
+}
+
+func (t *fileTransferTracker) upsert(ft FileTransfer) {
+	if ft.Name == "" {
+		return
+	}
+	if prev, ok := t.byName[ft.Name]; ok {
+		// Don't demote completed/failed back to transferring unless still active.
+		if (prev.Status == "completed" || prev.Status == "failed" || prev.Status == "checked") &&
+			ft.Status == "transferring" {
+			return
+		}
+		*prev = ft
+		return
+	}
+	if len(t.order) >= maxTrackedFiles && ft.Status != "failed" {
+		// Prefer keeping failures; drop oldest completed if full.
+		t.evictOldestCompleted()
+		if len(t.order) >= maxTrackedFiles {
+			return
+		}
+	}
+	cp := ft
+	t.byName[ft.Name] = &cp
+	t.order = append(t.order, ft.Name)
+}
+
+func (t *fileTransferTracker) evictOldestCompleted() {
+	for i, name := range t.order {
+		if ft := t.byName[name]; ft != nil && (ft.Status == "completed" || ft.Status == "checked") {
+			delete(t.byName, name)
+			t.order = append(t.order[:i], t.order[i+1:]...)
+			return
+		}
+	}
+}
+
+// seedPending inserts listed files as status=pending without demoting names
+// already known as transferring/completed/failed/checking.
+func (t *fileTransferTracker) seedPending(entries []FileEntry) {
+	for _, e := range entries {
+		if e.IsDir {
+			continue
+		}
+		name := strings.TrimSpace(e.Path)
+		if name == "" {
+			name = strings.TrimSpace(e.Name)
+		}
+		if name == "" {
+			continue
+		}
+		if prev, ok := t.byName[name]; ok && prev != nil {
+			// Keep live status; only fill size if still pending/unknown.
+			if prev.Size == 0 && e.Size > 0 {
+				prev.Size = e.Size
+			}
+			continue
+		}
+		t.upsert(FileTransfer{
+			Name:     name,
+			Size:     e.Size,
+			Bytes:    0,
+			Progress: 0,
+			Status:   "pending",
+		})
+	}
+}
+
+func (t *fileTransferTracker) snapshot(totalFiles int64) []FileTransfer {
+	out := make([]FileTransfer, 0, len(t.order)+1)
+	active := 0
+	completed := 0
+	failed := 0
+	pendingNamed := 0
+	for _, name := range t.order {
+		ft := t.byName[name]
+		if ft == nil {
+			continue
+		}
+		out = append(out, *ft)
+		switch ft.Status {
+		case "transferring", "checking":
+			active++
+		case "completed", "checked":
+			completed++
+		case "failed":
+			failed++
+		case "pending":
+			pendingNamed++
+		}
+	}
+	// Synthetic count only for files beyond named rows (cap/list miss).
+	// When seedPending already listed names, pendingNamed covers them.
+	if totalFiles > 0 {
+		known := int64(completed + failed + active + pendingNamed)
+		if pend := totalFiles - known; pend > 0 {
+			out = append(out, FileTransfer{
+				Name:     fmt.Sprintf("(%d pending)", pend),
+				Status:   "pending",
+				Progress: 0,
+			})
+		}
+	}
+	return out
 }
 
 // parseJSONStatsLine parses a single rclone --use-json-log line. If the line is
@@ -410,12 +781,87 @@ func parseJSONStatsLine(line string, s *Stats) bool {
 	s.Checks = st.Checks
 	s.ChecksTotal = st.TotalChecks
 	s.Deletes = st.Deletes
+	s.Renames = st.Renames
 	s.Errors = st.Errors
 	s.Speed = st.Speed
 	if st.Eta != nil {
 		s.ETA = int64(*st.Eta)
 	}
+	if entry.Object != "" {
+		s.CurrentFile = entry.Object
+	}
 	return true
+}
+
+// ingestJSONLogLine updates aggregate stats + per-file tracker from one log line.
+func ingestJSONLogLine(line string, s *Stats, track *fileTransferTracker) {
+	line = strings.TrimSpace(line)
+	if len(line) == 0 || line[0] != '{' || track == nil {
+		return
+	}
+	var entry jsonLogLine
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		return
+	}
+
+	// Active multi-file transfers from stats.transferring (when rclone provides it).
+	if entry.Stats != nil && len(entry.Stats.Transferring) > 0 {
+		for _, tr := range entry.Stats.Transferring {
+			if tr.Name == "" {
+				continue
+			}
+			s.CurrentFile = tr.Name
+			track.upsert(FileTransfer{
+				Name:     tr.Name,
+				Size:     tr.Size,
+				Bytes:    tr.Bytes,
+				Progress: float64(tr.Percentage),
+				Status:   "transferring",
+				Speed:    tr.Speed,
+			})
+		}
+	}
+
+	if entry.Object == "" {
+		return
+	}
+	s.CurrentFile = entry.Object
+	msg := strings.ToLower(entry.Msg)
+	level := strings.ToLower(entry.Level)
+
+	ft := FileTransfer{Name: entry.Object, Size: entry.Size, Bytes: entry.Size}
+
+	switch {
+	case level == "error" || strings.Contains(msg, "error") || strings.Contains(msg, "failed"):
+		ft.Status = "failed"
+		ft.Error = entry.Msg
+		ft.Progress = 0
+	case strings.Contains(msg, "check"):
+		if strings.Contains(msg, "ok") || strings.Contains(msg, "identical") {
+			ft.Status = "checked"
+			ft.Progress = 100
+		} else {
+			ft.Status = "checking"
+		}
+	case strings.Contains(msg, "copied") ||
+		strings.Contains(msg, "moved") ||
+		strings.Contains(msg, "updated") ||
+		strings.Contains(msg, "multi-thread"):
+		ft.Status = "completed"
+		ft.Progress = 100
+		if entry.Size > 0 {
+			ft.Bytes = entry.Size
+		}
+	default:
+		// Unknown object notice — treat as completed success path if info-level.
+		if level == "info" || level == "notice" {
+			ft.Status = "completed"
+			ft.Progress = 100
+		} else {
+			return
+		}
+	}
+	track.upsert(ft)
 }
 
 // parseStatsLine extracts progress numbers from an rclone --stats-one-line line.
@@ -563,6 +1009,43 @@ func (c *Client) ListFiles(ctx context.Context, remotePath string) ([]FileEntry,
 	var entries []FileEntry
 	if err := json.Unmarshal(out, &entries); err != nil {
 		return nil, fmt.Errorf("rclone: parse lsjson: %w", err)
+	}
+	return entries, nil
+}
+
+// listFilesForPending recursively lists files (not dirs) for the Pending tab seed.
+// limit caps how many names we ship to the UI (same budget as maxTrackedFiles).
+func (c *Client) listFilesForPending(ctx context.Context, remotePath string, limit int) ([]FileEntry, error) {
+	remotePath = strings.TrimSpace(remotePath)
+	if remotePath == "" {
+		return nil, errors.New("rclone: path is required")
+	}
+	if !strings.Contains(remotePath, ":") && !strings.HasPrefix(remotePath, "/") {
+		return nil, errors.New("rclone: path must be absolute (/path) or remote:path")
+	}
+	if limit <= 0 {
+		limit = maxTrackedFiles
+	}
+	out, err := c.run(ctx, nil,
+		"--log-level", "ERROR",
+		"lsjson", remotePath,
+		"--config", c.config,
+		"--recursive",
+		"--files-only",
+	)
+	if err != nil {
+		return nil, err
+	}
+	out = bytes.TrimSpace(out)
+	if len(out) == 0 {
+		return []FileEntry{}, nil
+	}
+	var entries []FileEntry
+	if err := json.Unmarshal(out, &entries); err != nil {
+		return nil, fmt.Errorf("rclone: parse lsjson: %w", err)
+	}
+	if len(entries) > limit {
+		entries = entries[:limit]
 	}
 	return entries, nil
 }

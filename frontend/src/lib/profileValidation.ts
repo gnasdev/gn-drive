@@ -3,7 +3,7 @@
  * exposed in the web UI (name, from, to, parallel, bandwidth, direction).
  */
 
-import { isAbsoluteLocalPath, parseRemotePath, SYNC_ACTIONS } from '@/constants/forms'
+import { isAbsoluteLocalPath, parseRemotePath, PROFILE_DIRECTIONS } from '@/constants/forms'
 
 export type ProfileField =
   | 'name'
@@ -93,7 +93,8 @@ export function validateBandwidth(bandwidth: number | null | undefined): Profile
 export function validateDirection(direction: string | undefined): ProfileValidationError | null {
   const d = (direction ?? '').trim()
   if (!d) return { field: 'direction', messageKey: 'directionEmpty' }
-  if (!(SYNC_ACTIONS as readonly string[]).includes(d)) {
+  // Profiles only allow push / bi / bi-resync (not pull or other sync actions).
+  if (!(PROFILE_DIRECTIONS as readonly string[]).includes(d)) {
     return { field: 'direction', messageKey: 'directionInvalid' }
   }
   return null

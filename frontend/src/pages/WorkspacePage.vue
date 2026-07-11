@@ -1,174 +1,235 @@
 <script setup lang="ts">
 /**
- * Single-page workspace ported from desktop Angular v0.4.x:
- * topbar + scrollable neo cards where remotes, sync operations (profiles),
- * boards, and flows live together — no multi-page sidebar.
+ * Workspace aligned with Wails v0.4 desktop:
+ * - Flow = unit of work (run sequential Operations)
+ * - Operation = source remote/path → target + action
+ * - Remotes = infra for path pickers
+ * Profiles are NOT a workspace unit. Boards removed from product surface.
  */
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onActivated, onMounted, ref, type Ref } from 'vue'
 
-/** Required for <KeepAlive include="WorkspacePage"> in App.vue */
 defineOptions({ name: 'WorkspacePage' })
-import {
-  errorsByField,
-  isProfileDraftValid,
-  validateProfileDraft,
-} from '@/lib/profileValidation'
+
 import { useI18n } from 'vue-i18n'
 import {
   PhPlus,
   PhPlay,
   PhStop,
   PhTrash,
-  PhPencilSimple,
   PhCloud,
-  PhArrowRight,
-  PhArrowDown,
   PhStack,
-  PhSquaresFour,
   PhCheckCircle,
   PhXCircle,
   PhSpinner,
   PhClock,
+  PhArrowRight,
+  PhArrowsLeftRight,
+  PhFloppyDisk,
+  PhPencilSimple,
+  PhCheck,
+  PhX,
 } from '@phosphor-icons/vue'
-import { useProfilesStore } from '@/stores/profiles'
 import { useRemotesStore } from '@/stores/remotes'
-import { useBoardsStore } from '@/stores/boards'
-import { useFlowsStore } from '@/stores/flows'
-import { useOperationsStore } from '@/stores/operations'
-import type { Profile, Board, BoardEdge, BoardNode, Flow } from '@/api/types'
 import {
-  BOARD_EDGE_ACTIONS,
-  composedPathToBoardNode,
-} from '@/constants/forms'
+  useFlowsStore,
+  emptyFlow,
+  emptyOperation,
+  resolveOpAction,
+  withSyncedAction,
+} from '@/stores/flows'
+import type { Flow, Operation } from '@/api/types'
+import { normalizeFlowAction } from '@/constants/forms'
 import RemotePathField from '@/components/forms/RemotePathField.vue'
 import RemoteTypeSelect from '@/components/forms/RemoteTypeSelect.vue'
-import DirectionField from '@/components/forms/DirectionField.vue'
 import CronField from '@/components/forms/CronField.vue'
 import AppCheckbox from '@/components/ui/Checkbox.vue'
 import AppAlert from '@/components/ui/Alert.vue'
+import FlowRunStatusPanel from '@/components/flows/FlowRunStatusPanel.vue'
+import OperationSettingsPanel from '@/components/flows/OperationSettingsPanel.vue'
+import { parseSyncConfig, syncConfigSummaryChips } from '@/lib/syncConfig'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useToast } from '@/composables/useToast'
+import { storeToRefs } from 'pinia'
 
 const { t } = useI18n()
-const profiles = useProfilesStore()
 const remotes = useRemotesStore()
-const boards = useBoardsStore()
 const flows = useFlowsStore()
-const ops = useOperationsStore()
+const { runStatus, lastError, opSyncStatus } = storeToRefs(flows)
 const { confirmDialog } = useConfirmDialog()
 const toast = useToast()
+const eventsConnected = inject<Ref<boolean>>('eventsConnected', ref(false))
+
+/** Wails-style: name edit only after user clicks pencil. */
+const editingNameId = ref<string | null>(null)
+const editingNameDraft = ref('')
+
+/**
+ * Per-flow edit mode. Default is view-only (read summary of schedule + ops).
+ * User clicks Edit to open forms; Done/Cancel return to view.
+ */
+const editingFlowIds = ref(new Set<string>())
+
+function isFlowEditing(id: string): boolean {
+  return editingFlowIds.value.has(id)
+}
+
+function enterEditFlow(id: string) {
+  if (flows.isFlowRunning(id)) {
+    toast.error(t('workspace.busyLocked'))
+    return
+  }
+  const next = new Set(editingFlowIds.value)
+  next.add(id)
+  editingFlowIds.value = next
+}
+
+async function cancelEditFlow(id: string) {
+  if (isFlowDirty(id)) {
+    const ok = await confirmDialog({
+      title: t('workspace.discardEditTitle'),
+      message: t('workspace.discardEditMessage'),
+      confirmText: t('workspace.discardEditConfirm'),
+      confirmVariant: 'danger',
+    })
+    if (!ok) return
+    // Reload from server to drop local draft.
+    await flows.load()
+    clearFlowDirty(id)
+  }
+  const next = new Set(editingFlowIds.value)
+  next.delete(id)
+  editingFlowIds.value = next
+  if (editingNameId.value === id) cancelEditName()
+}
+
+async function doneEditFlow(id: string) {
+  if (isFlowDirty(id)) {
+    const ok = await saveFlow(id, { quiet: false })
+    if (!ok) return
+  }
+  const next = new Set(editingFlowIds.value)
+  next.delete(id)
+  editingFlowIds.value = next
+  if (editingNameId.value === id) cancelEditName()
+}
+
+/** True when forms are interactive (edit mode and not mid-run). */
+function canEditFlow(id: string): boolean {
+  return isFlowEditing(id) && !flows.isFlowRunning(id)
+}
+
+function flowRuntimeStatus(f: Flow): string {
+  return runStatus.value[f.id] || f.status || 'idle'
+}
+
+/** Wails: show panel while running OR when last sync snapshot exists. */
+function showRunStatusPanel(f: Flow): boolean {
+  const st = flowRuntimeStatus(f)
+  if (st && st !== 'idle') return true
+  return !!opSyncStatus.value[f.id]
+}
+
+function startEditName(f: Flow) {
+  if (flows.isFlowRunning(f.id)) return
+  // Renaming requires edit mode so view stays clean.
+  if (!isFlowEditing(f.id)) enterEditFlow(f.id)
+  editingNameId.value = f.id
+  editingNameDraft.value = f.name || ''
+}
+
+function cancelEditName() {
+  editingNameId.value = null
+  editingNameDraft.value = ''
+}
+
+async function commitEditName(f: Flow) {
+  const name = editingNameDraft.value.trim() || f.name
+  editingNameId.value = null
+  editingNameDraft.value = ''
+  if (name === f.name) return
+  // Wails saveName: emit flowChange immediately (persist name now).
+  updateFlowLocal(f.id, { name })
+  await saveFlow(f.id, { quiet: true })
+}
+
+/** Wails getFlowStatusBadgeClass — title-case status for header chip. */
+function flowStatusLabel(st: string): string {
+  if (!st || st === 'idle') return ''
+  return st.charAt(0).toUpperCase() + st.slice(1)
+}
+
+function flowCardBorderClass(f: Flow): string {
+  const st = flowRuntimeStatus(f)
+  if (st === 'running' || st === 'cancelling') return 'border-running'
+  if (st === 'completed') return 'border-success'
+  if (st === 'failed') return 'border-danger'
+  if (st === 'cancelled') return 'border-border-muted'
+  return ''
+}
 
 const loading = ref(true)
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const dataLoaded = ref(false)
+/** Flow ids with local edits not yet saved to the server. */
+const dirtyFlowIds = ref(new Set<string>())
+const savingFlowIds = ref(new Set<string>())
 
-// --- Remotes form ---
+// remotes
 const showRemoteForm = ref(false)
 const remoteName = ref('')
 const remoteType = ref('local')
-/** Per-remote test UI state — never seed with {ok:false} (that looks like a failed test). */
 type RemoteTestState = { status: 'loading' } | { status: 'ok' } | { status: 'error'; error?: string }
 const remoteTest = ref<Record<string, RemoteTestState>>({})
 
-// --- Profile (operation) form ---
-const showProfileForm = ref(false)
-const profileMode = ref<'create' | 'edit'>('create')
-const profileDraft = ref<Profile>(emptyProfile())
-const expandedProfile = ref<string | null>(null)
+const anyRunning = computed(() => flows.runningFlowIds.size > 0)
 
-// --- Board form ---
-const showBoardForm = ref(false)
-const boardName = ref('')
-const boardSource = ref('')
-const boardTarget = ref('')
-const boardAction = ref('copy')
-
-// --- Flow form ---
-const showFlowForm = ref(false)
-const flowName = ref('')
-const flowCron = ref('')
-const flowEnabled = ref(true)
-
-function emptyProfile(): Profile {
-  return {
-    name: '',
-    from: '',
-    to: '',
-    direction: 'push',
-    parallel: 4,
-    bandwidth: 0,
-    dry_run: false,
-  }
+function isFlowDirty(id: string): boolean {
+  return dirtyFlowIds.value.has(id)
 }
 
-const activeTasks = computed(() =>
-  (ops.tasks ?? []).filter((x) => x.status === 'running' || x.status === 'pending'),
-)
-
-const dataLoaded = ref(false)
-
-function startTaskPoll() {
-  if (pollTimer.value) return
-  pollTimer.value = setInterval(() => {
-    void ops.loadTasks()
-  }, 4000)
+function isFlowSaving(id: string): boolean {
+  return savingFlowIds.value.has(id)
 }
 
-function stopTaskPoll() {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value)
-    pollTimer.value = null
-  }
+function markFlowDirty(id: string) {
+  const next = new Set(dirtyFlowIds.value)
+  next.add(id)
+  dirtyFlowIds.value = next
 }
 
-async function loadWorkspaceData() {
-  await Promise.all([
-    profiles.load(),
-    remotes.load(),
-    boards.load(),
-    flows.load(),
-    ops.loadTasks(),
-  ])
+function clearFlowDirty(id: string) {
+  if (!dirtyFlowIds.value.has(id)) return
+  const next = new Set(dirtyFlowIds.value)
+  next.delete(id)
+  dirtyFlowIds.value = next
 }
 
 onMounted(async () => {
   try {
-    await loadWorkspaceData()
+    await loadAll()
     dataLoaded.value = true
   } finally {
     loading.value = false
   }
-  startTaskPoll()
 })
 
-// KeepAlive: on first mount Vue also runs onActivated — skip double-fetch.
-// Later returns from Settings refresh lists without wiping local form state.
 onActivated(() => {
-  startTaskPoll()
-  if (dataLoaded.value) {
-    void loadWorkspaceData()
-  }
+  if (dataLoaded.value) void loadAll()
 })
 
-onDeactivated(() => {
-  stopTaskPoll()
-})
-
-onUnmounted(() => {
-  stopTaskPoll()
-})
+async function loadAll() {
+  await Promise.all([remotes.load(), flows.load()])
+}
 
 // —— Remotes ——
 async function submitRemote() {
-  if (!remoteName.value.trim() || !remoteType.value) return
+  if (!remoteName.value.trim()) return
   try {
     await remotes.add(remoteName.value.trim(), remoteType.value.trim())
     showRemoteForm.value = false
     remoteName.value = ''
     remoteType.value = 'local'
     toast.success(t('workspace.remoteAdded'))
-  } catch {
-    /* store error */
-  }
+  } catch { /* */ }
 }
 
 async function testRemote(name: string) {
@@ -180,13 +241,11 @@ async function testRemote(name: string) {
   }
 }
 
-function remoteTestTitle(name: string): string {
-  const st = remoteTest.value[name]
-  if (st?.status === 'error' && st.error) return st.error
-  return t('remotes.testTitle', { name })
-}
-
 async function deleteRemote(name: string) {
+  if (anyRunning.value) {
+    toast.error(t('workspace.busyLocked'))
+    return
+  }
   const ok = await confirmDialog({
     title: t('remotes.deleteTitle'),
     message: t('remotes.deleteMessage', { name }),
@@ -197,213 +256,203 @@ async function deleteRemote(name: string) {
   await remotes.remove(name)
 }
 
-// —— Profiles as operations ——
-type ProfileFieldKey = 'name' | 'from' | 'to' | 'parallel' | 'bandwidth' | 'direction'
-const profileTouched = ref<Partial<Record<ProfileFieldKey, boolean>>>({})
-
-function resetProfileTouched() {
-  profileTouched.value = {}
-}
-
-function touchProfileField(field: ProfileFieldKey) {
-  profileTouched.value = { ...profileTouched.value, [field]: true }
-}
-
-function openCreateProfile() {
-  profileMode.value = 'create'
-  profileDraft.value = emptyProfile()
-  resetProfileTouched()
-  showProfileForm.value = true
-}
-
-function openEditProfile(p: Profile) {
-  profileMode.value = 'edit'
-  profileDraft.value = {
-    ...p,
-    direction: p.direction || 'push',
-    parallel: p.parallel || 4,
-    bandwidth: p.bandwidth ?? 0,
-    dry_run: !!p.dry_run,
-  }
-  resetProfileTouched()
-  showProfileForm.value = true
-}
-
-const profileErrors = computed(() => validateProfileDraft(profileDraft.value))
-const profileFieldErrors = computed(() => errorsByField(profileErrors.value))
-const profileFormValid = computed(() => isProfileDraftValid(profileDraft.value))
-function fieldError(field: ProfileFieldKey): string | null {
-  if (!profileTouched.value[field]) return null
-  const e = profileFieldErrors.value[field]
-  if (!e) return null
-  return t(`profiles.validation.${e.messageKey}`, e.params ?? {})
-}
-
-async function submitProfile() {
-  if (!profileFormValid.value) {
-    // Reveal all field errors if user somehow submits invalid form.
-    for (const f of ['name', 'from', 'to', 'parallel', 'bandwidth', 'direction'] as ProfileFieldKey[]) {
-      profileTouched.value[f] = true
-    }
-    profileTouched.value = { ...profileTouched.value }
+// —— Flows (primary Wails unit) ——
+async function addFlow() {
+  if (anyRunning.value) {
+    toast.error(t('workspace.busyLocked'))
     return
+  }
+  const f = emptyFlow()
+  f.name = t('workspace.untitledFlow')
+  f.operations = [emptyOperation()]
+  try {
+    await flows.save(f)
+    clearFlowDirty(f.id)
+    enterEditFlow(f.id)
+    toast.success(t('workspace.flowAdded'))
+  } catch (e: any) {
+    toast.error(e?.message ?? 'save failed')
+  }
+}
+
+/** Local-only edit; user must press Save (or Run, which saves first). */
+function updateFlowLocal(id: string, patch: Partial<Flow>, opts?: { dirty?: boolean }) {
+  if (!canEditFlow(id) && opts?.dirty !== false) {
+    // Ignore structural edits while view-only (defensive).
+    if (!('is_collapsed' in patch && Object.keys(patch).length === 1)) {
+      return
+    }
+  }
+  const idx = flows.items.findIndex((x) => x.id === id)
+  if (idx < 0) return
+  const next = { ...flows.items[idx], ...patch }
+  flows.items[idx] = next
+  // Collapse toggle is UI chrome — do not mark dirty / force save.
+  if (opts?.dirty === false) return
+  if ('is_collapsed' in patch && Object.keys(patch).length === 1) return
+  markFlowDirty(id)
+}
+
+async function saveFlow(id: string, opts?: { quiet?: boolean }): Promise<boolean> {
+  const f = flows.items.find((x) => x.id === id)
+  if (!f) return false
+  if (flows.isFlowRunning(id)) {
+    toast.error(t('workspace.busyLocked'))
+    return false
+  }
+  const nextSaving = new Set(savingFlowIds.value)
+  nextSaving.add(id)
+  savingFlowIds.value = nextSaving
+  try {
+    await flows.save(f)
+    clearFlowDirty(id)
+    if (!opts?.quiet) toast.success(t('workspace.flowSaved', { name: f.name }))
+    return true
+  } catch (e: any) {
+    toast.error(e?.message ?? 'save failed')
+    return false
+  } finally {
+    const done = new Set(savingFlowIds.value)
+    done.delete(id)
+    savingFlowIds.value = done
+  }
+}
+
+function addOperation(flowId: string) {
+  if (!canEditFlow(flowId)) return
+  const f = flows.items.find((x) => x.id === flowId)
+  if (!f) return
+  const ops = [...(f.operations ?? []), emptyOperation()]
+  updateFlowLocal(flowId, { operations: ops })
+}
+
+function removeOperation(flowId: string, opId: string) {
+  if (!canEditFlow(flowId)) return
+  const f = flows.items.find((x) => x.id === flowId)
+  if (!f) return
+  updateFlowLocal(flowId, {
+    operations: (f.operations ?? []).filter((o) => o.id !== opId),
+  })
+}
+
+function patchOperation(flowId: string, opId: string, patch: Partial<Operation>) {
+  if (!canEditFlow(flowId)) return
+  const f = flows.items.find((x) => x.id === flowId)
+  if (!f) return
+  updateFlowLocal(flowId, {
+    operations: (f.operations ?? []).map((o) => {
+      if (o.id !== opId) return o
+      let next: Operation = { ...o, ...patch }
+      // Wails: action column ↔ sync_config.action stay aligned.
+      if (patch.action !== undefined) {
+        next = withSyncedAction(next, patch.action)
+      } else if (patch.sync_config !== undefined) {
+        next = withSyncedAction(next, resolveOpAction(next))
+      }
+      return next
+    }),
+  })
+}
+
+function setOpAction(flowId: string, op: Operation, action: string) {
+  patchOperation(flowId, op.id, { action: normalizeFlowAction(action) })
+}
+
+function setOpSyncConfig(flowId: string, op: Operation, sc: Record<string, unknown>) {
+  const action = normalizeFlowAction(
+    typeof sc.action === 'string' ? sc.action : resolveOpAction(op),
+  )
+  patchOperation(flowId, op.id, {
+    action,
+    sync_config: { ...sc, action },
+  })
+}
+
+function opSettingsChips(op: Operation): string[] {
+  return syncConfigSummaryChips(parseSyncConfig(op.sync_config, resolveOpAction(op)))
+}
+
+/** Bind RemotePathField composed path → operation source/target fields. */
+function setOpSource(flowId: string, op: Operation, composed: string) {
+  const p = parseComposed(composed)
+  patchOperation(flowId, op.id, {
+    source_remote: p.remote,
+    source_path: p.path,
+  })
+}
+
+function setOpTarget(flowId: string, op: Operation, composed: string) {
+  const p = parseComposed(composed)
+  patchOperation(flowId, op.id, {
+    target_remote: p.remote,
+    target_path: p.path,
+  })
+}
+
+function parseComposed(composed: string): { remote: string; path: string } {
+  const v = (composed ?? '').trim()
+  if (!v) return { remote: '', path: '/' }
+  if (v.startsWith('/')) return { remote: '', path: v }
+  const colon = v.indexOf(':')
+  if (colon > 0) {
+    return {
+      remote: v.slice(0, colon),
+      path: v.slice(colon + 1) || '/',
+    }
+  }
+  return { remote: '', path: v }
+}
+
+function composeOp(remote: string, path: string): string {
+  if (!remote || remote === 'local') return path || '/'
+  const p = path || '/'
+  return p.startsWith('/') ? `${remote}:${p}` : `${remote}:${p}`
+}
+
+async function runFlow(id: string) {
+  if (flows.isFlowRunning(id)) return
+  const f = flows.items.find((x) => x.id === id)
+  if (!f?.operations?.length) {
+    toast.error(t('workspace.flowEmpty'))
+    return
+  }
+  // Persist draft edits before execute so the engine sees latest ops/paths.
+  if (isFlowDirty(id)) {
+    const ok = await saveFlow(id, { quiet: true })
+    if (!ok) return
+  }
+  // Leave edit mode while running — status panel + view summary only.
+  if (isFlowEditing(id)) {
+    const next = new Set(editingFlowIds.value)
+    next.delete(id)
+    editingFlowIds.value = next
+    if (editingNameId.value === id) cancelEditName()
+  }
+  // Expand so the Run status panel is visible during/after the run.
+  if (f.is_collapsed) {
+    updateFlowLocal(id, { is_collapsed: false }, { dirty: false })
   }
   try {
-    if (profileMode.value === 'create') {
-      await profiles.add({ ...profileDraft.value })
-      toast.success(t('profiles.added'))
-    } else {
-      await profiles.update({ ...profileDraft.value })
-      toast.success(t('profiles.updated'))
-    }
-    showProfileForm.value = false
-    profileDraft.value = emptyProfile()
-    resetProfileTouched()
-  } catch {
-    /* store error — shown via profiles.error in form */
-  }
-}
-
-async function deleteProfile(name: string) {
-  const ok = await confirmDialog({
-    title: t('profiles.deleteTitle'),
-    message: t('profiles.deleteMessage', { name }),
-    confirmText: t('common.delete'),
-    confirmVariant: 'danger',
-  })
-  if (!ok) return
-  await profiles.remove(name)
-}
-
-async function runProfile(p: Profile) {
-  const action = p.direction || 'push'
-  const id = await ops.startSync(action, p.name)
-  if (id) {
-    toast.success(t('workspace.syncStarted', { name: p.name }))
-    await ops.loadTasks()
-  } else if (ops.error) {
-    toast.error(String(ops.error))
-  }
-}
-
-// —— Boards ——
-async function submitBoard() {
-  if (!boardName.value.trim()) {
-    toast.error(t('boards.nameRequired'))
-    return
-  }
-  if (!boardSource.value.trim() || !boardTarget.value.trim()) {
-    toast.error(t('boards.pathsRequired'))
-    return
-  }
-  const src = composedPathToBoardNode(boardSource.value)
-  const dst = composedPathToBoardNode(boardTarget.value)
-  const id = crypto.randomUUID()
-  const n1: BoardNode = {
-    id: crypto.randomUUID(),
-    remote_name: src.remote_name,
-    path: src.path || '/',
-    label: 'source',
-    x: 0,
-    y: 0,
-  }
-  const n2: BoardNode = {
-    id: crypto.randomUUID(),
-    remote_name: dst.remote_name,
-    path: dst.path || '/',
-    label: 'target',
-    x: 200,
-    y: 0,
-  }
-  const edges: BoardEdge[] = [
-    {
-      id: crypto.randomUUID(),
-      source_id: n1.id,
-      target_id: n2.id,
-      action: boardAction.value || 'copy',
-    },
-  ]
-  const board: Board = {
-    id,
-    name: boardName.value.trim(),
-    created_at: '',
-    updated_at: '',
-    nodes: [n1, n2],
-    edges,
-  }
-  await boards.add(board)
-  showBoardForm.value = false
-  boardName.value = ''
-  boardSource.value = ''
-  boardTarget.value = ''
-  boardAction.value = 'copy'
-  toast.success(t('workspace.boardAdded'))
-}
-
-async function deleteBoard(id: string, name: string) {
-  const ok = await confirmDialog({
-    title: t('boards.deleteTitle'),
-    message: t('boards.deleteMessage', { name }),
-    confirmText: t('common.delete'),
-    confirmVariant: 'danger',
-  })
-  if (!ok) return
-  await boards.remove(id)
-}
-
-async function runBoard(id: string) {
-  try {
-    await boards.execute(id, true)
-    toast.success(t('boards.execStarted'))
-    await ops.loadTasks()
+    await flows.execute(id)
+    toast.success(t('workspace.flowStarted', { name: f.name }))
   } catch (e: any) {
     toast.error(e?.message ?? 'execute failed')
   }
 }
 
-async function stopBoard(id: string) {
+async function stopFlow(id: string) {
   try {
-    await boards.stop(id)
+    await flows.stop(id)
   } catch (e: any) {
     toast.error(e?.message ?? 'stop failed')
   }
 }
 
-function boardRouteSummary(b: Board): string {
-  const nodes = b.nodes ?? []
-  const edges = b.edges ?? []
-  if (!edges.length) return t('workspace.noEdges')
-  const e = edges[0]
-  const src = nodes.find((n) => n.id === e.source_id)
-  const dst = nodes.find((n) => n.id === e.target_id)
-  const fmt = (n?: BoardNode) => {
-    if (!n) return '?'
-    return n.remote_name ? `${n.remote_name}:${n.path || '/'}` : n.path || '/'
-  }
-  return `${fmt(src)} → ${fmt(dst)} (${e.action})`
-}
-
-// —— Flows ——
-async function submitFlow() {
-  if (!flowName.value.trim()) {
-    toast.error(t('flows.nameRequired'))
+async function deleteFlow(id: string, name: string) {
+  if (flows.isFlowRunning(id)) {
+    toast.error(t('workspace.busyLocked'))
     return
   }
-  const f: Flow = {
-    id: crypto.randomUUID(),
-    name: flowName.value.trim(),
-    schedule_cron: flowCron.value.trim() || undefined,
-    enabled: flowEnabled.value,
-  }
-  await flows.add(f)
-  showFlowForm.value = false
-  flowName.value = ''
-  flowCron.value = ''
-  flowEnabled.value = true
-  toast.success(t('workspace.flowAdded'))
-}
-
-async function deleteFlow(id: string, name: string) {
   const ok = await confirmDialog({
     title: t('flows.deleteTitle'),
     message: t('flows.deleteMessage', { name }),
@@ -414,432 +463,513 @@ async function deleteFlow(id: string, name: string) {
   await flows.remove(id)
 }
 
+/** Arrow icon between Source and Target (Wails getActionArrowClass). */
+function opFlowIcon(action?: string): 'right' | 'both' {
+  const a = normalizeFlowAction(action)
+  if (a === 'bi' || a === 'bi-resync') return 'both'
+  return 'right'
+}
+
+function opActionLabel(action?: string): string {
+  const a = normalizeFlowAction(action)
+  return t(`workspace.actionOptions.${a}`)
+}
+
+function displayPath(remote: string, path: string): string {
+  return composeOp(remote, path) || t('common.empty')
+}
+
+function scheduleLabel(f: Flow): string {
+  const cron = f.schedule_cron || f.cron_expr || ''
+  if (!cron) return t('workspace.noSchedule')
+  const on = !!(f.schedule_enabled ?? f.enabled)
+  return on ? cron : t('workspace.scheduleOff', { cron })
+}
 </script>
 
 <template>
-  <div class="flex h-full flex-col" data-testid="page-workspace">
-    <!-- Remotes strip (infra for all routes) — full-bleed bar, capped content -->
-    <section
-      class="shrink-0 border-b-2 border-border bg-bg py-3"
-      data-testid="workspace-remotes"
-    >
+  <div class="flex h-full min-h-0 flex-col overflow-hidden" data-testid="page-workspace">
+    <!-- Remotes -->
+    <section class="shrink-0 border-b-2 border-border bg-bg py-3" data-testid="workspace-remotes">
       <div class="page-content-wide">
-      <div class="mb-2 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-text-muted">
-          <PhCloud :size="14" weight="bold" />
-          <span>{{ t('workspace.remotes') }}</span>
-          <span class="badge">{{ remotes.items.length }}</span>
-        </div>
-        <button
-          type="button"
-          class="btn-secondary !px-2 !py-1 text-xs"
-          data-testid="remotes-add"
-          @click="showRemoteForm = !showRemoteForm"
-        >
-          <PhPlus :size="14" weight="bold" /> {{ t('remotes.add') }}
-        </button>
-      </div>
-
-      <div v-if="showRemoteForm" class="neo-inset mb-3 p-3" data-testid="remotes-add-form">
-        <form class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]" @submit.prevent="submitRemote">
-          <label class="field-label">
-            <span>{{ t('common.name') }}</span>
-            <input v-model="remoteName" required class="field-input" data-testid="remotes-name" placeholder="gdrive" />
-          </label>
-          <label class="field-label">
-            <span>{{ t('common.type') }}</span>
-            <RemoteTypeSelect v-model="remoteType" test-id="remotes-type" />
-          </label>
-          <div class="flex items-end">
-            <button type="submit" class="btn-primary w-full sm:w-auto" data-testid="remotes-submit">
-              {{ t('common.save') }}
-            </button>
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-text-muted">
+            <PhCloud :size="14" weight="bold" />
+            <span>{{ t('workspace.remotes') }}</span>
+            <span class="badge">{{ remotes.items.length }}</span>
+            <span
+              class="font-mono text-[10px] uppercase"
+              :class="eventsConnected ? 'text-success' : 'text-text-dim'"
+            >
+              {{ eventsConnected ? t('workspace.live') : t('workspace.polling') }}
+            </span>
           </div>
-        </form>
-      </div>
-
-      <div v-if="remotes.items.length" class="flex flex-wrap gap-2">
-        <div
-          v-for="r in remotes.items"
-          :key="r.name"
-          class="neo-inset flex items-center gap-2 px-2.5 py-1.5"
-          :data-testid="`remote-chip-${r.name}`"
-        >
-          <PhCloud :size="14" weight="regular" class="text-info" />
-          <span class="font-bold text-sm">{{ r.name }}</span>
-          <span class="text-[11px] text-text-dim">{{ r.type }}</span>
           <button
             type="button"
-            class="btn-ghost !px-1 !py-0.5 text-[11px]"
-            :disabled="remoteTest[r.name]?.status === 'loading'"
-            :title="remoteTestTitle(r.name)"
-            :data-testid="`remotes-test-${r.name}`"
-            @click="testRemote(r.name)"
+            class="btn-secondary !px-2 !py-1 text-xs"
+            data-testid="remotes-add"
+            :disabled="anyRunning"
+            @click="showRemoteForm = !showRemoteForm"
           >
-            <PhSpinner
-              v-if="remoteTest[r.name]?.status === 'loading'"
-              :size="14"
-              class="animate-spin text-text-muted"
-            />
-            <PhCheckCircle
-              v-else-if="remoteTest[r.name]?.status === 'ok'"
-              :size="14"
-              class="text-success"
-              weight="fill"
-            />
-            <PhXCircle
-              v-else-if="remoteTest[r.name]?.status === 'error'"
-              :size="14"
-              class="text-danger"
-              weight="fill"
-            />
-            <span v-else>{{ t('common.test') }}</span>
-          </button>
-          <button type="button" class="btn-ghost !px-1 !py-0.5 text-danger" @click="deleteRemote(r.name)">
-            <PhTrash :size="14" />
+            <PhPlus :size="14" weight="bold" /> {{ t('remotes.add') }}
           </button>
         </div>
-      </div>
-      <p v-else class="text-sm text-text-muted">{{ t('workspace.noRemotes') }}</p>
+        <div v-if="showRemoteForm" class="neo-inset mb-3 p-3" data-testid="remotes-add-form">
+          <form class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]" @submit.prevent="submitRemote">
+            <label class="field-label">
+              <span>{{ t('common.name') }}</span>
+              <input v-model="remoteName" required class="field-input" data-testid="remotes-name" />
+            </label>
+            <label class="field-label">
+              <span>{{ t('common.type') }}</span>
+              <RemoteTypeSelect v-model="remoteType" test-id="remotes-type" />
+            </label>
+            <div class="flex items-end">
+              <button type="submit" class="btn-primary" data-testid="remotes-submit">{{ t('common.save') }}</button>
+            </div>
+          </form>
+        </div>
+        <div v-if="remotes.items.length" class="flex flex-wrap gap-2">
+          <div
+            v-for="r in remotes.items"
+            :key="r.name"
+            class="neo-inset flex items-center gap-2 px-2.5 py-1.5"
+          >
+            <span class="font-bold text-sm">{{ r.name }}</span>
+            <span class="text-[11px] text-text-dim">{{ r.type }}</span>
+            <button type="button" class="btn-ghost !px-1 !text-[11px]" @click="testRemote(r.name)">
+              <PhSpinner v-if="remoteTest[r.name]?.status === 'loading'" :size="12" class="animate-spin" />
+              <PhCheckCircle v-else-if="remoteTest[r.name]?.status === 'ok'" :size="12" class="text-success" weight="fill" />
+              <PhXCircle v-else-if="remoteTest[r.name]?.status === 'error'" :size="12" class="text-danger" weight="fill" />
+              <span v-else>{{ t('common.test') }}</span>
+            </button>
+            <button type="button" class="btn-ghost !px-1 text-danger" :disabled="anyRunning" @click="deleteRemote(r.name)">
+              <PhTrash :size="12" />
+            </button>
+          </div>
+        </div>
+        <p v-else class="text-sm text-text-muted">{{ t('workspace.noRemotes') }}</p>
       </div>
     </section>
 
-    <!-- Scrollable workspace body -->
     <div class="min-h-0 flex-1 overflow-auto py-4 md:py-5">
       <div class="page-content-wide space-y-5">
-      <AppAlert v-if="profiles.error || remotes.error || boards.error || flows.error" type="error">
-        {{ profiles.error || remotes.error || boards.error || flows.error }}
-      </AppAlert>
+        <AppAlert v-if="remotes.error || flows.error" type="error">
+          {{ remotes.error || flows.error }}
+        </AppAlert>
 
-      <!-- Active tasks -->
-      <section v-if="activeTasks.length" class="neo-card" data-testid="workspace-tasks">
-        <div class="neo-header flex items-center gap-2">
-          <PhSpinner :size="16" class="animate-spin" weight="bold" />
-          <span class="font-bold">{{ t('workspace.activeTasks') }}</span>
-          <span class="badge">{{ activeTasks.length }}</span>
-        </div>
-        <ul class="divide-y-2 divide-border">
-          <li
-            v-for="task in activeTasks"
-            :key="task.id"
-            class="flex items-center gap-2 px-3 py-2 text-sm"
-          >
-            <span class="font-bold">{{ task.name }}</span>
-            <span class="text-text-dim">({{ task.action }})</span>
-            <span class="ml-auto font-mono text-[11px] uppercase">{{ task.status }}</span>
-          </li>
-        </ul>
-      </section>
-
-      <!-- ========== OPERATIONS (profiles) — old "operation" units ========== -->
-      <section class="neo-card" data-testid="workspace-operations">
-        <div class="neo-header grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-          <div class="min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-wide text-text/70">
-              {{ t('workspace.opsLabel') }}
-            </div>
-            <h2 class="truncate text-lg font-bold leading-tight">{{ t('workspace.operations') }}</h2>
-            <p class="mt-0.5 text-xs font-medium text-text/80">{{ t('workspace.operationsHint') }}</p>
+        <!-- FLOWS (primary) -->
+        <div class="flex items-end justify-between gap-3">
+          <div>
+            <h2 class="m-0 flex items-center gap-2 text-lg font-bold">
+              <PhStack :size="22" weight="bold" />
+              {{ t('workspace.flows') }}
+            </h2>
+            <p class="m-0 mt-0.5 text-xs text-text-muted">{{ t('workspace.flowsHint') }}</p>
           </div>
-          <button type="button" class="btn-secondary" data-testid="profiles-add" @click="openCreateProfile">
-            <PhPlus :size="14" weight="bold" /> {{ t('workspace.addOperation') }}
+          <button
+            type="button"
+            class="btn-primary"
+            data-testid="flows-add"
+            :disabled="anyRunning"
+            @click="addFlow"
+          >
+            <PhPlus :size="14" weight="bold" /> {{ t('flows.add') }}
           </button>
         </div>
 
-        <div class="space-y-2 bg-bg p-3">
-          <div v-if="showProfileForm" class="neo-inset p-3" data-testid="profiles-add-form">
-            <h3 class="section-label">
-              {{ profileMode === 'create' ? t('profiles.new') : t('profiles.edit') }}
-            </h3>
-            <form class="grid grid-cols-1 gap-3 md:grid-cols-2" @submit.prevent="submitProfile">
-              <label class="field-label">
-                <span>{{ t('common.name') }}</span>
+        <!-- Wails flow-card layout -->
+        <section
+          v-for="(f, fi) in flows.items"
+          :key="f.id"
+          class="neo-card overflow-hidden"
+          :class="flowCardBorderClass(f)"
+          :data-testid="`flow-card-${f.id}`"
+        >
+          <!-- Header: name | Run/Stop + Remove  (Wails flow-card) -->
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b-2 border-border bg-accent p-3">
+            <div class="min-w-0 flex items-center gap-2">
+              <template v-if="editingNameId === f.id">
                 <input
-                  v-model="profileDraft.name"
-                  class="field-input"
-                  :class="fieldError('name') && 'border-danger'"
-                  :disabled="profileMode === 'edit'"
-                  data-testid="profiles-name"
-                  @focus="touchProfileField('name')"
+                  v-model="editingNameDraft"
+                  class="min-w-0 flex-1 border-2 border-border bg-bg px-2 py-1 text-base font-bold outline-none"
+                  type="text"
+                  :placeholder="t('workspace.flowLabel', { n: fi + 1 })"
+                  data-testid="flows-name-inline"
+                  autocomplete="off"
+                  @keydown.enter.prevent="commitEditName(f)"
+                  @keydown.escape.prevent="cancelEditName"
                 />
-                <p v-if="fieldError('name')" class="field-error" data-testid="profiles-error-name">{{ fieldError('name') }}</p>
-              </label>
-              <label class="field-label">
-                <span>{{ t('profiles.direction') }}</span>
-                <DirectionField
-                  v-model="profileDraft.direction"
-                  :invalid="!!fieldError('direction')"
-                  test-id="profiles-direction"
-                  @focus="touchProfileField('direction')"
-                />
-                <p v-if="fieldError('direction')" class="field-error">{{ fieldError('direction') }}</p>
-              </label>
-              <div class="field-label md:col-span-2" @focusin="touchProfileField('from')">
-                <span>{{ t('profiles.fromLabel') }}</span>
-                <RemotePathField v-model="profileDraft.from" :remotes="remotes.items" test-id="profiles-from" />
-                <p v-if="fieldError('from')" class="field-error" data-testid="profiles-error-from">{{ fieldError('from') }}</p>
-              </div>
-              <div class="field-label md:col-span-2" @focusin="touchProfileField('to')">
-                <span>{{ t('profiles.toLabel') }}</span>
-                <RemotePathField v-model="profileDraft.to" :remotes="remotes.items" test-id="profiles-to" />
-                <p v-if="fieldError('to')" class="field-error" data-testid="profiles-error-to">{{ fieldError('to') }}</p>
-              </div>
-              <label class="field-label">
-                <span>{{ t('profiles.parallel') }}</span>
-                <input
-                  v-model.number="profileDraft.parallel"
-                  type="number"
-                  min="0"
-                  class="field-input"
-                  :class="fieldError('parallel') && 'border-danger'"
-                  @focus="touchProfileField('parallel')"
-                />
-                <p v-if="fieldError('parallel')" class="field-error">{{ fieldError('parallel') }}</p>
-              </label>
-              <div class="flex items-end">
-                <AppCheckbox v-model="profileDraft.dry_run!" :label="t('profiles.dryRun')" />
-              </div>
-
-              <AppAlert v-if="profiles.error" type="error" class="md:col-span-2">{{ profiles.error }}</AppAlert>
-
-              <div class="flex gap-2 md:col-span-2">
-                <button
-                  type="submit"
-                  class="btn-primary"
-                  data-testid="profiles-submit"
-                  :disabled="!profileFormValid || profiles.loading"
-                >
-                  {{ t('common.save') }}
+                <button type="button" class="btn-primary !px-2 !py-1" @click="commitEditName(f)">
+                  <PhCheck :size="14" weight="bold" />
                 </button>
-                <button type="button" class="btn-secondary" @click="showProfileForm = false">{{ t('common.cancel') }}</button>
-              </div>
-            </form>
-          </div>
-
-          <template v-if="profiles.items.length">
-            <article
-              v-for="(p, i) in profiles.items"
-              :key="p.name"
-              class="neo-inset"
-              :data-testid="`profile-row-${p.name}`"
-            >
-              <div
-                class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b-2 border-border bg-bg-secondary px-3 py-2"
-              >
-                <span class="font-mono text-xs font-bold text-text-dim">#{{ i + 1 }}</span>
+                <button type="button" class="btn-secondary !px-2 !py-1" @click="cancelEditName">
+                  <PhX :size="14" weight="bold" />
+                </button>
+              </template>
+              <template v-else>
                 <div class="min-w-0">
-                  <div class="truncate font-bold">{{ p.name }}</div>
-                  <div class="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-text-muted">
-                    <span class="font-mono truncate">{{ p.from }}</span>
-                    <PhArrowRight :size="12" weight="bold" class="shrink-0 text-text-dim" />
-                    <span class="font-mono truncate">{{ p.to }}</span>
-                    <span class="badge ml-1">{{ p.direction || 'push' }}</span>
+                  <div class="text-[10px] font-bold uppercase tracking-wide text-text/70">
+                    {{ t('workspace.flowLabel', { n: fi + 1 }) }}
                   </div>
+                  <h2 class="m-0 truncate text-lg font-bold leading-tight">
+                    {{ f.name || t('workspace.untitledFlow') }}
+                  </h2>
                 </div>
-                <div class="flex shrink-0 items-center gap-1.5">
-                  <button type="button" class="btn-primary !px-2 !py-1" data-testid="ops-run" @click="runProfile(p)">
-                    <PhPlay :size="14" weight="bold" /> {{ t('workspace.run') }}
-                  </button>
-                  <button type="button" class="btn-secondary !px-2 !py-1" @click="openEditProfile(p)">
-                    <PhPencilSimple :size="14" weight="bold" />
-                  </button>
-                  <button type="button" class="btn-danger !px-2 !py-1" @click="deleteProfile(p.name)">
-                    <PhTrash :size="14" />
-                  </button>
-                </div>
-              </div>
+                <button
+                  v-if="isFlowEditing(f.id)"
+                  type="button"
+                  class="btn-secondary !px-2 !py-1"
+                  :disabled="flows.isFlowRunning(f.id)"
+                  :title="t('workspace.editName')"
+                  data-testid="flows-edit-name"
+                  @click="startEditName(f)"
+                >
+                  <PhPencilSimple :size="14" weight="bold" />
+                </button>
+              </template>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                v-if="flows.isFlowRunning(f.id)"
+                type="button"
+                class="btn-danger !px-2.5 !py-1"
+                @click="stopFlow(f.id)"
+              >
+                <PhStop :size="14" weight="bold" /> {{ t('workspace.stop') }}
+              </button>
+              <button
+                v-else
+                type="button"
+                class="btn-primary !px-2.5 !py-1"
+                :disabled="!(f.operations ?? []).length || isFlowSaving(f.id)"
+                data-testid="flows-run"
+                @click="runFlow(f.id)"
+              >
+                <PhPlay :size="14" weight="bold" /> {{ t('workspace.run') }}
+              </button>
+              <template v-if="isFlowEditing(f.id)">
+                <button
+                  type="button"
+                  class="btn-primary !px-2.5 !py-1"
+                  :disabled="flows.isFlowRunning(f.id) || isFlowSaving(f.id)"
+                  :data-testid="`flows-done-edit-${f.id}`"
+                  @click="doneEditFlow(f.id)"
+                >
+                  <PhCheck :size="14" weight="bold" />
+                  {{ isFlowDirty(f.id) ? t('workspace.saveAndDone') : t('workspace.doneEdit') }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-secondary !px-2.5 !py-1"
+                  :disabled="flows.isFlowRunning(f.id) || isFlowSaving(f.id)"
+                  :data-testid="`flows-cancel-edit-${f.id}`"
+                  @click="cancelEditFlow(f.id)"
+                >
+                  <PhX :size="14" weight="bold" /> {{ t('common.cancel') }}
+                </button>
+              </template>
+              <button
+                v-else
+                type="button"
+                class="btn-secondary !px-2.5 !py-1"
+                :disabled="flows.isFlowRunning(f.id)"
+                :data-testid="`flows-edit-${f.id}`"
+                @click="enterEditFlow(f.id)"
+              >
+                <PhPencilSimple :size="14" weight="bold" /> {{ t('workspace.editFlow') }}
+              </button>
               <button
                 type="button"
-                class="flex w-full items-center justify-center gap-1 py-1 text-[11px] font-bold uppercase text-text-dim hover:bg-surface-hover"
-                @click="expandedProfile = expandedProfile === p.name ? null : p.name"
+                class="btn-secondary !px-2.5 !py-1"
+                :disabled="flows.isFlowRunning(f.id)"
+                :data-testid="`flows-delete-${f.id}`"
+                @click="deleteFlow(f.id, f.name)"
               >
-                {{ expandedProfile === p.name ? t('workspace.collapse') : t('workspace.details') }}
+                <PhTrash :size="14" class="text-danger" /> {{ t('workspace.remove') }}
               </button>
-              <div v-if="expandedProfile === p.name" class="border-t-2 border-border px-3 py-2 text-xs text-text-muted">
-                <div>{{ t('profiles.parallel') }}: {{ p.parallel ?? 4 }} · {{ t('profiles.bandwidth') }}: {{ p.bandwidth ?? 0 }}</div>
-                <div v-if="p.dry_run" class="text-warning">{{ t('profiles.dryRun') }}</div>
-              </div>
-            </article>
-            <div v-if="profiles.items.length > 1" class="flex justify-center py-1 text-text-dim">
-              <PhArrowDown :size="16" />
             </div>
-          </template>
-          <div
-            v-else
-            class="neo-dashed flex cursor-pointer items-center justify-center gap-2 p-4"
-            role="button"
-            tabindex="0"
-            @click="openCreateProfile"
-            @keydown.enter="openCreateProfile"
-          >
-            <PhPlus :size="16" class="text-text-dim" />
-            <span class="text-sm font-medium text-text-muted">{{ t('workspace.addOperation') }}</span>
-          </div>
-        </div>
-      </section>
 
-      <!-- ========== BOARDS ========== -->
-      <section class="neo-card" data-testid="workspace-boards">
-        <div class="neo-header grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-          <div class="min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-wide text-text/70">
-              {{ t('workspace.boardsLabel') }}
+            <!-- Meta row (Wails col-span-2): ops · cron · status -->
+            <div class="col-span-2 flex flex-wrap items-center gap-2">
+              <span class="border-2 border-border bg-bg/70 px-2 py-1 text-xs font-bold">
+                {{ (f.operations ?? []).length }}
+                {{
+                  (f.operations ?? []).length === 1
+                    ? t('workspace.operation')
+                    : t('workspace.operations')
+                }}
+              </span>
+              <span
+                v-if="(f.schedule_enabled ?? f.enabled) && (f.schedule_cron || f.cron_expr)"
+                class="border-2 border-border bg-bg/70 px-2 py-1 text-xs font-bold"
+              >
+                <PhClock :size="12" class="mr-0.5 inline" />
+                {{ f.schedule_cron || f.cron_expr }}
+              </span>
+              <span
+                v-if="isFlowDirty(f.id)"
+                class="border-2 border-warning px-2 py-1 text-xs font-bold text-warning"
+                data-testid="flows-unsaved"
+              >
+                {{ t('workspace.unsaved') }}
+              </span>
+              <span
+                v-if="flowRuntimeStatus(f) !== 'idle'"
+                class="border-2 border-border px-2 py-1 text-xs font-bold"
+                :class="{
+                  'bg-warning/20 text-running': flowRuntimeStatus(f) === 'running' || flowRuntimeStatus(f) === 'cancelling',
+                  'bg-success/20 text-success': flowRuntimeStatus(f) === 'completed',
+                  'bg-danger/20 text-danger': flowRuntimeStatus(f) === 'failed',
+                  'bg-bg text-text-muted': flowRuntimeStatus(f) === 'cancelled',
+                }"
+              >
+                {{ flowStatusLabel(flowRuntimeStatus(f)) }}
+              </span>
             </div>
-            <h2 class="flex items-center gap-2 text-lg font-bold leading-tight">
-              <PhSquaresFour :size="20" weight="bold" />
-              {{ t('workspace.boards') }}
-            </h2>
-            <p class="mt-0.5 text-xs font-medium text-text/80">{{ t('workspace.boardsHint') }}</p>
-          </div>
-          <button type="button" class="btn-secondary" data-testid="boards-add" @click="showBoardForm = !showBoardForm">
-            <PhPlus :size="14" weight="bold" /> {{ t('boards.add') }}
-          </button>
-        </div>
-
-        <div class="space-y-2 bg-bg p-3">
-          <div v-if="showBoardForm" class="neo-inset p-3" data-testid="boards-add-form">
-            <form class="grid grid-cols-1 gap-3" @submit.prevent="submitBoard">
-              <label class="field-label">
-                <span>{{ t('common.name') }}</span>
-                <input v-model="boardName" required class="field-input" data-testid="boards-name" />
-              </label>
-              <label class="field-label">
-                <span>{{ t('boards.source') }}</span>
-                <RemotePathField v-model="boardSource" :remotes="remotes.items" test-id="boards-source" />
-              </label>
-              <label class="field-label">
-                <span>{{ t('boards.target') }}</span>
-                <RemotePathField v-model="boardTarget" :remotes="remotes.items" test-id="boards-target" />
-              </label>
-              <label class="field-label">
-                <span>{{ t('common.action') }}</span>
-                <select v-model="boardAction" class="field-input" data-testid="boards-action">
-                  <option v-for="a in BOARD_EDGE_ACTIONS" :key="a" :value="a">{{ a }}</option>
-                </select>
-              </label>
-              <div class="flex gap-2">
-                <button type="submit" class="btn-primary" data-testid="boards-submit">{{ t('common.save') }}</button>
-                <button type="button" class="btn-secondary" @click="showBoardForm = false">{{ t('common.cancel') }}</button>
-              </div>
-            </form>
           </div>
 
-          <article
-            v-for="b in boards.items"
-            :key="b.id"
-            class="neo-inset"
-            :data-testid="`board-card-${b.id}`"
-          >
-            <div class="flex flex-wrap items-center gap-3 px-3 py-3">
-              <div class="min-w-0 flex-1">
-                <div class="font-bold">{{ b.name }}</div>
-                <div class="mt-1 font-mono text-xs text-text-muted">{{ boardRouteSummary(b) }}</div>
-                <div v-if="boards.lastRun[b.id]" class="mt-1 text-[11px] font-bold uppercase text-text-dim">
-                  {{ boards.lastRun[b.id].status }}
-                </div>
-              </div>
-              <div class="flex gap-1.5">
-                <button
-                  v-if="boards.lastRun[b.id]?.status === 'running'"
-                  type="button"
-                  class="btn-danger !px-2 !py-1"
-                  @click="stopBoard(b.id)"
+          <!-- Wails: operation-logs-panel under header when running or has last sync -->
+          <FlowRunStatusPanel
+            v-if="showRunStatusPanel(f)"
+            :flow="f"
+            :flow-status="flowRuntimeStatus(f)"
+            :sync-status="opSyncStatus[f.id] ?? null"
+            :last-error="lastError[f.id] || f.last_error"
+          />
+
+          <!-- Content: view-only summary OR edit forms -->
+          <div class="space-y-2 bg-bg p-3">
+            <!-- —— VIEW ONLY —— -->
+            <template v-if="!isFlowEditing(f.id)">
+              <div
+                class="flex flex-wrap items-center gap-2 text-xs"
+                :data-testid="`flow-view-schedule-${f.id}`"
+              >
+                <span class="font-bold uppercase text-text-muted">{{ t('flows.schedule') }}</span>
+                <span class="border-2 border-border bg-bg-secondary px-2 py-1 font-mono font-bold">
+                  <PhClock :size="12" class="mr-0.5 inline" />
+                  {{ scheduleLabel(f) }}
+                </span>
+                <span
+                  v-if="(f.schedule_enabled ?? f.enabled) && (f.schedule_cron || f.cron_expr)"
+                  class="badge"
                 >
-                  <PhStop :size="14" weight="bold" /> {{ t('workspace.stop') }}
-                </button>
-                <button v-else type="button" class="btn-primary !px-2 !py-1" @click="runBoard(b.id)">
-                  <PhPlay :size="14" weight="bold" /> {{ t('workspace.run') }}
-                </button>
-                <button type="button" class="btn-danger !px-2 !py-1" @click="deleteBoard(b.id, b.name)">
-                  <PhTrash :size="14" />
+                  {{ t('common.enabled') }}
+                </span>
+              </div>
+
+              <template v-if="(f.operations ?? []).length">
+                <template v-for="(op, oi) in f.operations ?? []" :key="op.id">
+                  <div v-if="oi > 0" class="flex justify-center py-0.5 text-text-dim">
+                    <PhArrowRight :size="16" class="rotate-90" weight="bold" />
+                  </div>
+                  <div
+                    class="neo-op-card px-3 py-2.5"
+                    :data-testid="`op-view-${op.id}`"
+                  >
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-mono text-xs font-bold text-text-dim">#{{ oi + 1 }}</span>
+                      <span class="border-2 border-border bg-bg px-2 py-0.5 text-[11px] font-bold">
+                        {{ opActionLabel(resolveOpAction(op)) }}
+                      </span>
+                      <span
+                        v-for="chip in opSettingsChips(op)"
+                        :key="chip"
+                        class="border-2 border-border bg-bg px-2 py-0.5 text-[10px] font-bold text-text-muted"
+                      >
+                        {{ chip }}
+                      </span>
+                      <span
+                        v-if="op.status && op.status !== 'idle' && flowRuntimeStatus(f) !== 'idle'"
+                        class="badge font-mono uppercase"
+                        :class="{
+                          'text-running': op.status === 'running' || op.status === 'cancelling',
+                          'text-success': op.status === 'completed',
+                          'text-danger': op.status === 'failed' || op.status === 'cancelled',
+                        }"
+                      >{{ flowStatusLabel(op.status) }}</span>
+                    </div>
+                    <div
+                      class="mt-2 flex min-w-0 flex-col gap-1 font-mono text-[12px] sm:flex-row sm:items-center sm:gap-2"
+                    >
+                      <span
+                        class="min-w-0 truncate font-medium text-text"
+                        :title="displayPath(op.source_remote, op.source_path)"
+                      >
+                        {{ displayPath(op.source_remote, op.source_path) }}
+                      </span>
+                      <span class="shrink-0 text-text-dim" :title="opActionLabel(resolveOpAction(op))">
+                        <PhArrowsLeftRight
+                          v-if="opFlowIcon(resolveOpAction(op)) === 'both'"
+                          :size="14"
+                          weight="bold"
+                          class="inline"
+                        />
+                        <PhArrowRight v-else :size="14" weight="bold" class="inline" />
+                      </span>
+                      <span
+                        class="min-w-0 truncate font-medium text-text"
+                        :title="displayPath(op.target_remote, op.target_path)"
+                      >
+                        {{ displayPath(op.target_remote, op.target_path) }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </template>
+              <p
+                v-else
+                class="m-0 border-2 border-dashed border-border-muted px-3 py-4 text-center text-sm text-text-muted"
+              >
+                {{ t('workspace.noOperations') }}
+              </p>
+            </template>
+
+            <!-- —— EDIT MODE —— -->
+            <template v-else>
+              <div class="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto] md:items-end">
+                <label class="field-label !mb-0">
+                  <span>{{ t('flows.schedule') }}</span>
+                  <CronField
+                    :model-value="f.schedule_cron || f.cron_expr || ''"
+                    :disabled="!canEditFlow(f.id)"
+                    allow-none
+                    test-id="flows-cron"
+                    @update:model-value="updateFlowLocal(f.id, { schedule_cron: $event, cron_expr: $event })"
+                  />
+                </label>
+                <AppCheckbox
+                  :model-value="!!(f.schedule_enabled ?? f.enabled)"
+                  :disabled="!canEditFlow(f.id)"
+                  :label="t('common.enabled')"
+                  @update:model-value="updateFlowLocal(f.id, { schedule_enabled: $event, enabled: $event })"
+                />
+              </div>
+
+              <template v-for="(op, oi) in f.operations ?? []" :key="op.id">
+                <div v-if="oi > 0" class="flex justify-center py-0.5 text-text-dim">
+                  <PhArrowRight :size="16" class="rotate-90" weight="bold" />
+                </div>
+                <div class="neo-op-card overflow-hidden" :data-testid="`op-row-${op.id}`">
+                  <div class="flex items-center gap-2 border-b-2 border-border bg-bg-secondary px-3 py-2">
+                    <span class="font-mono text-xs font-bold text-text-dim">#{{ oi + 1 }}</span>
+                    <span class="border-2 border-border bg-bg px-2 py-0.5 font-mono text-[11px] font-bold uppercase">
+                      {{ opActionLabel(resolveOpAction(op)) }}
+                    </span>
+                    <span
+                      v-if="op.status && op.status !== 'idle' && flowRuntimeStatus(f) !== 'idle'"
+                      class="badge font-mono uppercase"
+                      :class="{
+                        'text-running': op.status === 'running' || op.status === 'cancelling',
+                        'text-success': op.status === 'completed',
+                        'text-danger': op.status === 'failed' || op.status === 'cancelled',
+                      }"
+                    >{{ flowStatusLabel(op.status) }}</span>
+                    <button
+                      type="button"
+                      class="btn-secondary ml-auto !px-2 !py-1"
+                      :disabled="!canEditFlow(f.id)"
+                      @click="removeOperation(f.id, op.id)"
+                    >
+                      <PhTrash :size="12" class="text-danger" />
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_auto_1fr]">
+                    <label class="field-label">
+                      <span>{{ t('workspace.source') }}</span>
+                      <RemotePathField
+                        :model-value="composeOp(op.source_remote, op.source_path)"
+                        :remotes="remotes.items"
+                        :disabled="!canEditFlow(f.id)"
+                        :test-id="`op-src-${op.id}`"
+                        @update:model-value="setOpSource(f.id, op, $event)"
+                      />
+                    </label>
+                    <div
+                      class="hidden items-center justify-center lg:flex"
+                      :title="opActionLabel(resolveOpAction(op))"
+                    >
+                      <PhArrowsLeftRight
+                        v-if="opFlowIcon(resolveOpAction(op)) === 'both'"
+                        :size="18"
+                        weight="bold"
+                        class="text-text-dim"
+                      />
+                      <PhArrowRight v-else :size="18" weight="bold" class="text-text-dim" />
+                    </div>
+                    <label class="field-label">
+                      <span>{{ t('workspace.target') }}</span>
+                      <RemotePathField
+                        :model-value="composeOp(op.target_remote, op.target_path)"
+                        :remotes="remotes.items"
+                        :disabled="!canEditFlow(f.id)"
+                        :test-id="`op-dst-${op.id}`"
+                        @update:model-value="setOpTarget(f.id, op, $event)"
+                      />
+                    </label>
+                  </div>
+                  <!-- Wails operation-settings-panel (Performance / Filtering / Safety / …) -->
+                  <OperationSettingsPanel
+                    :model-value="
+                      (op.sync_config && typeof op.sync_config === 'object'
+                        ? op.sync_config
+                        : { action: resolveOpAction(op) }) as Record<string, unknown>
+                    "
+                    :action="resolveOpAction(op)"
+                    :disabled="!canEditFlow(f.id)"
+                    @update:model-value="setOpSyncConfig(f.id, op, $event)"
+                    @update:action="setOpAction(f.id, op, $event)"
+                  />
+                </div>
+              </template>
+
+              <div
+                class="mt-1 flex cursor-pointer items-center justify-center gap-2 border-2 border-dashed border-border-muted bg-bg/50 p-3 text-sm font-medium text-text-muted transition-colors hover:border-accent-strong hover:bg-accent/20"
+                role="button"
+                tabindex="0"
+                :class="!canEditFlow(f.id) && 'pointer-events-none opacity-50'"
+                data-testid="flows-add-op"
+                @click="addOperation(f.id)"
+                @keydown.enter="addOperation(f.id)"
+              >
+                <PhPlus :size="14" /> {{ t('workspace.addOperation') }}
+              </div>
+
+              <div
+                v-if="isFlowDirty(f.id)"
+                class="flex flex-wrap items-center justify-between gap-2 border-t-2 border-border pt-3"
+              >
+                <p class="m-0 text-xs text-text-muted">{{ t('workspace.saveHint') }}</p>
+                <button
+                  type="button"
+                  class="btn-primary"
+                  :disabled="!canEditFlow(f.id) || isFlowSaving(f.id)"
+                  :data-testid="`flows-save-bottom-${f.id}`"
+                  @click="saveFlow(f.id)"
+                >
+                  <PhFloppyDisk :size="16" weight="bold" />
+                  {{ isFlowSaving(f.id) ? t('common.saving') : t('workspace.saveFlow') }}
                 </button>
               </div>
-            </div>
-          </article>
-
-          <div
-            v-if="!boards.items.length && !showBoardForm"
-            class="neo-dashed flex cursor-pointer items-center justify-center gap-2 p-4"
-            role="button"
-            tabindex="0"
-            @click="showBoardForm = true"
-            @keydown.enter="showBoardForm = true"
-          >
-            <PhPlus :size="16" class="text-text-dim" />
-            <span class="text-sm font-medium text-text-muted">{{ t('boards.add') }}</span>
+            </template>
           </div>
+        </section>
+
+        <div
+          v-if="!flows.items.length && !loading"
+          class="neo-dashed flex cursor-pointer items-center justify-center gap-2 p-6"
+          role="button"
+          tabindex="0"
+          @click="addFlow"
+          @keydown.enter="addFlow"
+        >
+          <PhPlus :size="18" />
+          <span class="font-medium text-text-muted">{{ t('flows.add') }}</span>
         </div>
-      </section>
 
-      <!-- ========== FLOWS ========== -->
-      <section
-        v-for="(f, fi) in flows.items"
-        :key="f.id"
-        class="neo-card"
-        :data-testid="`flow-card-${f.id}`"
-      >
-        <div class="neo-header grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-          <div class="min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-wide text-text/70">
-              {{ t('workspace.flowLabel', { n: fi + 1 }) }}
-            </div>
-            <h2 class="flex items-center gap-2 truncate text-lg font-bold leading-tight">
-              <PhStack :size="20" weight="bold" />
-              {{ f.name || t('workspace.untitledFlow') }}
-            </h2>
-            <div class="mt-1 flex flex-wrap gap-2">
-              <span v-if="f.schedule_cron" class="badge">
-                <PhClock :size="12" class="mr-0.5 inline" /> {{ f.schedule_cron }}
-              </span>
-              <span v-else class="badge">{{ t('flows.noSchedule') }}</span>
-              <span class="badge" :class="f.enabled ? 'text-success' : ''">
-                {{ f.enabled ? t('common.enabled') : t('common.disabled') }}
-              </span>
-            </div>
-          </div>
-          <button type="button" class="btn-danger !px-2 !py-1" :data-testid="`flows-delete-${f.id}`" @click="deleteFlow(f.id, f.name)">
-            <PhTrash :size="14" /> {{ t('workspace.remove') }}
-          </button>
-        </div>
-        <div class="bg-bg p-3 text-sm text-text-muted">
-          {{ t('workspace.flowBody') }}
-        </div>
-      </section>
-
-      <!-- Add flow -->
-      <div
-        class="neo-dashed flex cursor-pointer items-center justify-center gap-2 p-3 transition-colors hover:border-accent-strong hover:bg-accent/10"
-        role="button"
-        tabindex="0"
-        data-testid="flows-add"
-        @click="showFlowForm = !showFlowForm"
-        @keydown.enter="showFlowForm = !showFlowForm"
-      >
-        <PhPlus :size="16" class="text-text-dim" />
-        <span class="text-sm font-medium text-text-muted">{{ t('flows.add') }}</span>
-      </div>
-
-      <div v-if="showFlowForm" class="neo-card p-4" data-testid="flows-add-form">
-        <form class="grid grid-cols-1 gap-3 md:grid-cols-2" @submit.prevent="submitFlow">
-          <label class="field-label">
-            <span>{{ t('common.name') }}</span>
-            <input v-model="flowName" required class="field-input" data-testid="flows-name" />
-          </label>
-          <label class="field-label">
-            <span>{{ t('flows.schedule') }}</span>
-            <CronField v-model="flowCron" test-id="flows-cron" allow-none />
-          </label>
-          <div class="flex items-end">
-            <AppCheckbox v-model="flowEnabled" :label="t('common.enabled')" />
-          </div>
-          <div class="flex gap-2 md:col-span-2">
-            <button type="submit" class="btn-primary" data-testid="flows-submit">{{ t('common.save') }}</button>
-            <button type="button" class="btn-secondary" @click="showFlowForm = false">{{ t('common.cancel') }}</button>
-          </div>
-        </form>
-      </div>
-
-      <p v-if="loading" class="text-center text-sm text-text-muted">{{ t('common.loading') }}…</p>
+        <p v-if="loading" class="text-center text-sm text-text-muted">{{ t('common.loading') }}…</p>
       </div>
     </div>
   </div>

@@ -1,33 +1,47 @@
-# .air.toml — Go hot-reload config for `task dev`.
-# Docs: https://github.com/cosmtrek/air
+# .air.toml — Go hot-reload for `task dev` (air v1.62+ / air-verse/air).
+# Docs: https://github.com/air-verse/air
+#
+# Note: air v1.62 uses `bin` + `args_bin` / `full_bin`, NOT `entrypoint`.
+# A previous config only set `entrypoint`, so air fell back to ./tmp/main
+# (exit 127 — binary missing) while `cmd` wrote ./tmp/gn-drive.
+
+root = "."
+tmp_dir = "tmp"
 
 [build]
-  # Build command. We use `go build` into a tmp binary that air then runs.
+  # Build the portal binary into tmp/ (watched dir is excluded from rebuilds).
   cmd = "go build -trimpath -o ./tmp/gn-drive ./cmd/gn-drive"
-  # Binary that air invokes after each build, plus its arguments. The bare
-  # binary just prints help and exits, so we must pass the `run` subcommand
-  # (and --no-browser, since dev opens the URL manually). Path is relative to
-  # project root. `bin` is deprecated in favour of `entrypoint`.
-  #
-  # Fixed --port so air restarts keep the same loopback URL. Auto-port (0)
-  # would rebind a new port on every Vue/Go reload and break the browser tab.
-  # Keep in sync with frontend/vite.config.ts proxy default (53241).
-  entrypoint = ["./tmp/gn-drive", "run", "--no-browser", "--dev", "--port", "53241"]
-  # Delay before triggering a new build (ms). Vite --watch rebuilds happen
-  # frequently; 800ms keeps the Go side from restarting mid-Vue-build.
+  bin = "./tmp/gn-drive"
+  # Bare binary only prints help; must run the `run` subcommand.
+  # Keep --port in sync with frontend/vite.config.ts proxy default (53241).
+  full_bin = "./tmp/gn-drive run --no-browser --dev --port 53241"
+  # Delay (ms) before rebuild — Vite --watch fires often; avoid mid-bundle restarts.
   delay = 800
-  # Stop running the previous binary cleanly on rebuild.
+  # Do not start a previous binary if build failed.
   stop_on_error = true
-  # Extensions that trigger a rebuild. We include js/css/html so that when
-  # Vite re-bundles internal/webui/dist/, air rebuilds the Go binary and
-  # re-embeds the latest UI (go:embed is baked at compile time, so a dist
-  # change is only visible after a recompile).
+  # go:embed bakes webui at compile time; watch dist assets so UI rebuild restarts Go.
   include_ext = ["go", "html", "js", "css", "tpl", "tmpl"]
+  exclude_dir = [
+    "assets",
+    "tmp",
+    "vendor",
+    "testdata",
+    "frontend/node_modules",
+    "frontend/dist",
+    "frontend/e2e",
+    "bin",
+    ".git",
+    "scripts",
+    "docs",
+  ]
+  exclude_regex = ["_test.go"]
+  log = "build-errors.log"
+  send_interrupt = true
+  kill_delay = "2s"
 
 [log]
-  # Show only air's own output; the binary's stdout/stderr already flows
-  # through to the terminal via the `bin` directive above.
   time = false
+  main_only = false
 
 [color]
   app = "cyan"
@@ -37,22 +51,8 @@
   runner = "green"
 
 [misc]
-  # Show the full command air is about to run.
-  show_command = true
+  clean_on_exit = true
 
 [screen]
   clear_on_rebuild = false
   keep_scroll = true
-
-[exclude]
-  # Watch internal/webui/dist (the go:embed source) so a Vite re-bundle
-  # triggers a Go rebuild + re-embed. We still ignore node_modules, the
-  # legacy frontend/dist output, and build scratch dirs.
-  regex_dirs = [
-    "frontend/node_modules",
-    "frontend/dist",
-    "tmp",
-    "bin",
-    ".git",
-    "scripts",
-  ]

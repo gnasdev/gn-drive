@@ -19,8 +19,11 @@ func newProfileCmd() *cobra.Command {
 
 Examples:
   gn-drive profile list
-  gn-drive profile add --name backup --from gdrive: --to gdrive: --direction pull
-  gn-drive profile delete backup`,
+  gn-drive profile add --name backup --from /data --to s3:bucket --direction push
+  gn-drive profile add --name photos --from /photos --to drive:photos --direction bi
+  gn-drive profile delete backup
+
+Direction (profiles only): push | bi | bi-resync`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.Help()
@@ -80,10 +83,10 @@ func runProfileList(cmd *cobra.Command, a *app.App) error {
 
 func newProfileAddCmd() *cobra.Command {
 	var (
-		name, from, to string
-		parallel       int
-		bandwidth      int
-		dryRun         bool
+		name, from, to, direction string
+		parallel                  int
+		bandwidth                 int
+		dryRun                    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "add",
@@ -98,12 +101,13 @@ func newProfileAddCmd() *cobra.Command {
 				return err
 			}
 			defer a.Close()
-			return runProfileAdd(ctx, a, name, from, to, parallel, bandwidth, dryRun, cmd)
+			return runProfileAdd(ctx, a, name, from, to, direction, parallel, bandwidth, dryRun, cmd)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Profile name (required)")
 	cmd.Flags().StringVar(&from, "from", "", "Source remote:path (required)")
 	cmd.Flags().StringVar(&to, "to", "", "Destination remote:path (required)")
+	cmd.Flags().StringVar(&direction, "direction", "push", "Direction: push | bi | bi-resync")
 	cmd.Flags().IntVar(&parallel, "parallel", 4, "Concurrent transfers")
 	cmd.Flags().IntVar(&bandwidth, "bandwidth", 0, "Bandwidth limit in MB/s (0=unlimited)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Default to dry-run mode")
@@ -111,11 +115,18 @@ func newProfileAddCmd() *cobra.Command {
 }
 
 // runProfileAdd is the testable inner work of newProfileAddCmd.
-func runProfileAdd(ctx context.Context, a *app.App, name, from, to string, parallel, bandwidth int, dryRun bool, cmd *cobra.Command) error {
+func runProfileAdd(ctx context.Context, a *app.App, name, from, to, direction string, parallel, bandwidth int, dryRun bool, cmd *cobra.Command) error {
+	if direction == "" {
+		direction = store.ProfileDirectionPush
+	}
+	if !store.IsValidProfileDirection(direction) {
+		return fmt.Errorf("profile add: invalid --direction %q (allowed: push, bi, bi-resync)", direction)
+	}
 	p := &store.Profile{
 		Name:      name,
 		From:      from,
 		To:        to,
+		Direction: direction,
 		Parallel:  parallel,
 		Bandwidth: bandwidth,
 		DryRun:    dryRun,
@@ -123,7 +134,7 @@ func runProfileAdd(ctx context.Context, a *app.App, name, from, to string, paral
 	if err := a.Store.Profiles().Save(ctx, p); err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ added profile %q\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ added profile %q (direction=%s)\n", name, direction)
 	return nil
 }
 

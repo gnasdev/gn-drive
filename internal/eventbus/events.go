@@ -18,21 +18,39 @@ func (eventBase) eventMarker() {}
 
 // --- Sync events -----------------------------------------------------------
 
+// FileTransferEvent is one file row in SyncProgressEvent.Transfers (Wails FileTransferInfo).
+type FileTransferEvent struct {
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	Bytes    int64   `json:"bytes"`
+	Progress float64 `json:"progress"`
+	Status   string  `json:"status"` // transferring | completed | failed | checking | checked | pending
+	Speed    float64 `json:"speed,omitempty"`
+	Error    string  `json:"error,omitempty"`
+}
+
 // SyncProgressEvent is emitted periodically during a sync task.
+// Field set mirrors Wails SyncStatusDTO so the web status panel can match desktop.
 type SyncProgressEvent struct {
 	eventBase
-	TaskID          string  `json:"task_id"`
-	ProfileID       string  `json:"profile_id"`
-	Action          string  `json:"action"`
-	State           string  `json:"state"` // running, completed, failed, cancelled
-	Transferred     int64   `json:"transferred"`
-	Total           int64   `json:"total"`
-	BytesPerSec     float64 `json:"bytes_per_sec"`
-	ETA             int64   `json:"eta_secs"`
-	Errors          int     `json:"errors"`
-	CurrentFile     string  `json:"current_file"`
-	FilesTransferred int    `json:"files_transferred"`
-	TotalFiles      int     `json:"total_files"`
+	TaskID           string  `json:"task_id"`
+	ProfileID        string  `json:"profile_id"`
+	Action           string  `json:"action"`
+	State            string  `json:"state"` // running, completed, failed, cancelled
+	Transferred      int64   `json:"transferred"`
+	Total            int64   `json:"total"`
+	BytesPerSec      float64 `json:"bytes_per_sec"`
+	ETA              int64   `json:"eta_secs"`
+	Errors           int     `json:"errors"`
+	CurrentFile      string  `json:"current_file"`
+	FilesTransferred int     `json:"files_transferred"`
+	TotalFiles       int     `json:"total_files"`
+	Checks           int64   `json:"checks"`
+	TotalChecks      int64   `json:"total_checks"`
+	Deletes          int64   `json:"deletes"`
+	Renames          int64   `json:"renames"`
+	// Transfers is the per-file list for Syncing / Complete / Error / Pending tabs.
+	Transfers []FileTransferEvent `json:"transfers,omitempty"`
 	// ErrorMessage is set on failed sync events so the UI can surface the
 	// reason (omitted for running/completed events).
 	ErrorMessage string `json:"error_message,omitempty"`
@@ -92,6 +110,7 @@ type ScheduleTriggeredEvent struct {
 // --- Board events ----------------------------------------------------------
 
 // BoardExecutionEvent is emitted during board DAG execution.
+// Flow engine also emits this (board_id = flow id) for backward compatibility.
 type BoardExecutionEvent struct {
 	eventBase
 	BoardID   string `json:"board_id"`
@@ -100,6 +119,15 @@ type BoardExecutionEvent struct {
 	Status    string `json:"status"` // running, completed, failed
 	ProfileID string `json:"profile_id,omitempty"`
 	Action    string `json:"action,omitempty"`
+}
+
+// FlowExecutionEvent is emitted during sequential flow operation runs.
+type FlowExecutionEvent struct {
+	eventBase
+	FlowID string `json:"flow_id"`
+	OpID   string `json:"op_id,omitempty"`
+	Status string `json:"status"` // running, completed, failed, cancelled, cancelling
+	Error  string `json:"error,omitempty"`
 }
 
 // --- State events ----------------------------------------------------------

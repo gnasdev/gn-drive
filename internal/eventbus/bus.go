@@ -142,6 +142,9 @@ func (b *Bus) SubscribeAll(topics []string, handler func(topic string, ev Event)
 // Non-blocking: a full subscriber buffer drops its oldest event (see
 // subscriber.send). No-op once the bus is closed.
 func (b *Bus) Publish(topic string, event Event) {
+	if b == nil {
+		return
+	}
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if b.closed {
@@ -194,6 +197,7 @@ const (
 	TopicScheduleTriggered = "schedule:triggered"
 
 	TopicBoardExecution = "board:execution"
+	TopicFlowExecution  = "flow:execution"
 )
 
 // AllTopics returns every topic the bus is expected to emit.
@@ -210,5 +214,6 @@ func AllTopics() []string {
 		TopicStateChanged,
 		TopicScheduleTriggered,
 		TopicBoardExecution,
+		TopicFlowExecution,
 	}
 }

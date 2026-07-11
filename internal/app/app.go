@@ -16,6 +16,7 @@ import (
 	"github.com/gnasdev/gn-drive/internal/browser"
 	"github.com/gnasdev/gn-drive/internal/config"
 	"github.com/gnasdev/gn-drive/internal/eventbus"
+	"github.com/gnasdev/gn-drive/internal/flowengine"
 	"github.com/gnasdev/gn-drive/internal/logging"
 	"github.com/gnasdev/gn-drive/internal/rclone"
 	"github.com/gnasdev/gn-drive/internal/service"
@@ -34,6 +35,7 @@ type App struct {
 	Rclone      *rclone.Client
 	SyncEngine  *syncengine.Engine
 	BoardEngine *boardengine.Engine
+	FlowEngine  *flowengine.Engine
 	Browser     *browser.Opener
 	API         *api.Server
 	Listener    net.Listener    // set by Run()
@@ -142,6 +144,12 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		Bus:    bus,
 		Log:    log,
 	})
+	a.FlowEngine = flowengine.New(flowengine.Options{
+		Store: nil,
+		Sync:  a.SyncEngine,
+		Bus:   bus,
+		Log:   log,
+	})
 
 	// Open data plane now when config is usable (unlocked, not set up, or
 	// locked but still plaintext on disk). Encrypted+locked → defer until
@@ -158,8 +166,8 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		Auth:        authSvc,
 		Store:       a.Store,
 		Rclone:      a.Rclone,
-		SyncEngine:  a.SyncEngine,
-		BoardEngine: a.BoardEngine,
+		SyncEngine: a.SyncEngine,
+		FlowEngine: a.FlowEngine,
 		Bus:         bus,
 		WebUI:       webui.Handler(),
 		Service:     nil,
@@ -213,10 +221,14 @@ func (a *App) openDataPlane(ctx context.Context) error {
 	a.Rclone = rc
 	a.SyncEngine.AttachStore(st, rc)
 	a.BoardEngine.Attach(st, rc)
+	if a.FlowEngine != nil {
+		a.FlowEngine.Attach(st, a.SyncEngine)
+	}
 
 	if a.deps != nil {
 		a.deps.Store = st
 		a.deps.Rclone = rc
+		a.deps.FlowEngine = a.FlowEngine
 	}
 
 	a.Log.Info("data plane ready", "db", dbPath)
@@ -242,6 +254,9 @@ func (a *App) BeforeLock() error {
 	}
 	if a.BoardEngine != nil {
 		a.BoardEngine.Detach()
+	}
+	if a.FlowEngine != nil {
+		a.FlowEngine.Detach()
 	}
 
 	var errs []error

@@ -54,9 +54,8 @@ describe('full journey', () => {
     await waitForTestId(page, 'page-workspace')
     await waitForTestId(page, 'workspace-remotes')
     await waitForTestId(page, 'workspace-operations')
-    await waitForTestId(page, 'workspace-boards')
     const text = await page.$eval('[data-testid="page-workspace"]', (el) => el.textContent ?? '')
-    assert.match(text, /Operations|Remotes|Boards/i)
+    assert.match(text, /Operations|Remotes|Flows/i)
     await collectCoverage(page)
   })
 
@@ -140,61 +139,6 @@ describe('full journey', () => {
     }
     assert.ok(copied, `expected ${dstDir}/hello.txt after push sync`)
     await collectCoverage(page)
-  })
-
-  it('creates board with edge, executes DAG, deletes', async () => {
-    const name = `e2e-board-${Date.now()}`
-    const boardSrc = fs.mkdtempSync(path.join(os.tmpdir(), 'gn-drive-board-src-'))
-    const boardDst = fs.mkdtempSync(path.join(os.tmpdir(), 'gn-drive-board-dst-'))
-    fs.writeFileSync(path.join(boardSrc, 'board.txt'), 'from-board\n')
-
-    await waitForTestId(page, 'workspace-boards')
-    await clickTestId(page, 'boards-add')
-    await waitForTestId(page, 'boards-add-form')
-    await typeTestId(page, 'boards-name', name)
-    await typeTestId(page, 'boards-source', boardSrc)
-    await typeTestId(page, 'boards-target', boardDst)
-    await typeTestId(page, 'boards-action', 'copy')
-    await clickTestId(page, 'boards-submit')
-    await waitForText(page, name)
-
-    await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('[data-testid^="board-card-"]'))
-      const card = cards.find((c) => c.textContent?.includes(n))
-      const buttons = Array.from(card?.querySelectorAll('button') ?? []) as HTMLButtonElement[]
-      const run = buttons.find((b) => /Run|Chạy/i.test(b.textContent ?? ''))
-      run?.click()
-    }, name)
-
-    const deadline = Date.now() + 30_000
-    let ok = false
-    while (Date.now() < deadline) {
-      if (fs.existsSync(path.join(boardDst, 'board.txt'))) {
-        ok = true
-        break
-      }
-      await new Promise((r) => setTimeout(r, 400))
-    }
-    assert.ok(ok, `board execute should copy board.txt into ${boardDst}`)
-
-    await page.evaluate((n: string) => {
-      const cards = Array.from(document.querySelectorAll('[data-testid^="board-card-"]'))
-      const card = cards.find((c) => c.textContent?.includes(n))
-      const buttons = Array.from(card?.querySelectorAll('button') ?? []) as HTMLButtonElement[]
-      const del = buttons.find((b) => b.querySelector('svg') && !/Run|Chạy|Stop|Dừng/i.test(b.textContent ?? ''))
-      // last danger button
-      buttons[buttons.length - 1]?.click()
-      void del
-    }, name)
-    await confirmDialog(page, 'Delete')
-    await textAbsent(page, name)
-    await collectCoverage(page)
-    try {
-      fs.rmSync(boardSrc, { recursive: true, force: true })
-      fs.rmSync(boardDst, { recursive: true, force: true })
-    } catch {
-      // ignore
-    }
   })
 
   it('creates and deletes a flow', async () => {

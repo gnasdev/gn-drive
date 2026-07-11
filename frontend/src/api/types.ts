@@ -6,8 +6,8 @@ export interface Profile {
   name: string
   from: string
   to: string
-  /** Default sync action: pull | push | bi | bi-resync */
-  direction?: 'pull' | 'push' | 'bi' | 'bi-resync' | string
+  /** Default sync action: push | bi | bi-resync */
+  direction?: 'push' | 'bi' | 'bi-resync' | string
   included_paths?: string[] | null
   excluded_paths?: string[] | null
   bandwidth: number
@@ -60,40 +60,102 @@ export interface Remote {
   description?: string
 }
 
-export interface Board {
+/**
+ * Wails-aligned units:
+ * - Flow: container, ops run sequentially
+ * - Operation: one source→target sync step inside a flow
+ * Profile is only rclone option bag / legacy CRUD, not a workspace unit.
+ */
+export interface Operation {
   id: string
-  name: string
-  created_at: string
-  updated_at: string
-  nodes?: BoardNode[]
-  edges?: BoardEdge[]
-}
-
-export interface BoardNode {
-  id: string
-  remote_name: string
-  path: string
-  label: string
-  x: number
-  y: number
-}
-
-export interface BoardEdge {
-  id: string
-  source_id: string
-  target_id: string
+  flow_id?: string
+  source_remote: string
+  source_path: string
+  target_remote: string
+  target_path: string
   action: string
-  sync_config?: any
+  sync_config?: Record<string, unknown> | null
+  is_expanded?: boolean
+  sort_order?: number
+  /** Runtime only */
+  status?: string
+  last_error?: string
 }
 
-/** Named job with optional cron; matches store.Flow (no step operations yet). */
 export interface Flow {
   id: string
   name: string
+  is_collapsed?: boolean
+  schedule_enabled?: boolean
+  enabled?: boolean
   schedule_cron?: string
-  enabled: boolean
+  cron_expr?: string
+  sort_order?: number
+  operations?: Operation[]
   created_at?: string
   updated_at?: string
+  /** Runtime only */
+  status?: string
+  last_error?: string
+}
+
+/** Matches syncengine.TaskSnapshot (stats nested). */
+export interface SyncTaskStats {
+  bytes?: number
+  bytes_total?: number
+  files?: number
+  files_total?: number
+  transfers?: number
+  errors?: number
+  checks?: number
+  checks_total?: number
+  deletes?: number
+  renames?: number
+  speed_bps?: number
+  eta_secs?: number
+  current_file?: string
+  last_update_unix?: number
+}
+
+/** Wails FileTransferInfo — one row in the file tabs. */
+export interface FileTransferInfo {
+  name: string
+  size: number
+  bytes: number
+  progress: number
+  /** transferring | completed | failed | checking | checked | pending */
+  status: string
+  speed?: number
+  error?: string
+}
+
+/**
+ * Wails SyncStatus-shaped snapshot for the flow run status panel
+ * (desktop operation-logs-panel / sync-status).
+ */
+export interface FlowOpSyncStatus {
+  flow_id: string
+  op_id: string
+  task_id?: string
+  action: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'stopped'
+  progress: number // 0-100
+  speed_bps: number
+  eta_secs: number
+  files_transferred: number
+  total_files: number
+  bytes_transferred: number
+  total_bytes: number
+  current_file: string
+  errors: number
+  checks: number
+  total_checks: number
+  deletes: number
+  renames: number
+  /** Per-file list for Syncing / Complete / Failed / Pending tabs. */
+  transfers?: FileTransferInfo[]
+  error_message?: string
+  updated_at: number
 }
 
 export interface SyncTask {
@@ -101,19 +163,25 @@ export interface SyncTask {
   name: string
   action: string
   status: string
+  stats?: SyncTaskStats
   started_at?: string
   ended_at?: string
+  // convenience / legacy flat fields (optional)
   transferred?: number
   total?: number
   bytes_per_sec?: number
   errors?: number
   files_transferred?: number
   total_files?: number
+  error_message?: string
 }
 
 export interface AppStatus {
   setup: boolean
+  /** Process crypto unlocked AND (when setup) a valid web session cookie. */
   unlocked: boolean
+  /** Valid gn-drive-session cookie present (minted on unlock or /status resume). */
+  session?: boolean
   version: string
   lockout?: {
     failed_attempts: number

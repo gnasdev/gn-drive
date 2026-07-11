@@ -45,3 +45,29 @@ func TestBuildArgs_BiResyncEstablishesBaseline(t *testing.T) {
 		t.Errorf("ActionBiResync must pass --force, got %v", args)
 	}
 }
+
+// Push keeps Source → Dest; pull reverses to Dest → Source (fixed path slots).
+func TestBuildArgs_PushPullDirection(t *testing.T) {
+	c, _ := New(Options{BinaryPath: newFakeRclone(t), Logger: noopLogger()})
+
+	pushArgs, _, err := c.buildArgs(SyncConfig{Action: ActionPush, Source: "local:/a", Dest: "remote:b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushJoined := strings.Join(pushArgs, " ")
+	if !strings.Contains(pushJoined, "sync local:/a remote:b") {
+		t.Errorf("push must be Source→Dest, got %v", pushArgs)
+	}
+
+	pullArgs, _, err := c.buildArgs(SyncConfig{Action: ActionPull, Source: "local:/a", Dest: "remote:b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pullJoined := strings.Join(pullArgs, " ")
+	if !strings.Contains(pullJoined, "sync remote:b local:/a") {
+		t.Fatalf("pull must reverse to Dest→Source, got %v", pullArgs)
+	}
+	if strings.Contains(pullJoined, "sync local:/a remote:b") {
+		t.Fatalf("pull must not use Source→Dest order, got %v", pullArgs)
+	}
+}

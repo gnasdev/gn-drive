@@ -48,13 +48,9 @@ export default defineConfig({
           : 'http://127.0.0.1:53241',
         changeOrigin: false,
         ws: false,
-      },
-      '/events': {
-        target: process.env.GN_DRIVE_DEV_PORT
-          ? `http://127.0.0.1:${process.env.GN_DRIVE_DEV_PORT}`
-          : 'http://127.0.0.1:53241',
-        changeOrigin: false,
-        ws: false,
+        // SSE (/api/v1/events) must not be buffered by the dev proxy.
+        timeout: 0,
+        proxyTimeout: 0,
       },
     },
   },

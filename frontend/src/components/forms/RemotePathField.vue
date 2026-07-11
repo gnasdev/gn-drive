@@ -20,11 +20,13 @@ const props = withDefaults(
     testId?: string
     label?: string
     required?: boolean
+    disabled?: boolean
   }>(),
   {
     testId: 'path-field',
     label: '',
     required: false,
+    disabled: false,
   },
 )
 
@@ -197,6 +199,7 @@ const pathInputId = computed(() =>
             : 'bg-bg text-text-muted hover:bg-surface-hover hover:text-text',
         )"
         :aria-pressed="mode === 'local'"
+        :disabled="disabled"
         :data-testid="`${testId}-mode-local`"
         @click="setMode('local')"
       >
@@ -211,6 +214,7 @@ const pathInputId = computed(() =>
             : 'bg-bg text-text-muted hover:bg-surface-hover hover:text-text',
         )"
         :aria-pressed="mode === 'remote'"
+        :disabled="disabled"
         :data-testid="`${testId}-mode-remote`"
         @click="setMode('remote')"
       >
@@ -224,6 +228,7 @@ const pathInputId = computed(() =>
         v-model="remoteName"
         :data-testid="remoteSelectId"
         class="field-input max-w-[200px] min-w-[140px]"
+        :disabled="disabled"
         @change="emitValue"
       >
         <option value="" disabled>{{ t('common.selectRemote') }}</option>
@@ -236,6 +241,7 @@ const pathInputId = computed(() =>
         :data-testid="pathInputId"
         :placeholder="mode === 'local' ? t('pathField.absolutePlaceholder') : t('pathField.folderPlaceholder')"
         :required="required"
+        :disabled="disabled"
         class="field-input min-w-[160px] flex-1"
         @change="emitValue"
         @input="emitValue"
@@ -243,7 +249,7 @@ const pathInputId = computed(() =>
       <button
         type="button"
         class="btn-secondary whitespace-nowrap !px-2.5 !py-1.5 !text-xs"
-        :disabled="!canBrowse"
+        :disabled="disabled || !canBrowse"
         :data-testid="`${testId}-browse`"
         :title="t('common.browse')"
         @click="openBrowse"

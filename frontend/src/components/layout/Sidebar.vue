@@ -7,7 +7,6 @@ import {
   PhKey,
   PhCloud,
   PhSwap,
-  PhSquaresFour,
   PhStack,
   PhGearSix,
 } from '@phosphor-icons/vue'
@@ -27,7 +26,6 @@ const items: NavItem[] = [
   { name: 'profiles', labelKey: 'nav.profiles', icon: PhKey, group: 'data' },
   { name: 'remotes', labelKey: 'nav.remotes', icon: PhCloud, group: 'data' },
   { name: 'operations', labelKey: 'nav.operations', icon: PhSwap, group: 'work' },
-  { name: 'boards', labelKey: 'nav.boards', icon: PhSquaresFour, group: 'work' },
   { name: 'flows', labelKey: 'nav.flows', icon: PhStack, group: 'work' },
   { name: 'settings', labelKey: 'nav.settings', icon: PhGearSix, group: 'system' },
 ]

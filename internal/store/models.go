@@ -5,7 +5,43 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 )
+
+// Profile directions allowed in the product surface (UI + API + CLI).
+// One-way push, bidirectional, and bidirectional resync only — not pull.
+const (
+	ProfileDirectionPush     = "push"
+	ProfileDirectionBi       = "bi"
+	ProfileDirectionBiResync = "bi-resync"
+)
+
+// ValidProfileDirections is the closed set accepted for Profile.Direction.
+var ValidProfileDirections = []string{
+	ProfileDirectionPush,
+	ProfileDirectionBi,
+	ProfileDirectionBiResync,
+}
+
+// IsValidProfileDirection reports whether d is push|bi|bi-resync.
+func IsValidProfileDirection(d string) bool {
+	switch strings.TrimSpace(d) {
+	case ProfileDirectionPush, ProfileDirectionBi, ProfileDirectionBiResync:
+		return true
+	default:
+		return false
+	}
+}
+
+// NormalizeProfileDirection returns a valid profile direction.
+// Empty → push; unknown/legacy values (e.g. pull) → push.
+func NormalizeProfileDirection(d string) string {
+	d = strings.TrimSpace(d)
+	if IsValidProfileDirection(d) {
+		return d
+	}
+	return ProfileDirectionPush
+}
 
 // Profile represents a sync profile with all rclone flags.
 // Mirrors models.Profile exactly; JSON keys match the Wails format.
@@ -13,6 +49,7 @@ type Profile struct {
 	Name          string   `json:"name"`
 	From          string   `json:"from"`
 	To            string   `json:"to"`
+	// Direction: push | bi | bi-resync (see ValidProfileDirections).
 	Direction     string   `json:"direction,omitempty"`
 	IncludedPaths []string `json:"included_paths"`
 	ExcludedPaths []string `json:"excluded_paths"`
@@ -156,16 +193,143 @@ type BoardEdge struct {
 	SyncConfig json.RawMessage `json:"sync_config"`
 }
 
-// Flow is a named job with optional cron schedule.
-// Maps to table flows: schedule_enabled → Enabled, cron_expr → ScheduleCron.
-// Step operations are not exposed until flow execution is implemented end-to-end.
+// Flow operation actions (product surface): push | bi | bi-resync.
+// Pull is not offered on flow operations (profiles/CLI one-shot may still use pull).
+const (
+	FlowActionPush     = "push"
+	FlowActionBi       = "bi"
+	FlowActionBiResync = "bi-resync"
+)
+
+// IsValidFlowAction reports whether a is push|bi|bi-resync.
+func IsValidFlowAction(a string) bool {
+	switch strings.TrimSpace(a) {
+	case FlowActionPush, FlowActionBi, FlowActionBiResync:
+		return true
+	default:
+		return false
+	}
+}
+
+// NormalizeFlowAction returns a valid flow action; unknown/legacy (e.g. pull) → push.
+func NormalizeFlowAction(a string) string {
+	a = strings.TrimSpace(a)
+	if IsValidFlowAction(a) {
+		return a
+	}
+	return FlowActionPush
+}
+
+// Operation is a single sync step inside a Flow (Wails models.Operation).
+// Paths are fixed slots: Source and Target never swap in storage.
+// Action semantics:
+//   - push: Source → Target
+//   - bi / bi-resync: bidirectional between Source and Target
+// Action is stored both in the action column and inside sync_config.action.
+type Operation struct {
+	ID           string          `json:"id"`
+	FlowID       string          `json:"flow_id,omitempty"`
+	SourceRemote string          `json:"source_remote"`
+	SourcePath   string          `json:"source_path"`
+	TargetRemote string          `json:"target_remote"`
+	TargetPath   string          `json:"target_path"`
+	Action       string          `json:"action"` // push|bi|bi-resync
+	SyncConfig   json.RawMessage `json:"sync_config,omitempty"`
+	IsExpanded   bool            `json:"is_expanded"`
+	SortOrder    int             `json:"sort_order"`
+}
+
+// ResolveAction returns the effective flow action (column or sync_config.action),
+// always normalized to push|bi|bi-resync.
+func (op *Operation) ResolveAction() string {
+	if op == nil {
+		return FlowActionPush
+	}
+	if a := strings.TrimSpace(op.Action); a != "" {
+		return NormalizeFlowAction(a)
+	}
+	if a := actionFromSyncConfig(op.SyncConfig); a != "" {
+		return NormalizeFlowAction(a)
+	}
+	return FlowActionPush
+}
+
+// NormalizeAction keeps the action column and sync_config.action aligned (Wails SaveFlows).
+// Invalid/legacy values (e.g. pull) are coerced to push.
+func (op *Operation) NormalizeAction() {
+	if op == nil {
+		return
+	}
+	a := op.ResolveAction()
+	op.Action = a
+	op.SyncConfig = mergeSyncConfigAction(op.SyncConfig, a)
+}
+
+func actionFromSyncConfig(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return ""
+	}
+	if v, ok := m["action"].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+func mergeSyncConfigAction(raw json.RawMessage, action string) json.RawMessage {
+	m := map[string]any{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &m)
+	}
+	if m == nil {
+		m = map[string]any{}
+	}
+	m["action"] = action
+	b, err := json.Marshal(m)
+	if err != nil {
+		return raw
+	}
+	return json.RawMessage(b)
+}
+
+// Flow is a named container of sequential Operations (Wails models.Flow).
+// Maps: schedule_enabled → Enabled / ScheduleEnabled, cron_expr → ScheduleCron / CronExpr.
 type Flow struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	ScheduleCron string `json:"schedule_cron,omitempty"`
-	Enabled      bool   `json:"enabled"`
-	CreatedAt    string `json:"created_at,omitempty"`
-	UpdatedAt    string `json:"updated_at,omitempty"`
+	ID              string      `json:"id"`
+	Name            string      `json:"name"`
+	IsCollapsed     bool        `json:"is_collapsed"`
+	ScheduleEnabled bool        `json:"schedule_enabled"`
+	// Enabled is an alias of ScheduleEnabled for older FE clients.
+	Enabled      bool        `json:"enabled"`
+	ScheduleCron string      `json:"schedule_cron,omitempty"`
+	CronExpr     string      `json:"cron_expr,omitempty"`
+	SortOrder    int         `json:"sort_order"`
+	Operations   []Operation `json:"operations"`
+	CreatedAt    string      `json:"created_at,omitempty"`
+	UpdatedAt    string      `json:"updated_at,omitempty"`
+}
+
+// ComposePath builds an rclone path from remote name + path.
+// Empty remote → treat path as local absolute (or relative as-is).
+func ComposePath(remote, path string) string {
+	path = strings.TrimSpace(path)
+	remote = strings.TrimSpace(remote)
+	if remote == "" || remote == "local" {
+		if path == "" {
+			return "/"
+		}
+		return path
+	}
+	if path == "" || path == "/" {
+		return remote + ":"
+	}
+	if strings.HasPrefix(path, "/") {
+		return remote + ":" + path
+	}
+	return remote + ":" + path
 }
 
 // DeltaState tracks change-notification state per remote endpoint.

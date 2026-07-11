@@ -245,6 +245,59 @@ func TestProfileRepo_EmptyNameRejected(t *testing.T) {
 	}
 }
 
+func TestProfileRepo_DirectionValidation(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// pull is not a profile direction.
+	if err := s.Profiles().Save(ctx, &Profile{
+		Name: "bad-dir", From: "a", To: "b", Direction: "pull",
+	}); err == nil {
+		t.Fatal("expected error for direction=pull")
+	}
+	// Empty direction normalizes to push.
+	if err := s.Profiles().Save(ctx, &Profile{
+		Name: "empty-dir", From: "a", To: "b", Direction: "",
+	}); err != nil {
+		t.Fatalf("empty direction: %v", err)
+	}
+	got, err := s.Profiles().Get(ctx, "empty-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Direction != ProfileDirectionPush {
+		t.Errorf("empty Direction = %q, want push", got.Direction)
+	}
+	// bi and bi-resync accepted.
+	for _, d := range []string{ProfileDirectionBi, ProfileDirectionBiResync} {
+		name := "dir-" + d
+		if err := s.Profiles().Save(ctx, &Profile{
+			Name: name, From: "a", To: "b", Direction: d,
+		}); err != nil {
+			t.Fatalf("direction %q: %v", d, err)
+		}
+		p, err := s.Profiles().Get(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Direction != d {
+			t.Errorf("Direction = %q, want %q", p.Direction, d)
+		}
+	}
+}
+
+func TestNormalizeProfileDirection(t *testing.T) {
+	if got := NormalizeProfileDirection(""); got != ProfileDirectionPush {
+		t.Errorf("empty = %q", got)
+	}
+	if got := NormalizeProfileDirection("pull"); got != ProfileDirectionPush {
+		t.Errorf("pull = %q", got)
+	}
+	if got := NormalizeProfileDirection("bi"); got != ProfileDirectionBi {
+		t.Errorf("bi = %q", got)
+	}
+}
+
 func TestProfileRepo_NotFound(t *testing.T) {
 	s := newTestStore(t)
 	if _, err := s.Profiles().Get(context.Background(), "missing"); !errors.Is(err, ErrNotFound) {
@@ -568,7 +621,15 @@ func TestFlowRepo_SaveGetListDelete(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	f := &Flow{ID: "f1", Name: "Flow 1", ScheduleCron: "0 * * * *", Enabled: true}
+	f := &Flow{
+		ID: "f1", Name: "Flow 1", ScheduleCron: "0 * * * *", Enabled: true,
+		Operations: []Operation{
+			{
+				ID: "op1", SourceRemote: "gdrive", SourcePath: "/docs",
+				TargetRemote: "", TargetPath: "/tmp/out", Action: "push",
+			},
+		},
+	}
 	if err := s.Flows().Save(ctx, f); err != nil {
 		t.Fatal(err)
 	}
@@ -583,10 +644,19 @@ func TestFlowRepo_SaveGetListDelete(t *testing.T) {
 	if !got.Enabled {
 		t.Error("Enabled not persisted")
 	}
+	if len(got.Operations) != 1 {
+		t.Fatalf("Operations = %d, want 1", len(got.Operations))
+	}
+	if got.Operations[0].SourceRemote != "gdrive" {
+		t.Errorf("SourceRemote = %q", got.Operations[0].SourceRemote)
+	}
 
 	list, _ := s.Flows().List(ctx)
 	if len(list) == 0 {
 		t.Error("List returned 0")
+	}
+	if len(list[0].Operations) != 1 {
+		t.Errorf("List ops = %d", len(list[0].Operations))
 	}
 
 	if err := s.Flows().Delete(ctx, "f1"); err != nil {
@@ -594,6 +664,94 @@ func TestFlowRepo_SaveGetListDelete(t *testing.T) {
 	}
 	if err := s.Flows().Delete(ctx, "missing"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("delete missing err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestOperation_ResolveAndNormalizeAction(t *testing.T) {
+	// Legacy pull is coerced to push (flow ops only allow push|bi|bi-resync).
+	op := &Operation{Action: "pull", SyncConfig: json.RawMessage(`{"action":"push"}`)}
+	if got := op.ResolveAction(); got != "push" {
+		t.Fatalf("ResolveAction(pull) = %q, want push", got)
+	}
+	// Empty column falls back to sync_config (Wails load path).
+	op2 := &Operation{SyncConfig: json.RawMessage(`{"action":"bi","dry_run":true}`)}
+	if got := op2.ResolveAction(); got != "bi" {
+		t.Fatalf("ResolveAction from sync_config = %q, want bi", got)
+	}
+	op2.NormalizeAction()
+	if op2.Action != "bi" {
+		t.Fatalf("NormalizeAction Action = %q, want bi", op2.Action)
+	}
+	if actionFromSyncConfig(op2.SyncConfig) != "bi" {
+		t.Fatalf("sync_config.action not aligned: %s", op2.SyncConfig)
+	}
+	// Default push.
+	op3 := &Operation{}
+	if got := op3.ResolveAction(); got != "push" {
+		t.Fatalf("default ResolveAction = %q", got)
+	}
+	// bi-resync accepted.
+	op4 := &Operation{Action: "bi-resync"}
+	if got := op4.ResolveAction(); got != "bi-resync" {
+		t.Fatalf("ResolveAction = %q, want bi-resync", got)
+	}
+}
+
+func TestFlowRepo_Save_NormalizesLegacyPullAction(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	f := &Flow{
+		ID: "f-pull", Name: "Legacy pull flow",
+		Operations: []Operation{{
+			ID: "op1", SourceRemote: "local", SourcePath: "/a",
+			TargetRemote: "gdrive", TargetPath: "/b",
+			// Legacy pull in sync_config only — Save must promote + coerce to push.
+			SyncConfig: json.RawMessage(`{"action":"pull","dry_run":true}`),
+		}},
+	}
+	if err := s.Flows().Save(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Flows().Get(ctx, "f-pull")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Operations) != 1 {
+		t.Fatalf("ops = %d", len(got.Operations))
+	}
+	op := got.Operations[0]
+	if op.Action != "push" {
+		t.Errorf("Action column = %q, want push (legacy pull coerced)", op.Action)
+	}
+	if op.ResolveAction() != "push" {
+		t.Errorf("ResolveAction = %q", op.ResolveAction())
+	}
+	if actionFromSyncConfig(op.SyncConfig) != "push" {
+		t.Errorf("sync_config.action = %s", op.SyncConfig)
+	}
+	// Source/Target must not be swapped in storage.
+	if op.SourcePath != "/a" || op.TargetPath != "/b" {
+		t.Errorf("paths swapped in storage: src=%q tgt=%q", op.SourcePath, op.TargetPath)
+	}
+}
+
+// Empty cron must persist as "" (NOT NULL), not SQL NULL — add-flow UI path.
+func TestFlowRepo_Save_EmptyCronExpr(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	f := &Flow{ID: "f-empty-cron", Name: "New flow"}
+	if err := s.Flows().Save(ctx, f); err != nil {
+		t.Fatalf("Save with empty cron: %v", err)
+	}
+	got, err := s.Flows().Get(ctx, "f-empty-cron")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CronExpr != "" {
+		t.Errorf("CronExpr = %q, want empty string", got.CronExpr)
+	}
+	if got.ScheduleCron != "" {
+		t.Errorf("ScheduleCron = %q, want empty string", got.ScheduleCron)
 	}
 }
 

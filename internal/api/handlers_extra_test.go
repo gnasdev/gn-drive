@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,7 +61,6 @@ func newTestServerWithRclone(t *testing.T, rcloneBin string) (*Server, func()) {
 		WebUI:      nil,
 		Rclone:     rc,
 		SyncEngine: eng,
-		// BoardEngine optional for remote-focused tests.
 	}
 	srv := New(deps, log)
 	cleanup := func() {
@@ -683,7 +683,7 @@ func TestMakeSSEHandler_MarshalError_Extra(t *testing.T) {
 
 	orig := makeSSEHandlerFn
 	t.Cleanup(func() { makeSSEHandlerFn = orig })
-	makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger) func(eventbus.Event) {
+	makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger, _ *sync.Mutex) func(eventbus.Event) {
 		return func(ev eventbus.Event) {
 			log.Warn("sse: marshal event", "topic", topic, "err", "simulated marshal error")
 		}

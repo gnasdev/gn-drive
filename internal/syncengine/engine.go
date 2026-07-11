@@ -5,18 +5,20 @@
 package syncengine
 
 import (
-    "context"
-    "errors"
-    "log/slog"
-    "sync"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/google/uuid"
-    "github.com/robfig/cron/v3"
+	"github.com/google/uuid"
+	"github.com/robfig/cron/v3"
 
-    "github.com/gnasdev/gn-drive/internal/eventbus"
-    "github.com/gnasdev/gn-drive/internal/rclone"
-    "github.com/gnasdev/gn-drive/internal/store"
+	"github.com/gnasdev/gn-drive/internal/eventbus"
+	"github.com/gnasdev/gn-drive/internal/rclone"
+	"github.com/gnasdev/gn-drive/internal/store"
 )
 
 // ErrNotRunning is returned when the engine is stopped.
@@ -26,6 +28,20 @@ var ErrNotRunning = errors.New("syncengine: engine is not running")
 // already in flight. Concurrent syncs on one profile could let two rclone
 // processes mutate the same source/dest simultaneously.
 var ErrProfileBusy = errors.New("syncengine: a sync for this profile is already running")
+
+// ErrTaskFailed is returned by WaitTask when the sync finished unsuccessfully.
+var ErrTaskFailed = errors.New("syncengine: task failed")
+
+// ErrTaskCancelled is returned by WaitTask when the task was cancelled.
+var ErrTaskCancelled = errors.New("syncengine: task cancelled")
+
+// taskOutcome is stored when a task leaves the active map so WaitTask can
+// distinguish success vs failure (previously WaitTask always returned nil
+// once the task disappeared, so flowengine treated failed ops as completed).
+type taskOutcome struct {
+	status string // completed | failed | cancelled
+	errMsg string
+}
 
 // Engine manages scheduled sync tasks and active task lifecycle.
 type Engine struct {
@@ -37,13 +53,15 @@ type Engine struct {
 	cronMu   sync.Mutex
 	schedule map[string]cron.EntryID // scheduleID → cron entry for lookup & removal
 	active   sync.Map                // taskID -> *Task
+	// outcomes holds terminal status for WaitTask after active.Delete.
+	outcomes sync.Map // taskID -> taskOutcome
 	// running guards against two concurrent syncs for the same profile, which
 	// would let two rclone processes mutate the same paths at once (especially
 	// dangerous for bisync). Keyed by profile name.
 	runningMu sync.Mutex
 	running   map[string]struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // SyncClient is the subset of rclone.Client used by the engine.
@@ -145,30 +163,59 @@ func (e *Engine) Stop(ctx context.Context) error {
     return nil
 }
 
-// StartSync starts a sync task and returns its taskID.
+// StartSync starts a sync task for a named profile and returns its taskID.
 func (e *Engine) StartSync(ctx context.Context, action, profileName string) (string, error) {
     if e.ctx == nil {
         return "", ErrNotRunning
+    }
+    if e.store == nil {
+        return "", errors.New("syncengine: store not ready")
     }
 
     p, err := e.store.Profiles().Get(ctx, profileName)
     if err != nil {
         return "", err
     }
+    return e.startWithProfile(ctx, action, profileName, p)
+}
 
-    // Reject a concurrent run for the same profile (see ErrProfileBusy).
-    // The entry is cleared by runSync's deferred cleanup when the sync ends.
+// StartPathSync runs an ad-hoc sync (flow operation) without a stored profile.
+// busyKey is used for concurrency locking (e.g. flowID:opID).
+// opts may be nil; when set, rclone flags (parallel, bandwidth, filters, …)
+// are taken from the profile fields (Name/From/To are overwritten).
+func (e *Engine) StartPathSync(ctx context.Context, action, busyKey, from, to string, opts *store.Profile) (string, error) {
+	if e.ctx == nil {
+		return "", ErrNotRunning
+	}
+	if from == "" || to == "" {
+		return "", errors.New("syncengine: from and to are required")
+	}
+	var p store.Profile
+	if opts != nil {
+		p = *opts
+	}
+	p.Name = busyKey
+	p.From = from
+	p.To = to
+	if p.Parallel <= 0 {
+		p.Parallel = 4
+	}
+	return e.startWithProfile(ctx, action, busyKey, &p)
+}
+
+func (e *Engine) startWithProfile(ctx context.Context, action, busyKey string, p *store.Profile) (string, error) {
+    // Reject a concurrent run for the same key (see ErrProfileBusy).
     e.runningMu.Lock()
-    if _, busy := e.running[profileName]; busy {
+    if _, busy := e.running[busyKey]; busy {
         e.runningMu.Unlock()
         return "", ErrProfileBusy
     }
-    e.running[profileName] = struct{}{}
+    e.running[busyKey] = struct{}{}
     e.runningMu.Unlock()
 
     task := &Task{
         ID:     uuid.New().String(),
-        Name:   profileName,
+        Name:   busyKey,
         Action: action,
         Status: "running",
     }
@@ -179,11 +226,42 @@ func (e *Engine) StartSync(ctx context.Context, action, profileName string) (str
 
     e.bus.Publish(eventbus.TopicSyncStarted, eventbus.SyncStartedEvent{
         TaskID:    task.ID,
-        ProfileID: profileName,
+        ProfileID: busyKey,
         Action:    action,
     })
 
     return task.ID, nil
+}
+
+// WaitTask blocks until the given task finishes and returns nil only on success.
+// Failed syncs return ErrTaskFailed; cancellations return ErrTaskCancelled
+// (or ctx.Err() if the waiter's context was cancelled first).
+func (e *Engine) WaitTask(ctx context.Context, taskID string) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if v, ok := e.outcomes.Load(taskID); ok {
+			o := v.(taskOutcome)
+			// One-shot: free memory after the waiter consumes the outcome.
+			e.outcomes.Delete(taskID)
+			switch o.status {
+			case "completed":
+				return nil
+			case "cancelled":
+				return ErrTaskCancelled
+			default:
+				if o.errMsg != "" {
+					return errors.Join(ErrTaskFailed, errors.New(o.errMsg))
+				}
+				return ErrTaskFailed
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 // StopSync cancels an active sync task.
@@ -299,19 +377,29 @@ func (e *Engine) loadSchedules() {
 }
 
 func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
-    defer func() {
-        e.active.Delete(t.ID)
-        e.runningMu.Lock()
-        delete(e.running, p.Name)
-        e.runningMu.Unlock()
-    }()
+	defer func() {
+		// Publish outcome BEFORE deleting from active so WaitTask never
+		// observes "gone" without a terminal result.
+		t.Mu.Lock()
+		st := t.Status
+		errMsg := t.Error
+		t.Mu.Unlock()
+		if st == "" || st == "running" {
+			st = "failed"
+		}
+		e.outcomes.Store(t.ID, taskOutcome{status: st, errMsg: errMsg})
+		e.active.Delete(t.ID)
+		e.runningMu.Lock()
+		delete(e.running, p.Name)
+		e.runningMu.Unlock()
+	}()
 
-    startedAt := time.Now()
-    t.Mu.Lock()
-    t.StartedAt = startedAt
-    t.Mu.Unlock()
+	startedAt := time.Now()
+	t.Mu.Lock()
+	t.StartedAt = startedAt
+	t.Mu.Unlock()
 
-    e.log.Info("sync: started", "task", t.ID, "profile", p.Name, "action", action)
+	e.log.Info("sync: started", "task", t.ID, "profile", p.Name, "action", action)
 
     // Record the run as in-progress so the History view shows it immediately.
     // History().Save upserts by task ID, so the terminal Save below updates
@@ -325,32 +413,16 @@ func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
     })
 
     res, err := e.rclone.Sync(t.ctx, rclone.SyncConfig{
-        Action: rclone.Action(action),
-        Source: p.From,
-        Dest:   p.To,
-        Profile: &rclone.ProfileFlags{
-            Transfers: p.Parallel,
-            DryRun:    p.DryRun,
-            MaxAge:    p.MaxAge,
-            MaxSize:   p.MaxSize,
-        },
+        Action:  rclone.Action(action),
+        Source:  p.From,
+        Dest:    p.To,
+        Profile: profileFlagsFromStore(p),
     }, func(s rclone.Stats) {
         t.Mu.Lock()
         t.Stats = s
         t.Mu.Unlock()
-        e.bus.Publish(eventbus.TopicSyncProgress, eventbus.SyncProgressEvent{
-            TaskID:          t.ID,
-            ProfileID:       p.Name,
-            Action:          action,
-            State:           "running",
-            Transferred:     s.Bytes,
-            Total:           s.BytesTotal,
-            FilesTransferred: int(s.Files),
-            TotalFiles:      int(s.FilesTotal),
-            Errors:          int(s.Errors),
-            CurrentFile:     s.CurrentFile,
-        })
-    })
+		e.publishSyncProgress(t.ID, p.Name, action, "running", s, "")
+	})
 
     endedAt := time.Now()
 
@@ -361,34 +433,52 @@ func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
         finalStats = res.Stats
     }
 
-    t.Mu.Lock()
-    t.EndedAt = endedAt
-    var state string
-    if err != nil {
-        state = "failed"
-        t.Status = state
-        e.bus.Publish(eventbus.TopicSyncFailed, eventbus.SyncProgressEvent{
-            TaskID:       t.ID,
-            ProfileID:    p.Name,
-            Action:       action,
-            State:        "failed",
-            ErrorMessage: truncateErrMsg(err.Error(), 1000),
-        })
-        e.log.Error("sync: failed", "task", t.ID, "profile", p.Name, "err", err)
-    } else {
-        state = "completed"
-        t.Status = state
-        e.bus.Publish(eventbus.TopicSyncCompleted, eventbus.SyncCompletedEvent{
-            TaskID:    t.ID,
-            ProfileID: p.Name,
-            Action:    action,
-            Duration:  res.EndedAt - res.StartedAt,
-            Bytes:     res.Stats.Bytes,
-            Errors:    int(res.Stats.Errors),
-        })
-        e.log.Info("sync: completed", "task", t.ID, "profile", p.Name, "bytes", res.Stats.Bytes, "errors", res.Stats.Errors)
-    }
-    t.Mu.Unlock()
+	t.Mu.Lock()
+	t.EndedAt = endedAt
+	var state string
+	if err != nil {
+		// Prefer cancelled when the task context (or cancel flag) says so.
+		if t.ctx != nil && t.ctx.Err() != nil {
+			state = "cancelled"
+		} else if t.Status == "cancelled" {
+			state = "cancelled"
+		} else {
+			state = "failed"
+		}
+		t.Status = state
+		// User-facing message only — never dump rclone JSON stderr on cancel.
+		if state == "cancelled" {
+			t.Error = ""
+		} else {
+			t.Error = truncateErrMsg(sanitizeRcloneErr(err.Error()), 240)
+		}
+		// Final progress carries FileTransfers so the Pending/Complete/Failed
+		// tabs still render after the run ends (completed event has no list).
+		e.publishSyncProgress(t.ID, p.Name, action, state, finalStats, t.Error)
+		e.bus.Publish(eventbus.TopicSyncFailed, eventbus.SyncProgressEvent{
+			TaskID:       t.ID,
+			ProfileID:    p.Name,
+			Action:       action,
+			State:        state,
+			ErrorMessage: t.Error,
+			Transfers:    fileTransfersFromStats(finalStats),
+		})
+		e.log.Error("sync: "+state, "task", t.ID, "profile", p.Name, "err", err)
+	} else {
+		state = "completed"
+		t.Status = state
+		e.publishSyncProgress(t.ID, p.Name, action, state, finalStats, "")
+		e.bus.Publish(eventbus.TopicSyncCompleted, eventbus.SyncCompletedEvent{
+			TaskID:    t.ID,
+			ProfileID: p.Name,
+			Action:    action,
+			Duration:  res.EndedAt - res.StartedAt,
+			Bytes:     res.Stats.Bytes,
+			Errors:    int(res.Stats.Errors),
+		})
+		e.log.Info("sync: completed", "task", t.ID, "profile", p.Name, "bytes", res.Stats.Bytes, "errors", res.Stats.Errors)
+	}
+	t.Mu.Unlock()
 
     // Persist the terminal outcome to history (upsert over the running row).
     entry := &store.HistoryEntry{
@@ -409,6 +499,113 @@ func (e *Engine) runSync(t *Task, p *store.Profile, action string) {
     e.saveHistory(entry)
 }
 
+// profileFlagsFromStore maps store.Profile (and flow SyncConfig-filled profiles)
+// onto rclone.ProfileFlags for the CLI shell-out.
+func profileFlagsFromStore(p *store.Profile) *rclone.ProfileFlags {
+	if p == nil {
+		return nil
+	}
+	f := &rclone.ProfileFlags{
+		Transfers:           p.Parallel,
+		DryRun:              p.DryRun,
+		MaxAge:              p.MaxAge,
+		MinAge:              p.MinAge,
+		MaxSize:             p.MaxSize,
+		MinSize:             p.MinSize,
+		ExcludeIfPresent:    p.ExcludeIfPresent,
+		Includes:            append([]string(nil), p.IncludedPaths...),
+		Excludes:            append([]string(nil), p.ExcludedPaths...),
+		BufferSize:          p.BufferSize,
+		MaxDuration:         p.MaxDuration,
+		RetriesSleep:        p.RetriesSleep,
+		ConnTimeout:         p.ConnTimeout,
+		IoTimeout:           p.IoTimeout,
+		OrderBy:             p.OrderBy,
+		CheckFirst:          p.CheckFirst,
+		Immutable:           p.Immutable,
+		MaxTransfer:         p.MaxTransfer,
+		MaxDeleteSize:       p.MaxDeleteSize,
+		Suffix:              p.Suffix,
+		SuffixKeepExtension: p.SuffixKeepExtension,
+		BackupDir:           p.BackupPath,
+		SizeOnly:            p.SizeOnly,
+		UpdateMode:          p.UpdateMode,
+		IgnoreExisting:      p.IgnoreExisting,
+		DeleteExcluded:      p.DeleteExcluded,
+		DeleteTiming:        p.DeleteTiming,
+		ConflictResolve:     p.ConflictResolution,
+		ConflictLoser:       p.ConflictLoser,
+		ConflictSuffix:      p.ConflictSuffix,
+		Resilient:           p.Resilient,
+		MaxLock:             p.MaxLock,
+		CheckAccess:         p.CheckAccess,
+	}
+	if p.Bandwidth > 0 {
+		f.Bandwidth = fmt.Sprintf("%dM", p.Bandwidth)
+	}
+	if p.TpsLimit != nil && *p.TpsLimit > 0 {
+		f.TpsLimit = *p.TpsLimit
+	}
+	if p.MultiThreadStreams != nil && *p.MultiThreadStreams > 0 {
+		f.MultiThreadStreams = *p.MultiThreadStreams
+	}
+	if p.Retries != nil && *p.Retries > 0 {
+		f.Retries = *p.Retries
+	}
+	if p.LowLevelRetries != nil && *p.LowLevelRetries > 0 {
+		f.LowLevelRetries = *p.LowLevelRetries
+	}
+	if p.MaxDelete != nil && *p.MaxDelete > 0 {
+		f.MaxDelete = *p.MaxDelete
+	}
+	if p.MaxDepth != nil && *p.MaxDepth > 0 {
+		f.MaxDepth = *p.MaxDepth
+	}
+	return f
+}
+
+func fileTransfersFromStats(s rclone.Stats) []eventbus.FileTransferEvent {
+	transfers := make([]eventbus.FileTransferEvent, 0, len(s.FileTransfers))
+	for _, ft := range s.FileTransfers {
+		transfers = append(transfers, eventbus.FileTransferEvent{
+			Name:     ft.Name,
+			Size:     ft.Size,
+			Bytes:    ft.Bytes,
+			Progress: ft.Progress,
+			Status:   ft.Status,
+			Speed:    ft.Speed,
+			Error:    ft.Error,
+		})
+	}
+	return transfers
+}
+
+func (e *Engine) publishSyncProgress(taskID, profileID, action, state string, s rclone.Stats, errMsg string) {
+	if e.bus == nil {
+		return
+	}
+	e.bus.Publish(eventbus.TopicSyncProgress, eventbus.SyncProgressEvent{
+		TaskID:           taskID,
+		ProfileID:        profileID,
+		Action:           action,
+		State:            state,
+		Transferred:      s.Bytes,
+		Total:            s.BytesTotal,
+		BytesPerSec:      s.Speed,
+		ETA:              s.ETA,
+		FilesTransferred: int(s.Files),
+		TotalFiles:       int(s.FilesTotal),
+		Errors:           int(s.Errors),
+		CurrentFile:      s.CurrentFile,
+		Checks:           s.Checks,
+		TotalChecks:      s.ChecksTotal,
+		Deletes:          s.Deletes,
+		Renames:          s.Renames,
+		Transfers:        fileTransfersFromStats(s),
+		ErrorMessage:     errMsg,
+	})
+}
+
 // saveHistory persists a sync history entry. It tolerates a nil store (some
 // tests construct the engine without one) and logs—rather than fails—on
 // error, so a sync outcome is not lost on a transient write hiccup.
@@ -423,8 +620,28 @@ func (e *Engine) saveHistory(entry *store.HistoryEntry) {
 
 // truncateErrMsg bounds the length of an error string stored in history.
 func truncateErrMsg(s string, n int) string {
-    if len(s) <= n {
-        return s
-    }
-    return s[:n]
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
+}
+
+// sanitizeRcloneErr strips rclone JSON stderr dumps and "signal: killed" noise
+// so the UI never shows multi-kilobyte log blobs.
+func sanitizeRcloneErr(s string) string {
+	lower := strings.ToLower(s)
+	if strings.Contains(lower, "signal: killed") ||
+		strings.Contains(lower, "signal: interrupt") ||
+		strings.Contains(lower, "context canceled") ||
+		strings.Contains(lower, "context cancelled") {
+		return ""
+	}
+	// Drop parenthetical stderr payloads: "rclone: exit status 1 (stderr: {...})"
+	if i := strings.Index(s, "(stderr:"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	if strings.HasPrefix(strings.TrimSpace(s), "{") {
+		return "sync failed"
+	}
+	return s
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gnasdev/gn-drive/internal/eventbus"
@@ -45,8 +46,13 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-store")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+	// Disable proxy/transform buffering that can hold SSE frames.
+	w.Header().Set("Content-Encoding", "identity")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
+
+	// Serialize concurrent bus → ResponseWriter writes (one sub per topic).
+	var writeMu sync.Mutex
 
 	topics := eventbus.AllTopics()
 	subs := make([]func(), 0, len(topics))
@@ -54,7 +60,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	for _, t := range topics {
 		topic := t
-		cancel := s.app.Bus.Subscribe(topic, makeSSEHandlerFn(w, flusher, topic, s.log))
+		cancel := s.app.Bus.Subscribe(topic, makeSSEHandlerFn(w, flusher, topic, s.log, &writeMu))
 		subs = append(subs, cancel)
 	}
 	defer func() {
@@ -71,26 +77,33 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-heartbeat.C():
-			io.WriteString(w, ": heartbeat\n\n")
+			writeMu.Lock()
+			_, _ = io.WriteString(w, ": heartbeat\n\n")
 			flusher.Flush()
+			writeMu.Unlock()
 		}
 	}
 }
 
 func makeSSEHandler(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger) func(eventbus.Event) {
-	return makeSSEHandlerFn(w, flusher, topic, log)
+	var mu sync.Mutex
+	return makeSSEHandlerFn(w, flusher, topic, log, &mu)
 }
 
 // makeSSEHandlerFn is overridable for tests.
-var makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger) func(eventbus.Event) {
+var makeSSEHandlerFn = func(w http.ResponseWriter, flusher http.Flusher, topic string, log *slog.Logger, writeMu *sync.Mutex) func(eventbus.Event) {
 	return func(ev eventbus.Event) {
 		data, err := json.Marshal(ev)
 		if err != nil {
 			log.Warn("sse: marshal event", "topic", topic, "err", err)
 			return
 		}
-		fmt.Fprintf(w, "event: %s\n", topic)
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		if writeMu != nil {
+			writeMu.Lock()
+			defer writeMu.Unlock()
+		}
+		_, _ = fmt.Fprintf(w, "event: %s\n", topic)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
 	}
 }

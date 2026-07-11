@@ -11,16 +11,17 @@ import (
 
 // Task represents a running or completed sync task.
 type Task struct {
-	ID       string
-	Name     string // profile name
-	Action   string
-	Status   string // running | completed | failed | cancelled
-	ctx      context.Context
-	cancel   context.CancelFunc
-	Mu       sync.Mutex
-	Stats    rclone.Stats
+	ID        string
+	Name      string // profile name / busyKey
+	Action    string
+	Status    string // running | completed | failed | cancelled
+	Error     string // last error message when failed/cancelled
+	ctx       context.Context
+	cancel    context.CancelFunc
+	Mu        sync.Mutex
+	Stats     rclone.Stats
 	StartedAt time.Time
-	EndedAt  time.Time
+	EndedAt   time.Time
 }
 
 func (t *Task) Cancel() {

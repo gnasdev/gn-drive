@@ -7,31 +7,36 @@ import (
 	"time"
 )
 
+// DefaultPort is the fixed loopback port for the gn-drive web UI + API.
+//
+// Chosen in the IANA dynamic/private range (49152–65535) to avoid collisions
+// with well-known services and common dev servers (3000, 5173, 8080, 5432, …).
+// Keep in sync with: .air.toml, scripts/dev.sh, frontend/vite.config.ts proxy.
+const DefaultPort = 53241
+
 // Listener is a net.Listener with explicit port tracking.
 type Listener struct {
 	net.Listener
 	Port int
 }
 
-// Allocate binds a TCP listener on 127.0.0.1 with port 0 (kernel picks)
-// and returns the listener plus the assigned port number. The caller must
-// close the listener when done.
+// Allocate binds DefaultPort on 127.0.0.1.
+// Deprecated name kept for tests/callers; prefer AllocatePort(DefaultPort).
 func Allocate() (*Listener, int, error) {
-	return AllocatePort(0)
+	return AllocatePort(DefaultPort)
 }
 
-// AllocatePort binds a TCP listener on 127.0.0.1:port. If port is 0, the
-// kernel picks a free port. Returns the listener and the actual bound port.
+// AllocatePort binds a TCP listener on 127.0.0.1:port.
+// Port 0 is treated as DefaultPort (no kernel auto-assign).
 //
-// When a non-zero port is requested, a few short retries are used so hot
-// reload (air) can rebind the same port while the previous process is still
-// releasing the socket.
+// When binding, a few short retries are used so hot reload (air) can rebind
+// the same port while the previous process is still releasing the socket.
 func AllocatePort(port int) (*Listener, int, error) {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	attempts := 1
-	if port != 0 {
-		attempts = 20
+	if port == 0 {
+		port = DefaultPort
 	}
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	attempts := 20
 	var lastErr error
 	for i := 0; i < attempts; i++ {
 		l, err := net.Listen("tcp", addr)
@@ -40,10 +45,7 @@ func AllocatePort(port int) (*Listener, int, error) {
 			return &Listener{Listener: l, Port: tcp.Port}, tcp.Port, nil
 		}
 		lastErr = err
-		if port == 0 {
-			break
-		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	return nil, 0, lastErr
+	return nil, 0, fmt.Errorf("bind %s: %w", addr, lastErr)
 }

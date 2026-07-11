@@ -43,7 +43,7 @@ async function submit() {
 
 <template>
   <div
-    class="flex min-h-dvh w-full items-center justify-center bg-bg p-6"
+    class="flex min-h-full w-full items-center justify-center bg-bg p-6"
     data-testid="page-unlock"
   >
     <div class="w-full max-w-[380px] rounded-[10px] border border-border bg-surface px-7 py-8">

@@ -50,8 +50,9 @@ func TestParseJSONStatsLine(t *testing.T) {
 func TestSync_JSONStatsParsed(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "rclone-json")
+	// Real rclone emits --use-json-log stats on STDERR.
 	script := "#!/bin/sh\n" +
-		`echo '{"level":"info","msg":"x","stats":{"bytes":2048,"totalBytes":4096,"transfers":3,"totalTransfers":6,"errors":0}}'` + "\n" +
+		`echo '{"level":"info","msg":"x","stats":{"bytes":2048,"totalBytes":4096,"transfers":3,"totalTransfers":6,"errors":0}}' 1>&2` + "\n" +
 		"exit 0\n"
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -84,5 +85,48 @@ func TestSync_JSONStatsParsed(t *testing.T) {
 	}
 	if last.Files != 3 {
 		t.Errorf("files = %d, want 3", last.Files)
+	}
+}
+
+// TestSync_JSONStatsOnStderr is the production shape: all rclone logs on stderr.
+func TestSync_JSONStatsOnStderr(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "rclone-json-err")
+	script := "#!/bin/sh\n" +
+		`echo '{"level":"info","msg":"Copied","object":"photo.jpg"}' 1>&2` + "\n" +
+		`echo '{"level":"info","msg":"stats","stats":{"bytes":9000,"totalBytes":10000,"transfers":1,"totalTransfers":2,"checks":1,"totalChecks":2,"speed":123.0,"eta":1}}' 1>&2` + "\n" +
+		"exit 0\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := New(Options{BinaryPath: bin, Logger: noopLogger()})
+	var last Stats
+	var calls int
+	var mu sync.Mutex
+	_, err := c.Sync(context.Background(), SyncConfig{
+		Action: ActionPush, Source: "/a", Dest: "/b",
+	}, func(s Stats) {
+		mu.Lock()
+		last = s
+		calls++
+		mu.Unlock()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if calls < 1 {
+		t.Fatal("onProgress not called for stderr stats")
+	}
+	if last.Bytes != 9000 || last.BytesTotal != 10000 {
+		t.Errorf("bytes = %d/%d", last.Bytes, last.BytesTotal)
+	}
+	if last.CurrentFile != "photo.jpg" && last.CurrentFile != "" {
+		// current file may be overwritten by stats line without object; accept either
+		t.Logf("current_file=%q", last.CurrentFile)
+	}
+	if last.Speed != 123.0 {
+		t.Errorf("speed = %v, want 123", last.Speed)
 	}
 }

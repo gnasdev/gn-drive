@@ -5,43 +5,50 @@ import (
 	"testing"
 )
 
-func TestAllocate_AutoPort(t *testing.T) {
+func TestDefaultPort_InDynamicRange(t *testing.T) {
+	// IANA dynamic/private ports: 49152–65535 — low conflict with system services.
+	if DefaultPort < 49152 || DefaultPort > 65535 {
+		t.Errorf("DefaultPort = %d, want in 49152–65535", DefaultPort)
+	}
+	if DefaultPort != 53241 {
+		t.Errorf("DefaultPort = %d, want 53241 (keep docs/dev tooling in sync)", DefaultPort)
+	}
+}
+
+func TestAllocate_DefaultPort(t *testing.T) {
 	l, port, err := Allocate()
 	if err != nil {
-		t.Fatalf("Allocate: %v", err)
+		t.Skipf("default port in use: %v", err)
 	}
 	defer l.Close()
-	if port == 0 {
-		t.Error("port = 0, want kernel-assigned non-zero port")
+	if port != DefaultPort {
+		t.Errorf("port = %d, want DefaultPort %d", port, DefaultPort)
 	}
 	if l.Port != port {
 		t.Errorf("listener.Port = %d, want %d", l.Port, port)
 	}
-	// Listener should be bound to 127.0.0.1.
-	addr := l.Addr().String()
-	if !startsWith(addr, "127.0.0.1:") {
-		t.Errorf("addr = %q, want 127.0.0.1:...", addr)
+	if !startsWith(l.Addr().String(), "127.0.0.1:") {
+		t.Errorf("addr = %q, want 127.0.0.1:...", l.Addr().String())
 	}
-	// And the port must be reachable.
-	conn, err := net.Dial("tcp", addr)
+	c, err := net.Dial("tcp", l.Addr().String())
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	conn.Close()
+	_ = c.Close()
 }
 
 func TestAllocatePort_SpecificPort(t *testing.T) {
-	// Pick a free port first, then ask for it.
-	l0, port, err := Allocate()
+	// Bind an ephemeral OS port first to learn a free number, then re-bind it
+	// via AllocatePort (simulates --port override).
+	tmp, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("seed Allocate: %v", err)
+		t.Fatal(err)
 	}
-	l0.Close()
+	port := tmp.Addr().(*net.TCPAddr).Port
+	_ = tmp.Close()
 
-	// The port is now likely free again. Try to bind it explicitly.
 	l, got, err := AllocatePort(port)
 	if err != nil {
-		// Race: another process grabbed it. Skip.
 		t.Skipf("could not reclaim port %d: %v", port, err)
 	}
 	defer l.Close()
@@ -50,25 +57,27 @@ func TestAllocatePort_SpecificPort(t *testing.T) {
 	}
 }
 
-func TestAllocatePort_ZeroIsAuto(t *testing.T) {
+func TestAllocatePort_ZeroMapsToDefault(t *testing.T) {
 	l, port, err := AllocatePort(0)
 	if err != nil {
-		t.Fatal(err)
+		t.Skipf("default port in use: %v", err)
 	}
 	defer l.Close()
-	if port == 0 {
-		t.Error("port = 0, want non-zero")
+	if port != DefaultPort {
+		t.Errorf("port = %d, want DefaultPort %d", port, DefaultPort)
 	}
 }
 
 func TestAllocatePort_InUseFails(t *testing.T) {
-	l, port, err := Allocate()
+	// Use a free ephemeral port so we don't fight DefaultPort if something else holds it.
+	tmp, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	port := tmp.Addr().(*net.TCPAddr).Port
+	// Keep tmp open so the second bind fails.
+	defer tmp.Close()
 
-	// Second bind to same port must fail.
 	_, _, err = AllocatePort(port)
 	if err == nil {
 		t.Fatal("expected error when binding to in-use port")

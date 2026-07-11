@@ -624,7 +624,7 @@ func TestProfileAddCmd_MissingFlags(t *testing.T) {
 func TestProfileAddCmd_Success(t *testing.T) {
 	a := newTestApp(t)
 	cmd, buf := fakeCmd()
-	if err := runProfileAdd(context.Background(), a, "newp", "a", "b", 8, 50, false, cmd); err != nil {
+	if err := runProfileAdd(context.Background(), a, "newp", "a", "b", "push", 8, 50, false, cmd); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "added profile") {
