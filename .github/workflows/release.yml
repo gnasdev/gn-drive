@@ -25,23 +25,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            goos: darwin
+          - goos: darwin
             goarch: arm64
             artifact: gn-drive-darwin-arm64
             archive: tar.gz
-          - os: ubuntu-latest
-            goos: linux
+          - goos: linux
             goarch: amd64
             artifact: gn-drive-linux-amd64
             archive: tar.gz
-          - os: windows-latest
-            goos: windows
+          - goos: windows
             goarch: amd64
             artifact: gn-drive-windows-amd64
             archive: zip
 
-    runs-on: ${{ matrix.os }}
+    # All three targets cross-compile on the self-hosted Mac mini — CGO is off,
+    # so GOOS/GOARCH alone selects the target.
+    runs-on: [self-hosted, macmini]
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
 
     steps:
@@ -97,6 +96,8 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
           EXT=""
           if [ "${{ matrix.goos }}" = "windows" ]; then
@@ -115,16 +116,16 @@ jobs:
           cd bin
           tar czf "../../${{ matrix.artifact }}.tar.gz" "${APP_NAME}"
           cd ../..
-          sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+          shasum -a 256 "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
 
       - name: Package (zip, Windows)
         if: matrix.archive == 'zip'
         shell: bash
         run: |
           cd bin
-          7z a "../../${{ matrix.artifact }}.zip" "${APP_NAME}.exe"
+          zip "../../${{ matrix.artifact }}.zip" "${APP_NAME}.exe"
           cd ../..
-          sha256sum "${{ matrix.artifact }}.zip" > "${{ matrix.artifact }}.zip.sha256"
+          shasum -a 256 "${{ matrix.artifact }}.zip" > "${{ matrix.artifact }}.zip.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -136,7 +137,7 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macmini]
     name: Create Release
 
     steps:
