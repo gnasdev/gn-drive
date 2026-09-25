@@ -20,3 +20,8 @@
 # air (Go hot reload) build output
 /tmp/
 frontend/tsconfig.tsbuildinfo
+
+# Swift
+.build/
+.DS_Store
+dist/

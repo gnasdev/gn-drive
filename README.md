@@ -2,7 +2,7 @@
 
 Local-only sync engine and web UI for cloud storage, powered by [rclone](https://rclone.org/). One binary, one process, one port — the sync engine, HTTP API, and Vue 3 SPA share a single process and bind loopback only.
 
-> **Status**: web stack GA (single-process CLI + Vue 3). Wails desktop is removed. Default UI is a single **Workspace** after unlock (flows + remotes), plus Settings.
+> **Status**: rewritten in Swift — `GNDriveCore` engine library + `gn-drive` CLI + `GNDriveApp` SwiftUI macOS app (engine runs in-process, no web server). The Go backend + Vue frontend remain in-tree for reference only.
 
 ## Features
 
@@ -17,17 +17,18 @@ Local-only sync engine and web UI for cloud storage, powered by [rclone](https:/
 - **Master password** — Argon2id + AES-256-GCM encrypts `rclone.conf` and the SQLite DB at rest; portal mode unlocks in the browser
 - **Self-update** — `gn-drive self-update` or Settings UI
 
-## Tech stack
+## Tech stack (Swift)
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Go 1.26.5 — `cmd/gn-drive` |
-| Frontend | Vue 3.5 + Vite 6 + TypeScript + Tailwind 4 + Pinia |
-| HTTP | `chi` + Server-Sent Events |
-| Database | SQLite (`modernc.org/sqlite`, pure Go) |
-| Sync | rclone shell-out (`exec.Command`) |
-| Auth | Argon2id + AES-256-GCM |
-| CLI | `spf13/cobra` |
+| Core | Swift 6 — `Sources/GNDriveCore` |
+| UI | SwiftUI — `Sources/GNDriveApp` |
+| Database | SQLite (`sqlite3`, system) — same schema |
+| Sync | rclone shell-out (`Process`) |
+| Auth | Argon2id (vendored `CArgon2`) + AES-256-GCM (CryptoKit) |
+| CLI | `swift-argument-parser` — `Sources/gn-drive` |
+
+Build: `swift build` · `task swift-app` produces `dist/GNDrive.app` · tests: `swift test`.
 
 ## Installation
 

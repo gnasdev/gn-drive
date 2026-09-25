@@ -1,7 +1,15 @@
 # GN Drive task definitions.
 #
-# Single-process CLI + Vue 3 web UI. One binary, one process, one port.
-# See docs/overview.md and DEVELOPER.md.
+# The app was rewritten in Swift: GNDriveCore (engine) + gn-drive (CLI) +
+# GNDriveApp (SwiftUI macOS app). The Go backend + Vue frontend are kept for
+# reference until removal. See docs/overview.md and DEVELOPER.md.
+#
+# Swift targets:
+#   task swift-build   — build CLI + app binaries (debug)
+#   task swift-app     — bundle dist/GNDrive.app (release)
+#   task swift-test    — run XCTest suite
+#
+# Go legacy tasks remain below for reference.
 
 version: "3"
 
@@ -13,6 +21,28 @@ vars:
   LDFLAGS: "-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}"
 
 tasks:
+  swift-build:
+    summary: Build the Swift CLI + macOS app (debug)
+    cmds:
+      - swift build --product gn-drive
+      - swift build --product GNDriveApp
+
+  swift-release:
+    summary: Build the Swift CLI + app (release)
+    cmds:
+      - swift build -c release --product gn-drive
+      - swift build -c release --product GNDriveApp
+
+  swift-app:
+    summary: Bundle dist/GNDrive.app (release build + Info.plist + CLI inside)
+    cmds:
+      - scripts/bundle-app.sh release "{{.VERSION}}"
+
+  swift-test:
+    summary: Run the Swift test suite
+    cmds:
+      - swift test
+
   install:
     summary: Install backend (go mod) + frontend (pnpm) dependencies
     cmds:
