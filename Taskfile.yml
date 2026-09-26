@@ -1,93 +1,56 @@
 # GN Drive task definitions.
 #
-# The app was rewritten in Swift: GNDriveCore (engine) + gn-drive (CLI) +
-# GNDriveApp (SwiftUI macOS app). The Go backend + Vue frontend are kept for
-# reference until removal. See docs/overview.md and DEVELOPER.md.
+# The app is a native Swift package: GNDriveCore (engine) + gn-drive (CLI) +
+# GNDriveApp (SwiftUI macOS app). Engine runs in-process — no web server.
 #
-# Swift targets:
-#   task swift-build   — build CLI + app binaries (debug)
-#   task swift-app     — bundle dist/GNDrive.app (release)
-#   task swift-test    — run XCTest suite
+#   task build   — build debug binaries (gn-drive + GNDriveApp)
+#   task dist    — release build + bundle dist/GNDrive.app
+#   task dev     — rebuild & relaunch the app on file change (hot reload)
+#   task test    — run the XCTest suite
+#   task doctor  — run gn-drive doctor
 #
-# Go legacy tasks remain below for reference.
+# The Go backend + Vue frontend remain in-tree for reference only and no
+# longer have build tasks.
 
 version: "3"
 
 vars:
-  APP_NAME: "gn-drive"
-  BIN_DIR: "bin"
   VERSION: '{{.VERSION | default "dev"}}'
-  COMMIT: '{{.COMMIT | default "unknown"}}'
-  LDFLAGS: "-s -w -X main.Version={{.VERSION}} -X main.Commit={{.COMMIT}}"
 
 tasks:
-  swift-build:
-    summary: Build the Swift CLI + macOS app (debug)
+  build:
+    summary: Build debug binaries (gn-drive CLI + GNDriveApp)
     cmds:
       - swift build --product gn-drive
       - swift build --product GNDriveApp
 
-  swift-release:
-    summary: Build the Swift CLI + app (release)
-    cmds:
-      - swift build -c release --product gn-drive
-      - swift build -c release --product GNDriveApp
-
-  swift-app:
-    summary: Bundle dist/GNDrive.app (release build + Info.plist + CLI inside)
+  dist:
+    summary: Release build + bundle dist/GNDrive.app (app binary + CLI inside)
     cmds:
       - scripts/bundle-app.sh release "{{.VERSION}}"
 
-  swift-test:
+  dev:
+    summary: Hot reload — rebuild & relaunch GNDriveApp when Sources/ change
+    cmds:
+      - scripts/dev-swift.sh
+
+  test:
     summary: Run the Swift test suite
     cmds:
       - swift test
 
-  install:
-    summary: Install backend (go mod) + frontend (pnpm) dependencies
-    cmds:
-      - go mod download
-      - cd frontend && pnpm install --frozen-lockfile
-
-  build:
-    summary: Build web stack — Vue 3 frontend embedded into the Go binary
-    cmds:
-      - cd frontend && pnpm install --frozen-lockfile && pnpm run build
-      - rm -rf internal/webui/dist
-      - cp -r frontend/dist internal/webui/dist
-      - go build -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}} ./cmd/gn-drive
-      - echo "Built {{.BIN_DIR}}/{{.APP_NAME}} (Version={{.VERSION}} Commit={{.COMMIT}})"
-
-  dev:
-    summary: Run dev mode — Vue rebuild on change + Go hot reload (air) in parallel; Go serves Vue dist via SPA route
-    cmds:
-      - scripts/dev.sh
-
   doctor:
     summary: Diagnose environment via gn-drive doctor
     cmds:
-      - go run ./cmd/gn-drive doctor
+      - swift run gn-drive doctor
 
-  test:
-    summary: Run backend tests, frontend type-check, and e2e coverage gate
+  run:
+    summary: Run the gn-drive CLI in foreground (debug build)
     cmds:
-      - go test -race -coverprofile=coverage.out ./...
-      - go tool cover -html=coverage.out -o coverage.html
-      - cd frontend && pnpm run type-check
-      - cd frontend && pnpm run test:unit
-      - cd frontend && pnpm run test:e2e:coverage
-
-  lint:
-    summary: Lightweight lint — go vet + frontend type-check
-    cmds:
-      - go vet ./...
-      - cd frontend && pnpm run type-check
+      - swift run gn-drive run
 
   clean:
-    summary: Clean build artifacts
+    summary: Clean Swift build artifacts
     cmds:
-      - rm -rf {{.BIN_DIR}}
-      - rm -f {{.APP_NAME}} {{.APP_NAME}}-dev
-      - rm -rf frontend/dist
-      - rm -rf internal/webui/dist
+      - rm -rf .build dist
       - echo "Cleaned build artifacts"
