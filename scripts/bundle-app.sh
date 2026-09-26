@@ -25,6 +25,15 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 cp "$BIN_DIR/GNDriveApp" "$APP_DIR/Contents/MacOS/GNDriveApp"
 cp "$BIN_DIR/gn-drive" "$APP_DIR/Contents/MacOS/gn-drive"
 
+# Ship rclone inside the bundle — the app must not depend on system rclone.
+RCLONE_SRC="${RCLONE_SRC:-$(command -v rclone || true)}"
+if [ -z "$RCLONE_SRC" ] || [ ! -x "$RCLONE_SRC" ]; then
+    echo "✗ rclone not found; install it or set RCLONE_SRC=/path/to/rclone" >&2
+    exit 1
+fi
+cp "$RCLONE_SRC" "$APP_DIR/Contents/MacOS/rclone"
+echo "  bundled rclone: $RCLONE_SRC ($("$APP_DIR/Contents/MacOS/rclone" version | head -1))"
+
 sed -e "s/\$(GN_VERSION)/$VERSION/" -e "s/\$(GN_BUILD)/$VERSION/" \
     scripts/packaging/Info.plist > "$APP_DIR/Contents/Info.plist"
 

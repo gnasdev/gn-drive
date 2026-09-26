@@ -62,15 +62,32 @@ public final class RcloneClient: @unchecked Sendable {
         self.logger = logger
     }
 
+    /// rclone shipped inside the app bundle (Contents/MacOS/rclone or
+    /// Contents/Resources/rclone). The bundled build always wins over PATH so
+    /// the app never depends on a system rclone.
+    public static func bundledBinary() -> String? {
+        let fm = FileManager.default
+        var candidates: [String] = []
+        if let res = Bundle.main.resourcePath {
+            candidates.append(res + "/rclone")
+        }
+        if let exe = Bundle.main.executablePath {
+            candidates.append((exe as NSString).deletingLastPathComponent + "/rclone")
+        }
+        return candidates.first { fm.isExecutableFile(atPath: $0) }
+    }
+
     public static func resolveBinary(_ path: String?) throws -> String {
         func lookPath(_ name: String) -> String? {
             for dir in ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":") ?? [] {
-                let p = dir + "/" + name
+                let p = String(dir) + "/" + name
                 if FileManager.default.isExecutableFile(atPath: p) { return p }
             }
             return nil
         }
         guard let path, !path.isEmpty else {
+            // No explicit override: bundled rclone first, PATH as dev fallback.
+            if let p = bundledBinary() { return p }
             if let p = lookPath("rclone") { return p }
             throw RcloneError.binaryNotFound("rclone")
         }

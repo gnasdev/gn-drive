@@ -4,7 +4,8 @@
 - The Go backend (`internal/`, `cmd/`) and Vue frontend (`frontend/`) are kept for reference; do not extend them.
 - Argon2id hashes must stay compatible with the existing `auth.json` wire format (`$argon2id$v=19$m=65536,t=3,p=4$…`, vendored `CArgon2` reference implementation). `.enc` files are `[12-byte nonce][AES-256-GCM ct||tag]` (CryptoKit `SealedBox.combined`).
 - The SQLite schema is unchanged; `gn-drive.db` files load transparently.
-- Build: `swift build` / `task swift-build`; bundle: `task swift-app`; tests: `swift test` / `task swift-test`.
+- rclone is shipped inside `GNDrive.app` (`Contents/MacOS/rclone`); `RcloneClient.resolveBinary` always prefers the bundled copy over PATH (PATH remains a fallback for dev `swift run`/`swift test` outside a bundle).
+- Build: `task build` (debug); bundle: `task dist` → `dist/GNDrive.app`; hot reload: `task dev`; tests: `task test`.
 
 # Runtime edge telemetry
 
