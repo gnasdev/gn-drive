@@ -13,6 +13,9 @@ struct RunCommand: ParsableCommand {
     @Flag(help: "Run as a background service (use 'gn-drive service install' first)")
     var service = false
 
+    @Flag(help: "Development mode (debug-oriented logging)")
+    var dev = false
+
     @Option(help: "Unlock at process start (service mode / CI). Interactive runs unlock via the app UI instead.")
     var password: String = ""
 
@@ -21,7 +24,7 @@ struct RunCommand: ParsableCommand {
 
     func run() throws {
         var opts = AppContainer.Options()
-        opts.logMode = service ? .service : .foreground
+        opts.logMode = dev ? .foreground : (service ? .service : .foreground)
         opts.version = BuildInfo.version
         opts.unlockPassword = password.isEmpty
             ? (ProcessInfo.processInfo.environment["GN_DRIVE_PASSWORD"] ?? "")
@@ -242,7 +245,7 @@ struct BoardCommand: ParsableCommand {
     @Argument(help: "Board ID")
     var boardID: String
 
-    @Flag(help: "Stop execution at the first failed edge")
+    @Flag(inversion: .prefixedNo, help: "Stop execution at the first failed edge (default: on; use --no-stop-on-error to disable)")
     var stopOnError = true
 
     func run() throws {
@@ -587,4 +590,22 @@ func archName() -> String {
     #else
     return "x86_64"
     #endif
+}
+
+// MARK: - completion
+
+struct CompletionCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "completion",
+        abstract: "Generate shell completion scripts")
+
+    @Argument(help: "bash | zsh | fish")
+    var shell: String
+
+    func run() throws {
+        guard let s = CompletionShell(rawValue: shell) else {
+            throw CLIError.app("unsupported shell: \(shell) (want bash|zsh|fish)")
+        }
+        print(GNDriveCLI.completionScript(for: s))
+    }
 }

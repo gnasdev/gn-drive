@@ -16,12 +16,12 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 // Master password
-                Section("Master password") {
+                Section(t("settings.masterPassword")) {
                     if state.isSetup {
                         HStack {
-                            SecureField("Current", text: $oldPwd)
-                            SecureField("New", text: $newPwd)
-                            Button("Change") {
+                            SecureField(t("settings.currentPassword"), text: $oldPwd)
+                            SecureField(t("settings.newPassword"), text: $newPwd)
+                            Button(t("settings.changePassword")) {
                                 if state.changePassword(old: oldPwd, new: newPwd) {
                                     oldPwd = ""; newPwd = ""
                                 }
@@ -30,17 +30,17 @@ struct SettingsView: View {
                         }
                         .textFieldStyle(.roundedBorder)
                         HStack {
-                            Button("Lock now") { state.lockNow(); onClose() }
+                            Button(t("settings.lockApp")) { state.lockNow(); onClose() }
                             Spacer()
-                            Button("Remove password…", role: .destructive) { showRemoveConfirm = true }
+                            Button(t("settings.removePassword"), role: .destructive) { showRemoveConfirm = true }
                         }
                     } else {
-                        Text("No master password set").foregroundStyle(.secondary)
+                        Text(t("settings.removePasswordHelp")).foregroundStyle(.secondary)
                     }
                 }
 
                 // App settings (persisted in auth.json)
-                Section("Application") {
+                Section(t("settings.appearance")) {
                     Toggle("Notifications", isOn: binding(\.notificationsEnabled))
                     Toggle("Debug mode", isOn: binding(\.debugMode))
                     Toggle("Minimize to tray", isOn: binding(\.minimizeToTray))
@@ -48,7 +48,7 @@ struct SettingsView: View {
                 }
 
                 // Background service (launchd)
-                Section("Background service") {
+                Section(t("settings.lockNow")) {
                     ServiceSection()
                 }
 
@@ -85,21 +85,21 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(t("nav.settings"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onClose)
+                    Button(t("common.close"), action: onClose)
                 }
             }
         }
-        .alert("Remove master password? Config files will be decrypted permanently.",
+        .alert(t("settings.removePasswordConfirm"),
                isPresented: $showRemoveConfirm) {
-            SecureField("Password", text: $removePwd)
-            Button("Remove", role: .destructive) {
+            SecureField(t("unlock.password"), text: $removePwd)
+            Button(t("common.delete"), role: .destructive) {
                 _ = state.removePassword(removePwd)
                 removePwd = ""
             }
-            Button("Cancel", role: .cancel) { removePwd = "" }
+            Button(t("common.cancel"), role: .cancel) { removePwd = "" }
         }
     }
 

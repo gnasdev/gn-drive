@@ -59,9 +59,9 @@ struct RemotesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Remotes").font(.headline)
+                Text(t("workspace.remotes")).font(.headline)
                 Spacer()
-                Button { adding = true } label: { Label("Add", systemImage: "plus") }
+                Button { adding = true } label: { Label(t("common.add"), systemImage: "plus") }
             }
             .padding()
 
@@ -76,7 +76,7 @@ struct RemotesView: View {
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("Test") { state.testRemote(r.name) }.buttonStyle(.borderless)
+                        Button(t("common.test")) { state.testRemote(r.name) }.buttonStyle(.borderless)
                         Button(role: .destructive) { confirmDelete = r.name } label: {
                             Image(systemName: "trash")
                         }.buttonStyle(.borderless)
@@ -86,13 +86,13 @@ struct RemotesView: View {
         }
         .frame(width: 460, height: 420)
         .sheet(isPresented: $adding) { AddRemoteView() }
-        .alert("Delete remote \(confirmDelete ?? "")?", isPresented: .init(
+        .alert(t("remotes.deleteTitle"), isPresented: .init(
             get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } })) {
-            Button("Delete", role: .destructive) {
+            Button(t("common.delete"), role: .destructive) {
                 if let n = confirmDelete { state.deleteRemote(n) }
                 confirmDelete = nil
             }
-            Button("Cancel", role: .cancel) { confirmDelete = nil }
+            Button(t("common.cancel"), role: .cancel) { confirmDelete = nil }
         }
     }
 }
@@ -112,9 +112,9 @@ struct AddRemoteView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add remote").font(.headline)
-            TextField("Name", text: $name).textFieldStyle(.roundedBorder)
-            Picker("Type", selection: $type) {
+            Text(t("remotes.add")).font(.headline)
+            TextField(t("common.name"), text: $name).textFieldStyle(.roundedBorder)
+            Picker(t("common.type"), selection: $type) {
                 ForEach(remoteTypes, id: \.self) { Text($0).tag($0) }
             }
             ForEach(fields, id: \.key) { f in
@@ -130,8 +130,8 @@ struct AddRemoteView: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Create & test") {
+                Button(t("common.cancel")) { dismiss() }
+                Button(t("remotes.testAndAdd")) {
                     busy = true
                     let kvs = fields.compactMap { f -> String? in
                         let v = values[f.key]?.trimmingCharacters(in: .whitespaces) ?? ""

@@ -19,15 +19,15 @@ struct UnlockView: View {
                     Text("GN Drive").font(.title3).fontWeight(.semibold)
                 }
                 Text(mode == .setup
-                     ? "Set a master password to encrypt your config at rest."
-                     : "Enter your master password to unlock.")
+                     ? t("unlock.setupBody", args: ["db": "gn-drive.db", "conf": "rclone.conf"])
+                     : t("unlock.unlockBody"))
                     .font(.callout).foregroundStyle(.secondary)
 
-                SecureField("Password", text: $password)
+                SecureField(t("unlock.password"), text: $password)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(submit)
                 if mode == .setup {
-                    SecureField("Confirm password", text: $confirm)
+                    SecureField(t("unlock.confirm"), text: $confirm)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(submit)
                 }
@@ -40,7 +40,7 @@ struct UnlockView: View {
                         .font(.caption).foregroundStyle(.orange)
                 }
 
-                Button(mode == .setup ? "Set password" : "Unlock") { submit() }
+                Button(mode == .setup ? t("unlock.submitSetup") : t("unlock.submitUnlock")) { submit() }
                     .buttonStyle(.borderedProminent)
                     .disabled(password.count < 4 || (mode == .setup && password != confirm))
             }
@@ -56,8 +56,8 @@ struct UnlockView: View {
     private func submit() {
         error = ""
         if mode == .setup {
-            guard password == confirm else { error = "Passwords do not match"; return }
-            guard password.count >= 4 else { error = "Password must be at least 4 characters"; return }
+            guard password == confirm else { error = t("unlock.mismatch"); return }
+            guard password.count >= 4 else { error = t("unlock.tooShort"); return }
             state.setup(password)
         } else {
             state.unlock(password)

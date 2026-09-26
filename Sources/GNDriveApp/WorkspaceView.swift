@@ -17,21 +17,58 @@ struct WorkspaceView: View {
                 .frame(minWidth: 240, idealWidth: 300, maxWidth: 380)
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 4) {
+                    // Engine status dot (replaces the web SSE indicator).
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 7, height: 7)
+                    Text(t("topbar.connected"))
+                        .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                }
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Picker("Language", selection: $locale) {
+                        Text("English").tag("en")
+                        Text("Tiếng Việt").tag("vi")
+                    }
+                } label: { Image(systemName: "globe") }
+                    .help("Language")
+
+                Button { theme = theme == "dark" ? "light" : "dark" } label: {
+                    Image(systemName: theme == "dark" ? "moon.fill" : "sun.max")
+                }
+                .help("Theme")
+
                 Button { showRemotes.toggle() } label: {
                     Image(systemName: "externaldrive.connected.to.line.below")
                 }
-                .help("Remotes")
-            }
-            ToolbarItem(placement: .primaryAction) {
+                .help(t("workspace.remotes"))
+
                 Button(action: onOpenSettings) { Image(systemName: "gear") }
-                    .help("Settings")
+                    .help(t("nav.settings"))
+
+                Button(role: .destructive) { confirmLock = true } label: {
+                    Image(systemName: "lock")
+                }
+                .help(t("topbar.lock"))
             }
         }
         .sheet(isPresented: $showRemotes) {
             RemotesView()
         }
+        .alert(t("topbar.lockTitle"), isPresented: $confirmLock) {
+            Button(t("topbar.lock"), role: .destructive) { state.lockNow() }
+            Button(t("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(t("topbar.lockMessage"))
+        }
     }
+
+    @AppStorage("gn-drive:theme") private var theme = "light"
+    @AppStorage("gn-drive:locale") private var locale = "en"
+    @State private var confirmLock = false
 }
 
 // MARK: - Flow rail
@@ -43,10 +80,10 @@ struct FlowRailView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Flows").font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text(t("workspace.flows")).font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
                 Spacer()
                 Button { _ = state.addFlow(name: "Untitled flow") } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus").help(t("flows.add"))
                 }
                 .buttonStyle(.borderless)
             }
@@ -74,6 +111,7 @@ struct FlowRailView: View {
 struct FlowRow: View {
     @EnvironmentObject var state: AppState
     let flow: Flow
+    @State private var confirmDelete = false
 
     var body: some View {
         let status = state.flowStatus(flow.id)
@@ -91,10 +129,16 @@ struct FlowRow: View {
             Spacer()
         }
         .contextMenu {
-            Button("Run") { state.executeFlow(flow.id) }
-            Button("Stop") { state.stopFlow(flow.id) }
+            Button(t("workspace.run")) { state.executeFlow(flow.id) }
+            Button(t("workspace.stop")) { state.stopFlow(flow.id) }
             Divider()
-            Button("Delete", role: .destructive) { state.deleteFlow(flow.id) }
+            Button(t("common.delete"), role: .destructive) { confirmDelete = true }
+        }
+        .alert(t("flows.deleteTitle"), isPresented: $confirmDelete) {
+            Button(t("common.delete"), role: .destructive) { state.deleteFlow(flow.id) }
+            Button(t("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(t("flows.deleteMessage", args: ["name": flow.name.isEmpty ? t("workspace.untitledFlow") : flow.name]))
         }
     }
 }

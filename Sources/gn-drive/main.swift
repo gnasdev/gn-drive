@@ -48,6 +48,7 @@ struct GNDriveCLI: ParsableCommand {
             SelfUpdateCommand.self,
             VersionCommand.self,
             DoctorCommand.self,
+            CompletionCommand.self,
         ]
     )
 }

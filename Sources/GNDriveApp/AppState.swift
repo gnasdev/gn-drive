@@ -19,6 +19,9 @@ final class AppState: ObservableObject {
     @Published var appSettings = AppSettings()
     @Published var rcloneVersion: String = ""
     @Published var serviceStatusText: String = ""
+    /// Flows with unsaved local edits (canvas/inspector changes staged but
+    /// not persisted) — mirrors the web canvas.dirty flag.
+    @Published var dirtyFlowIDs: Set<String> = []
 
     enum Selection: Equatable {
         case node(String)
@@ -61,6 +64,13 @@ final class AppState: ObservableObject {
     }
 
     deinit { busCancel?() }
+
+    /// Suspend on quit: re-encrypt config files if locked-by-policy (keeps
+    /// the remembered key like Go's auth.Suspend).
+    func shutdown() {
+        container.syncEngine.stop()
+        container.close()
+    }
 
     var isUnlocked: Bool { authStatus.unlocked }
     var isSetup: Bool { authStatus.setup }
@@ -182,12 +192,25 @@ final class AppState: ObservableObject {
         return f
     }
 
+    /// Apply local edits without persisting (web: canvas.writeLocal + dirty).
+    func stageFlow(_ f: Flow) {
+        flows = flows.map { $0.id == f.id ? f : $0 }
+        dirtyFlowIDs.insert(f.id)
+    }
+
+    /// Persist a flow to SQLite (clears the dirty flag).
     func saveFlow(_ f: Flow) {
+        // Web API: PUT /flows rejects updates while the flow is running.
+        guard !isFlowActive(f.id) else {
+            toast("Cannot change this while a run is in progress", isError: true)
+            return
+        }
         var flow = f
         do {
             try container.store?.saveFlow(&flow)
             container.syncEngine.syncFlowSchedule(flow)
             container.bus.publish(BusTopic.stateChanged, StateChangedEvent(domain: "flows", id: flow.id))
+            dirtyFlowIDs.remove(flow.id)
             reloadData()
         } catch {
             toast(friendly(error), isError: true)
