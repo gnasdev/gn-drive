@@ -16,7 +16,7 @@ enum CLIError: Error, LocalizedError {
 /// Build-time version (overridable via -D GN_VERSION at build config level;
 /// simplest: read from compiled constant).
 public enum BuildInfo {
-    public static let version = "dev"
+    public static let version = BuildVersion.current
     public static let commit = "unknown"
 }
 

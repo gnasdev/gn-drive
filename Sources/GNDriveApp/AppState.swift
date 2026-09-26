@@ -314,8 +314,3 @@ final class AppState: ObservableObject {
         String(describing: e)
     }
 }
-
-/// Version injected at build time by scripts (fallback "dev").
-enum BuildVersion {
-    static let current = "dev"
-}

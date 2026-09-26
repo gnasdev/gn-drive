@@ -13,6 +13,12 @@ VERSION="${2:-dev}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Inject the release version into the binary, restoring the "dev" marker after.
+VFILE="Sources/GNDriveCore/BuildVersion.swift"
+cp "$VFILE" "$VFILE.bak"
+trap 'mv "$VFILE.bak" "$VFILE"' EXIT
+sed -i '' "s/\"dev\"/\"$VERSION\"/" "$VFILE"
+
 swift build -c "$CONFIG" --product GNDriveApp
 swift build -c "$CONFIG" --product gn-drive
 

@@ -1,10 +1,7 @@
-# GN Drive release workflow.
+# GN Drive release workflow (Swift rewrite).
 #
-# Single-process CLI + Vue 3 web UI. One binary per platform, with the
-# frontend embedded via go:embed. See Taskfile.yml for the local equivalent
-# of every step below.
-#
-# Runs only on version tags (v*.*.*), not on ordinary branch/PR pushes.
+# Builds the macOS app bundle + standalone CLI on version tags (v*.*.*).
+# Runs scripts/bundle-app.sh — the same path as `task dist` locally.
 name: Release
 
 on:
@@ -17,141 +14,46 @@ permissions:
 
 env:
   APP_NAME: gn-drive
-  GO_VERSION: "1.26.5"
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            goos: darwin
-            goarch: arm64
-            artifact: gn-drive-darwin-arm64
-            archive: tar.gz
-          - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            artifact: gn-drive-linux-amd64
-            archive: tar.gz
-          - os: windows-latest
-            goos: windows
-            goarch: amd64
-            artifact: gn-drive-windows-amd64
-            archive: zip
-
-    runs-on: ${{ matrix.os }}
-    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: macos-latest
+    name: Build GNDrive.app + CLI
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: go.sum
+      - name: Resolve version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11
+      - name: Install rclone (bundled into the app)
+        run: brew install rclone
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Build app bundle
+        run: scripts/bundle-app.sh release "${{ env.VERSION }}"
 
-      - name: Install backend dependencies
-        run: go mod download
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        working-directory: frontend
-        run: pnpm run build
-
-      - name: Copy frontend dist into Go embed path
-        shell: bash
+      - name: Package app zip
         run: |
-          rm -rf internal/webui/dist
-          cp -r frontend/dist internal/webui/dist
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent GNDrive.app "../GNDrive-${{ env.VERSION }}-macos.zip"
+          cd ..
+          shasum -a 256 "GNDrive-${{ env.VERSION }}-macos.zip" > "GNDrive-${{ env.VERSION }}-macos.zip.sha256"
 
-      - name: Set version metadata
-        shell: bash
+      - name: Package CLI tarball
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION=dev" >> "$GITHUB_ENV"
-          fi
-          echo "COMMIT=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          mkdir -p pkg
+          cp dist/GNDrive.app/Contents/MacOS/gn-drive pkg/
+          cp dist/GNDrive.app/Contents/MacOS/rclone pkg/
+          tar czf "gn-drive-${{ env.VERSION }}-macos-arm64.tar.gz" -C pkg gn-drive rclone
+          shasum -a 256 "gn-drive-${{ env.VERSION }}-macos-arm64.tar.gz" > "gn-drive-${{ env.VERSION }}-macos-arm64.tar.gz.sha256"
 
-      - name: Build binary
-        shell: bash
-        env:
-          CGO_ENABLED: "0"
-        run: |
-          EXT=""
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            EXT=".exe"
-          fi
-          mkdir -p bin
-          go build -trimpath \
-            -ldflags="-s -w -X main.Version=${{ env.VERSION }} -X main.Commit=${{ env.COMMIT }}" \
-            -o "bin/${APP_NAME}${EXT}"
-          ls -lh bin/
-
-      - name: Package (tar.gz)
-        if: matrix.archive == 'tar.gz'
-        shell: bash
-        run: |
-          cd bin
-          tar czf "../../${{ matrix.artifact }}.tar.gz" "${APP_NAME}"
-          cd ../..
-          sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
-
-      - name: Package (zip, Windows)
-        if: matrix.archive == 'zip'
-        shell: bash
-        run: |
-          cd bin
-          7z a "../../${{ matrix.artifact }}.zip" "${APP_NAME}.exe"
-          cd ../..
-          sha256sum "${{ matrix.artifact }}.zip" > "${{ matrix.artifact }}.zip.sha256"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.*
-          if-no-files-found: error
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    name: Create Release
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -lR artifacts/
-
-      - name: Create GitHub Release
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            artifacts/*
+            GNDrive-${{ env.VERSION }}-macos.zip
+            GNDrive-${{ env.VERSION }}-macos.zip.sha256
+            gn-drive-${{ env.VERSION }}-macos-arm64.tar.gz
+            gn-drive-${{ env.VERSION }}-macos-arm64.tar.gz.sha256
