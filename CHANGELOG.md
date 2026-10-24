@@ -2,6 +2,13 @@
 
 All notable changes to GN Drive will be documented in this file.
 
+## [v0.6.0] - 2026-10-24
+
+- Rust engine + CLI workspace (`gn-drive-core`, `gn-drive-cli`) with an NDJSON RPC dispatcher, used in-process by the GPUI window in ns-gpui.
+- Swift: `gn-drive serve` RPC command for GPUI parity.
+- `remote add` refuses OAuth remote types so the CLI never starts an interactive sign-in.
+- Release pipeline fixed: the Swift CLI entry point no longer lives in `main.swift` (`@main` was rejected by CI's compiler).
+
 ## [v1.0.0] - 2026-06-09
 
 ### Major: Web stack GA — Wails deprecated
