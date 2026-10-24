@@ -2,6 +2,8 @@ module github.com/gnasdev/gn-drive
 
 go 1.27.0
 
+toolchain go1.27.3
+
 require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/coder/websocket v1.8.15
