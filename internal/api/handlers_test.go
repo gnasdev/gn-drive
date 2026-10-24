@@ -41,10 +41,10 @@ func newTestServer(t *testing.T) (*Server, func()) {
 	}
 	bus := eventbus.NewBus(context.Background())
 
-	// rclone client (may use a fake binary path; we don't actually call
-	// Sync in handler tests because that would shell out to rclone).
+	// Always use a fake rclone: a handler test must never reach a real
+	// binary (creating an OAuth remote would start a sign-in flow).
 	rc, err := rclone.New(rclone.Options{
-		BinaryPath: "rclone",
+		BinaryPath: writeFakeRclone(t),
 		ConfigPath: filepath.Join(dir, "rclone.conf"),
 		Logger:     log,
 	})
@@ -1259,8 +1259,8 @@ func TestHandleTestRemote(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
 	rr := doRequest(srv, "POST", "/api/v1/remotes/whatever/test", nil, "")
-	// Will likely 503 since rclone not available. Just check status in expected range.
-	if rr.Code < 400 || rr.Code >= 600 {
+	// newTestServer uses a fake rclone that exits 0, so the connectivity test succeeds.
+	if rr.Code != http.StatusOK {
 		t.Errorf("unexpected status: %d", rr.Code)
 	}
 }

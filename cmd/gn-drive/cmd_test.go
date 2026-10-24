@@ -28,8 +28,9 @@ func newTestApp(t *testing.T) *app.App {
 	t.Helper()
 	dir := t.TempDir()
 	a, err := app.New(context.Background(), app.Options{
-		ConfigDir: dir,
-		LogMode:   logging.ModeForeground,
+		ConfigDir:    dir,
+		LogMode:      logging.ModeForeground,
+		RcloneBinary: fakeRclone(t),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -791,7 +792,7 @@ exit 0
 	}
 	defer a.Close()
 	cmd, _ := fakeCmd()
-	err = runRemoteAdd(context.Background(), a, "r1", "drive", nil, cmd)
+	err = runRemoteAdd(context.Background(), a, "r1", "s3", nil, cmd)
 	if err == nil {
 		t.Fatal("expected auth failure from runRemoteAdd")
 	}
@@ -1593,11 +1594,28 @@ func TestNewProfileDeleteCmd_RunE(t *testing.T) {
 	}
 }
 
+// withFakeApp points appNewFn at a real App backed by the guarded fake rclone.
+func withFakeApp(t *testing.T) {
+	t.Helper()
+	bin := fakeRclone(t)
+	cfg := filepath.Join(t.TempDir(), "config")
+	orig := appNewFn
+	t.Cleanup(func() { appNewFn = orig })
+	appNewFn = func(ctx context.Context, opts app.Options) (*app.App, error) {
+		return app.New(ctx, app.Options{
+			ConfigDir:    cfg,
+			LogMode:      logging.ModeForeground,
+			RcloneBinary: bin,
+		})
+	}
+}
+
 // TestNewRemoteListCmd_RunE tests the RunE body of newRemoteListCmd.
 func TestNewRemoteListCmd_RunE(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
+	withFakeApp(t)
 
 	cmd := newRemoteListCmd()
 	var buf bytes.Buffer
@@ -1615,6 +1633,7 @@ func TestNewRemoteAddCmd_RunE(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
+	withFakeApp(t)
 
 	cmd := newRemoteAddCmd()
 	var buf bytes.Buffer
@@ -1622,13 +1641,14 @@ func TestNewRemoteAddCmd_RunE(t *testing.T) {
 	cmd.SetErr(&buf)
 	cmd.SetArgs([]string{
 		"--name", "myremote",
-		"--type", "dropbox",
-		"--config", "key=val",
+		"--type", "local",
 	})
 	cmd.SilenceUsage = true
 	if err := cmd.Execute(); err != nil {
-		// rclone may not be installed; we just check it doesn't crash.
-		t.Logf("execute: %v (may fail if rclone not installed)", err)
+		t.Fatalf("execute: %v", err)
+	}
+	if !strings.Contains(buf.String(), "added remote") {
+		t.Errorf("output should confirm add: %q", buf.String())
 	}
 }
 
@@ -1637,6 +1657,7 @@ func TestNewRemoteTestCmd_RunE(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
+	withFakeApp(t)
 
 	cmd := newRemoteTestCmd()
 	var buf bytes.Buffer
@@ -1644,8 +1665,9 @@ func TestNewRemoteTestCmd_RunE(t *testing.T) {
 	cmd.SetErr(&buf)
 	cmd.SetArgs([]string{"anyremote"})
 	cmd.SilenceUsage = true
-	// rclone may not be installed; we just check it doesn't crash.
-	_ = cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
 }
 
 // TestNewRemoteDeleteCmd_RunE tests the RunE body of newRemoteDeleteCmd.
@@ -1653,6 +1675,7 @@ func TestNewRemoteDeleteCmd_RunE(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
+	withFakeApp(t)
 
 	cmd := newRemoteDeleteCmd()
 	var buf bytes.Buffer
@@ -1660,7 +1683,9 @@ func TestNewRemoteDeleteCmd_RunE(t *testing.T) {
 	cmd.SetErr(&buf)
 	cmd.SetArgs([]string{"anyremote"})
 	cmd.SilenceUsage = true
-	_ = cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
 }
 
 // TestNewServiceCmd_Actions tests RunE for install/start/stop/status.
@@ -1875,7 +1900,9 @@ func TestRunDoctor_WithAuth(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 
-	a, err := app.New(context.Background(), app.Options{ConfigDir: dir, LogMode: logging.ModeForeground})
+	a, err := app.New(context.Background(), app.Options{
+		ConfigDir: dir, LogMode: logging.ModeForeground, RcloneBinary: fakeRclone(t),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1945,8 +1972,9 @@ func makeRunDeps(t *testing.T) (runDeps, *fakeLocker, *app.App, chan os.Signal) 
 	t.Helper()
 	fl := &fakeLocker{}
 	a, err := app.New(context.Background(), app.Options{
-		ConfigDir: t.TempDir(),
-		LogMode:   logging.ModeForeground,
+		ConfigDir:    t.TempDir(),
+		LogMode:      logging.ModeForeground,
+		RcloneBinary: fakeRclone(t),
 	})
 	if err != nil {
 		t.Fatal(err)

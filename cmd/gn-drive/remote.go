@@ -3,12 +3,29 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/gnasdev/gn-drive/internal/app"
 	"github.com/gnasdev/gn-drive/internal/logging"
 	"github.com/spf13/cobra"
 )
+
+// oauthRemoteTypes start an interactive sign-in when created with
+// `rclone config create`. The non-interactive CLI must never trigger one.
+var oauthRemoteTypes = map[string]struct{}{
+	"drive": {}, "dropbox": {}, "onedrive": {}, "box": {}, "pcloud": {},
+	"yandex": {}, "googlephotos": {}, "iclouddrive": {}, "mega": {},
+	"mailru": {}, "sharepoint": {}, "jottacloud": {}, "koofr": {},
+	"opendrive": {}, "pikpak": {}, "sugarsync": {}, "uptobox": {},
+	"zoho": {}, "premiumizeme": {}, "seafile": {}, "sia": {},
+	"qingstor": {}, "putio": {},
+}
+
+func isOAuthRemoteType(t string) bool {
+	_, ok := oauthRemoteTypes[strings.ToLower(strings.TrimSpace(t))]
+	return ok
+}
 
 func newRemoteCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -106,6 +123,9 @@ Example (local filesystem):
 
 // runRemoteAdd is the testable inner work of newRemoteAddCmd.
 func runRemoteAdd(ctx context.Context, a *app.App, name, remoteType string, configKVs []string, cmd *cobra.Command) error {
+	if isOAuthRemoteType(remoteType) {
+		return fmt.Errorf("remote add: %q needs an OAuth sign-in; add it from the app or RPC remotes.add", remoteType)
+	}
 	if err := a.Rclone.CreateRemoteVerified(ctx, name, remoteType, configKVs); err != nil {
 		return err
 	}

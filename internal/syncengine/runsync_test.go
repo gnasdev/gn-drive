@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -15,13 +16,24 @@ import (
 	"github.com/gnasdev/gn-drive/internal/store"
 )
 
+// requireRealRclone gates tests that shell out to the host rclone. They only
+// use local paths (never OAuth), but stay opt-in so the suite never runs the
+// user's binary or touches their network.
+func requireRealRclone(t *testing.T) {
+	t.Helper()
+	if os.Getenv("GN_DRIVE_REAL_RCLONE_TESTS") != "1" {
+		t.Skip("set GN_DRIVE_REAL_RCLONE_TESTS=1 to run against the real rclone")
+	}
+	if _, err := exec.LookPath("rclone"); err != nil {
+		t.Skipf("rclone not found: %v", err)
+	}
+}
+
 // TestRunSync_RealRclone exercises the full runSync path using the system
 // rclone binary. It copies a single file to a local "remote" (a path with
 // a colon, treated by rclone as a local filesystem path).
 func TestRunSync_RealRclone(t *testing.T) {
-	if _, err := os.Stat("/opt/homebrew/bin/rclone"); err != nil {
-		t.Skipf("rclone not at default path: %v", err)
-	}
+	requireRealRclone(t)
 
 	dir := t.TempDir()
 	srcDir := filepath.Join(dir, "src")
@@ -109,9 +121,7 @@ func TestRunSync_RealRclone(t *testing.T) {
 // TestStartSync_PropagatesError covers the error branch of runSync
 // by pointing the rclone config to a path that will cause failures.
 func TestStartSync_PropagatesError(t *testing.T) {
-	if _, err := os.Stat("/opt/homebrew/bin/rclone"); err != nil {
-		t.Skipf("rclone not at default path: %v", err)
-	}
+	requireRealRclone(t)
 
 	dir := t.TempDir()
 	bus := eventbus.NewBus(context.Background())
