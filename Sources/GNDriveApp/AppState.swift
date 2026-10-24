@@ -6,6 +6,7 @@ import Combine
 @MainActor
 final class AppState: ObservableObject {
     let container: AppContainer
+    private let locker: InstanceLocker
 
     @Published var authStatus: AuthStatus
     @Published var flows: [Flow] = []
@@ -38,6 +39,9 @@ final class AppState: ObservableObject {
     nonisolated(unsafe) private var busCancel: (() -> Void)?
 
     init() throws {
+        // The app and `gn-drive serve` must not own the engine at once.
+        locker = try InstanceLocker.acquire(configDir: Paths.detect().configDir)
+
         var opts = AppContainer.Options()
         opts.portalMode = true
         opts.keyStore = KeychainStore(service: "gn-drive")
@@ -70,6 +74,7 @@ final class AppState: ObservableObject {
     func shutdown() {
         container.syncEngine.stop()
         container.close()
+        locker.release()
     }
 
     var isUnlocked: Bool { authStatus.unlocked }

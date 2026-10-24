@@ -28,6 +28,7 @@ struct GNDriveCLI: ParsableCommand {
         discussion: """
         Subcommands:
           run          Start the engine in foreground or service mode
+          serve        Serve the stdio RPC protocol for the GPUI window
           service      Install, uninstall, start, stop, or check service status
           sync         One-shot sync (pull, push, bi, bi-resync, dry-run)
           board        (legacy) Execute a board DAG — prefer flows
@@ -40,6 +41,7 @@ struct GNDriveCLI: ParsableCommand {
         version: BuildInfo.version,
         subcommands: [
             RunCommand.self,
+            ServeCommand.self,
             ServiceCommand.self,
             SyncCommand.self,
             BoardCommand.self,

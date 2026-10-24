@@ -158,6 +158,21 @@ public struct FileEntry: Sendable, Codable {
         case path = "Path"
         case id = "ID"
     }
+
+    /// rclone omits empty fields (notably `ID`), so tolerate missing keys
+    /// instead of failing the whole listing.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        size = try c.decodeIfPresent(Int64.self, forKey: .size) ?? 0
+        mimeType = try c.decodeIfPresent(String.self, forKey: .mimeType) ?? ""
+        isDir = try c.decodeIfPresent(Bool.self, forKey: .isDir) ?? false
+        modTime = try c.decodeIfPresent(String.self, forKey: .modTime) ?? ""
+        path = try c.decodeIfPresent(String.self, forKey: .path) ?? ""
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+    }
+
+    public init() {}
 }
 
 public struct QuotaInfo: Sendable {

@@ -102,6 +102,69 @@ public final class RcloneClient: @unchecked Sendable {
         return first.trimmingCharacters(in: .whitespaces)
     }
 
+    // MARK: - Raw run (exit code + both streams)
+
+    public struct ProcessResult: Sendable {
+        public var stdout: String
+        public var stderr: String
+        public var exitCode: Int32
+    }
+
+    /// Run rclone and capture both streams without throwing on a non-zero
+    /// exit. Used by the RPC wizard paths, which inspect the question JSON.
+    public func runRaw(_ args: [String]) throws -> ProcessResult {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: binary)
+        proc.arguments = args
+        let outPipe = Pipe(), errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+        try proc.run()
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        proc.waitUntilExit()
+        return ProcessResult(
+            stdout: String(data: outData, encoding: .utf8) ?? "",
+            stderr: String(data: errData, encoding: .utf8) ?? "",
+            exitCode: proc.terminationStatus)
+    }
+
+    /// `rclone config providers` — the backend schema array (PascalCase).
+    public func providers() throws -> [[String: Any]] {
+        let res = try runRaw(["config", "providers", "--config", configPath])
+        guard res.exitCode == 0 else {
+            let msg = res.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw RcloneError.runFailed(
+                command: "config providers",
+                stderr: truncateString(msg.isEmpty ? res.stdout : msg, 500))
+        }
+        guard let data = res.stdout.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw RcloneError.runFailed(command: "config providers", stderr: "invalid JSON output")
+        }
+        return arr
+    }
+
+    /// `rclone config create … --non-interactive --obscure`. Returns the raw
+    /// question JSON (stdout) so the caller can detect OAuth/required options.
+    public func createRemoteNonInteractive(name: String, type: String,
+                                           configKVs: [String]) throws -> ProcessResult {
+        var args = ["config", "create", name, type]
+        args.append(contentsOf: configKVs)
+        args += ["--non-interactive", "--obscure", "--config", configPath]
+        return try runRaw(args)
+    }
+
+    /// Continue the config wizard from a prior `State` with one answer.
+    public func continueRemoteCreate(name: String, type: String, state: String,
+                                     result: String, configKVs: [String] = []) throws -> ProcessResult {
+        var args = ["config", "create", name, type]
+        args.append(contentsOf: configKVs)
+        args += ["--continue", "--state", state, "--result", result,
+                 "--non-interactive", "--obscure", "--config", configPath]
+        return try runRaw(args)
+    }
+
     // MARK: - Simple run (capture stdout)
 
     @discardableResult

@@ -1,5 +1,6 @@
 // Native macOS app — replaces the Vue SPA + portal.
 import SwiftUI
+import AppKit
 import GNDriveCore
 
 @main
@@ -11,7 +12,13 @@ struct GNDriveApp: App {
         do {
             s = try AppState()
         } catch {
-            fatalError("gn-drive app init: \(error)")
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "GN Drive could not start"
+            alert.informativeText = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            alert.addButton(withTitle: "Quit")
+            alert.runModal()
+            exit(1)
         }
         _state = StateObject(wrappedValue: s)
         // Encrypt config files back on quit (auth.Suspend semantics).

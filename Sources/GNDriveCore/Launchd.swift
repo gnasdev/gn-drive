@@ -48,7 +48,7 @@ public final class LaunchdService: @unchecked Sendable {
 
     public init() {}
 
-    private func plistPath(_ spec: ServiceSpec) -> String {
+    public func plistPath(_ spec: ServiceSpec) -> String {
         if spec.scope == .system {
             return "/\(Self.systemPlistDir)/\(Self.label).plist"
         }
