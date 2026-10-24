@@ -1,0 +1,491 @@
+{
+  "authJSONKeys" : [
+    "app_settings",
+    "enabled",
+    "failed_attempts",
+    "lockout_until",
+    "password_hash"
+  ],
+  "boards" : [
+    {
+      "createdAt" : "2026-10-22 08:53:09",
+      "edges" : [
+        {
+          "action" : "push",
+          "id" : "e1",
+          "sourceID" : "n1",
+          "syncConfig" : "{\"bandwidth\":\"5M\",\"filters\":{\"exclude\":[\"*.tmp\"],\"depth\":2}}",
+          "targetID" : "n2"
+        },
+        {
+          "action" : "bi",
+          "id" : "e2",
+          "sourceID" : "n2",
+          "syncConfig" : "{}",
+          "targetID" : "n3"
+        }
+      ],
+      "id" : "board-1",
+      "name" : "Main board / ü",
+      "nodes" : [
+        {
+          "id" : "n1",
+          "label" : "Home",
+          "path" : "/Users/me",
+          "remoteName" : "local-src",
+          "x" : 10.5,
+          "y" : -20
+        },
+        {
+          "id" : "n2",
+          "label" : "S3",
+          "path" : "bucket/docs",
+          "remoteName" : "fake-s3",
+          "x" : 300,
+          "y" : 40.25
+        },
+        {
+          "id" : "n3",
+          "label" : "",
+          "path" : "/tmp/日本",
+          "remoteName" : "local-src",
+          "x" : 0,
+          "y" : 0
+        }
+      ],
+      "updatedAt" : "2026-10-22 08:53:09"
+    }
+  ],
+  "deltaStates" : [
+    {
+      "deltaCount" : 0,
+      "isWatching" : false,
+      "lastFullSync" : "2026-10-22T08:53:09Z",
+      "provider" : "drive",
+      "remoteKey" : "gdrive:root"
+    },
+    {
+      "deltaCount" : 0,
+      "isWatching" : false,
+      "lastFullSync" : "2026-10-22T08:53:09Z",
+      "provider" : "local",
+      "remoteKey" : "local:/tmp/x"
+    }
+  ],
+  "flows" : [
+    {
+      "canvasJSON" : "{\"nodes\":[{\"id\":\"a\",\"x\":1.5,\"y\":2}],\"zoom\":1.25,\"label\":\"日本語\"}",
+      "createdAt" : "2026-10-22 08:53:09",
+      "id" : "flow-1",
+      "isCollapsed" : true,
+      "name" : "Daily backup",
+      "operations" : [
+        {
+          "action" : "push",
+          "flowID" : "flow-1",
+          "id" : "op-1",
+          "isExpanded" : true,
+          "sortOrder" : 0,
+          "sourcePath" : "/Users/me/Documents",
+          "sourceRemote" : "local-src",
+          "syncConfig" : {
+            "action" : "push",
+            "bandwidth" : "10M",
+            "filters" : {
+              "depth" : 3,
+              "include" : [
+                "*.txt",
+                "日本語/**"
+              ],
+              "nested" : {
+                "deep" : {
+                  "ok" : true,
+                  "x" : 1.5
+                }
+              }
+            },
+            "flags" : [
+              1,
+              2.5,
+              true,
+              null,
+              "s"
+            ],
+            "parallel" : 4
+          },
+          "targetPath" : "bucket/docs",
+          "targetRemote" : "fake-s3"
+        },
+        {
+          "action" : "bi",
+          "flowID" : "flow-1",
+          "id" : "op-2",
+          "isExpanded" : false,
+          "sortOrder" : 5,
+          "sourcePath" : "bucket/docs",
+          "sourceRemote" : "fake-s3",
+          "syncConfig" : {
+            "action" : "bi"
+          },
+          "targetPath" : "/tmp/restore",
+          "targetRemote" : "local-src"
+        }
+      ],
+      "scheduleCron" : "30 2 * * *",
+      "scheduleEnabled" : true,
+      "sortOrder" : 0,
+      "updatedAt" : "2026-10-22 08:53:09"
+    },
+    {
+      "canvasJSON" : "{}",
+      "createdAt" : "2026-10-22 08:53:09",
+      "id" : "flow-2",
+      "isCollapsed" : false,
+      "name" : "Ad-hoc ü",
+      "operations" : [
+        {
+          "action" : "bi-resync",
+          "flowID" : "flow-2",
+          "id" : "op-3",
+          "isExpanded" : false,
+          "sortOrder" : 0,
+          "sourcePath" : "/",
+          "sourceRemote" : "local-src",
+          "syncConfig" : {
+            "action" : "bi-resync"
+          },
+          "targetPath" : "/",
+          "targetRemote" : "local-src"
+        },
+        {
+          "action" : "push",
+          "flowID" : "flow-2",
+          "id" : "op-4",
+          "isExpanded" : false,
+          "sortOrder" : 1,
+          "sourcePath" : "/a",
+          "sourceRemote" : "local-src",
+          "syncConfig" : {
+            "action" : "push",
+            "dryRun" : true
+          },
+          "targetPath" : "b",
+          "targetRemote" : "fake-s3"
+        },
+        {
+          "action" : "push",
+          "flowID" : "flow-2",
+          "id" : "op-5",
+          "isExpanded" : false,
+          "sortOrder" : 2,
+          "sourcePath" : "/",
+          "sourceRemote" : "fake-s3",
+          "syncConfig" : {
+            "action" : "push"
+          },
+          "targetPath" : "/",
+          "targetRemote" : "local-src"
+        }
+      ],
+      "scheduleCron" : "",
+      "scheduleEnabled" : false,
+      "sortOrder" : 1,
+      "updatedAt" : "2026-10-22 08:53:09"
+    }
+  ],
+  "history" : [
+    {
+      "action" : "bi",
+      "bytes" : 0,
+      "duration" : 0,
+      "errorMessage" : "",
+      "errors" : 0,
+      "files" : 0,
+      "finishedAt" : "",
+      "id" : "h5",
+      "profileName" : "bi-minimal",
+      "startedAt" : "2025-01-05T12:00:00Z",
+      "state" : "running"
+    },
+    {
+      "action" : "bi-resync",
+      "bytes" : 999,
+      "duration" : 60000000000,
+      "errorMessage" : "1 file skipped",
+      "errors" : 1,
+      "files" : 7,
+      "finishedAt" : "2025-01-04T11:12:11Z",
+      "id" : "h4",
+      "profileName" : "résumé/ünï 日本",
+      "startedAt" : "2025-01-04T11:11:11Z",
+      "state" : "success"
+    },
+    {
+      "action" : "bi",
+      "bytes" : 12,
+      "duration" : 1000000000,
+      "errorMessage" : "",
+      "errors" : 0,
+      "files" : 1,
+      "finishedAt" : "2025-01-03T10:00:01Z",
+      "id" : "h3",
+      "profileName" : "bi-minimal",
+      "startedAt" : "2025-01-03T10:00:00Z",
+      "state" : "cancelled"
+    },
+    {
+      "action" : "push",
+      "bytes" : 0,
+      "duration" : 7000000000,
+      "errorMessage" : "couldn't list: 403 \"Forbidden\"\nline2 日本語",
+      "errors" : 3,
+      "files" : 0,
+      "finishedAt" : "2025-01-02T00:00:07Z",
+      "id" : "h2",
+      "profileName" : "docs-push",
+      "startedAt" : "2025-01-02T00:00:00Z",
+      "state" : "error"
+    },
+    {
+      "action" : "push",
+      "bytes" : 1234567890123,
+      "duration" : 330000000000,
+      "errorMessage" : "",
+      "errors" : 0,
+      "files" : 4242,
+      "finishedAt" : "2025-01-01T00:05:30Z",
+      "id" : "h1",
+      "profileName" : "docs-push",
+      "startedAt" : "2025-01-01T00:00:00Z",
+      "state" : "success"
+    }
+  ],
+  "historyStats" : {
+    "byProfile" : {
+      "bi-minimal" : {
+        "bytes" : 12,
+        "duration" : 1000000000,
+        "errors" : 0,
+        "syncs" : 2
+      },
+      "docs-push" : {
+        "bytes" : 1234567890123,
+        "duration" : 337000000000,
+        "errors" : 3,
+        "syncs" : 2
+      },
+      "résumé/ünï 日本" : {
+        "bytes" : 999,
+        "duration" : 60000000000,
+        "errors" : 1,
+        "syncs" : 1
+      }
+    },
+    "totalBytes" : 1234567891134,
+    "totalDuration" : 398000000000,
+    "totalErrors" : 4,
+    "totalSyncs" : 5
+  },
+  "password" : "compat-test-pw-123",
+  "passwordHash" : "$argon2id$v=19$m=65536,t=3,p=4$87527yyyWCkKIdftIp8HOAiqXoSdJCAoU/2Y9eJFDEQ$lOynHYOC/MEGotlpXi6M9HBg8beO5lvvUMNr/+odI1g",
+  "profiles" : [
+    {
+      "backupPath" : "",
+      "bandwidth" : 0,
+      "bufferSize" : "",
+      "cachePath" : "",
+      "checkAccess" : false,
+      "checkFirst" : false,
+      "conflictLoser" : "",
+      "conflictResolution" : "",
+      "conflictSuffix" : "",
+      "connTimeout" : "",
+      "deleteExcluded" : false,
+      "deleteTiming" : "",
+      "direction" : "bi",
+      "dryRun" : false,
+      "excludedPaths" : [
+
+      ],
+      "excludeIfPresent" : "",
+      "fastList" : false,
+      "filterFromFile" : "",
+      "from" : "local-src:/tmp/a",
+      "ignoreExisting" : false,
+      "immutable" : false,
+      "includedPaths" : [
+
+      ],
+      "ioTimeout" : "",
+      "lowLevelRetries" : null,
+      "maxAge" : "",
+      "maxDelete" : null,
+      "maxDeleteSize" : "",
+      "maxDepth" : null,
+      "maxDuration" : "",
+      "maxLock" : "",
+      "maxSize" : "",
+      "maxTransfer" : "",
+      "minAge" : "",
+      "minSize" : "",
+      "multiThreadStreams" : null,
+      "name" : "bi-minimal",
+      "orderBy" : "",
+      "parallel" : 0,
+      "resilient" : false,
+      "retries" : null,
+      "retriesSleep" : "",
+      "sizeOnly" : false,
+      "suffix" : "",
+      "suffixKeepExtension" : false,
+      "to" : "local-src:/tmp/b",
+      "tpsLimit" : null,
+      "updateMode" : false,
+      "useRegex" : false
+    },
+    {
+      "backupPath" : "/backup/dir",
+      "bandwidth" : 1024,
+      "bufferSize" : "16M",
+      "cachePath" : "/cache/dir",
+      "checkAccess" : true,
+      "checkFirst" : true,
+      "conflictLoser" : "delete",
+      "conflictResolution" : "newer",
+      "conflictSuffix" : ".conflict",
+      "connTimeout" : "30s",
+      "deleteExcluded" : true,
+      "deleteTiming" : "after",
+      "direction" : "push",
+      "dryRun" : true,
+      "excludedPaths" : [
+        "**/.DS_Store",
+        "tmp/",
+        "Ünïcødé/ñ/*.log"
+      ],
+      "excludeIfPresent" : ".nosync",
+      "fastList" : true,
+      "filterFromFile" : "/etc/filters.txt",
+      "from" : "local-src:/Users/me/Documents",
+      "ignoreExisting" : true,
+      "immutable" : true,
+      "includedPaths" : [
+        "photos/2024/**",
+        "日本語/ドキュメント/*.txt",
+        "a b/c d.md"
+      ],
+      "ioTimeout" : "1m",
+      "lowLevelRetries" : 10,
+      "maxAge" : "30d",
+      "maxDelete" : 50,
+      "maxDeleteSize" : "1G",
+      "maxDepth" : 3,
+      "maxDuration" : "2h",
+      "maxLock" : "15m",
+      "maxSize" : "10G",
+      "maxTransfer" : "100G",
+      "minAge" : "1m",
+      "minSize" : "1k",
+      "multiThreadStreams" : 8,
+      "name" : "docs-push",
+      "orderBy" : "size,desc",
+      "parallel" : 4,
+      "resilient" : true,
+      "retries" : 5,
+      "retriesSleep" : "5s",
+      "sizeOnly" : true,
+      "suffix" : ".bak",
+      "suffixKeepExtension" : true,
+      "to" : "fake-s3:bucket/docs",
+      "tpsLimit" : 2.5,
+      "updateMode" : true,
+      "useRegex" : true
+    },
+    {
+      "backupPath" : "",
+      "bandwidth" : 0,
+      "bufferSize" : "",
+      "cachePath" : "",
+      "checkAccess" : false,
+      "checkFirst" : false,
+      "conflictLoser" : "",
+      "conflictResolution" : "",
+      "conflictSuffix" : "",
+      "connTimeout" : "",
+      "deleteExcluded" : false,
+      "deleteTiming" : "",
+      "direction" : "bi-resync",
+      "dryRun" : false,
+      "excludedPaths" : [
+
+      ],
+      "excludeIfPresent" : "",
+      "fastList" : false,
+      "filterFromFile" : "",
+      "from" : "fake-s3:src",
+      "ignoreExisting" : false,
+      "immutable" : false,
+      "includedPaths" : [
+        "only/this/path/"
+      ],
+      "ioTimeout" : "",
+      "lowLevelRetries" : null,
+      "maxAge" : "",
+      "maxDelete" : 0,
+      "maxDeleteSize" : "",
+      "maxDepth" : -1,
+      "maxDuration" : "",
+      "maxLock" : "",
+      "maxSize" : "",
+      "maxTransfer" : "",
+      "minAge" : "",
+      "minSize" : "",
+      "multiThreadStreams" : null,
+      "name" : "résumé/ünï 日本",
+      "orderBy" : "",
+      "parallel" : 0,
+      "resilient" : false,
+      "retries" : 0,
+      "retriesSleep" : "",
+      "sizeOnly" : false,
+      "suffix" : "",
+      "suffixKeepExtension" : false,
+      "to" : "local-src:/dst",
+      "tpsLimit" : 0,
+      "updateMode" : false,
+      "useRegex" : false
+    }
+  ],
+  "rcloneConf" : "[local-src]\ntype = local\n\n[fake-s3]\ntype = s3\nprovider = AWS\naccess_key_id = AKIAFAKEFAKEFAKE0000\nsecret_access_key = fakeSecretKeyDoNotUse/0123456789abcdefABCDEF\nregion = us-east-1\n",
+  "schedules" : [
+    {
+      "action" : "push",
+      "createdAt" : "2026-10-22 08:53:09",
+      "cron" : "0 */6 * * *",
+      "enabled" : true,
+      "id" : "sched-1",
+      "lastResult" : "success",
+      "lastRun" : "2025-01-02T03:04:05Z",
+      "nextRun" : "2025-01-02T09:00:00Z",
+      "profileName" : "docs-push"
+    },
+    {
+      "action" : "bi",
+      "createdAt" : "2026-10-22 08:53:09",
+      "cron" : "*/15 * * * *",
+      "enabled" : false,
+      "id" : "sched-2",
+      "lastResult" : "",
+      "lastRun" : "",
+      "nextRun" : "",
+      "profileName" : "bi-minimal"
+    }
+  ],
+  "settings" : {
+    "empty_value" : "",
+    "language" : "日本語",
+    "legacy_flag" : "1",
+    "notifications" : "true",
+    "theme" : "dark"
+  }
+}

@@ -1,11 +1,15 @@
-# Swift rewrite
+# Rust engine + CLI
 
-- The app was rewritten in Swift (SwiftPM). `GNDriveCore` holds the former `internal/*` packages (auth, store, rclone, sync/flow/board engines, runtime hub, launchd, self-update). `gn-drive` is the CLI (swift-argument-parser). `GNDriveApp` is the SwiftUI macOS app replacing the Vue SPA — the engine runs in-process; there is no loopback HTTP server or SSE.
-- The Go backend (`internal/`, `cmd/`) and Vue frontend (`frontend/`) are kept for reference; do not extend them.
-- Argon2id hashes must stay compatible with the existing `auth.json` wire format (`$argon2id$v=19$m=65536,t=3,p=4$…`, vendored `CArgon2` reference implementation). `.enc` files are `[12-byte nonce][AES-256-GCM ct||tag]` (CryptoKit `SealedBox.combined`).
-- The SQLite schema is unchanged; `gn-drive.db` files load transparently.
-- rclone is shipped inside `GNDrive.app` (`Contents/MacOS/rclone`); `RcloneClient.resolveBinary` always prefers the bundled copy over PATH (PATH remains a fallback for dev `swift run`/`swift test` outside a bundle).
-- Build: `task build` (debug); bundle: `task dist` → `dist/GNDrive.app`; hot reload: `task dev`; tests: `task test`.
+- Engine and CLI are the Cargo workspace: `crates/gn-drive-core` (library) and `crates/gn-drive-cli` (binary `gn-drive`). Module map and data compatibility: `docs/rust-port.md`.
+- The GPUI window is `~/Github/ngosangns/ns-gpui/crates/gn-drive-gpui`. It path-depends on `gn-drive-core` and calls `gn_drive_core::rpc::Dispatcher` in-process (`handle(method, params) -> Result<Value, RpcError>`, `subscribe()`). Do not edit ns-gpui from this repo. Keep that API stable and record any change under `docs/gpui/rpc.md` "Changelog". `gn-drive serve --stdio` is the same dispatcher over NDJSON.
+- Dev flow: `task build`, `task test`, `task check`, `task cli:install:dev`, `task dev:install`, `task dev:run`. Dev CLI: `~/.local/state/gn-drive/dev/bin/gn-drive`. `task dev:run` sets `GN_DRIVE_MOCK=1`. `task dist` builds the release CLI; the app bundle is ns-gpui's job. Swift tasks are `task swift:*`.
+- Never trigger real OAuth/sign-in in tests, smoke scripts, or app runs. Use `FakeRunner` / `FakeSpawner`, or `serve --rclone` plus a temp `GN_DRIVE_CONFIG_DIR`. Do not run `rclone authorize`, `reconnect`, or `config create` for a token backend, and do not let rclone bind `:53682` or open a browser. `remotes.add` and `gn-drive remote add` are `--non-interactive` and return a prompt instead of starting OAuth. OAuth starts only from an explicit `remotes.oauth.start`. One in-flight authorize at a time; it is cancellable and is not restarted automatically. Do not launch `/Applications/GN Drive.app`.
+
+# Swift tree (kept until the coordinator deletes it)
+
+- `Sources/GNDriveCore` and `Sources/gn-drive` are the Swift originals. Do not edit them for the Rust port. `GNDriveApp` is the SwiftUI app. Go (`internal/`, `cmd/`) and Vue (`frontend/`) are reference only.
+- Argon2id hashes stay `$argon2id$v=19$m=65536,t=3,p=4$…`. `.enc` files are `[12-byte nonce][AES-256-GCM ct||tag]`. The SQLite schema is unchanged.
+- Swift build/test/bundle: `task swift:build`, `task swift:test`, `task swift:dist`, `task swift:dev`. Those are not the default `task build` / `task test` / `task dist`.
 
 # Runtime edge telemetry
 

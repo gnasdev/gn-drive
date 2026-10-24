@@ -1,0 +1,39 @@
+[package]
+name = "gn-drive-core"
+description = "GN Drive engine: auth, store, rclone, sync/flow/board engines, RPC dispatcher"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+aes-gcm = "0.11.1"
+argon2 = "0.6.0"
+base64 = "0.23.1"
+chrono = "0.4.45"
+crossbeam-channel = "0.5.17"
+hex = "0.4.3"
+libc = "0.2.191"
+parking_lot = "0.13.0"
+rand = "0.10.3"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+sha2 = "0.11.1"
+thiserror = "2.0.21"
+ureq = "3.5.0"
+uuid = { version = "1.28.0", features = ["v4"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+# Enables `test-util` for this crate's own integration tests (`cargo test`).
+# A dev-dependency feature is unified only into test/example/bench builds.
+gn-drive-core = { path = ".", features = ["test-util"] }
+
+[features]
+# Exposes rclone::testing::FakeRunner and the OAuth fake spawner to other crates.
+test-util = []

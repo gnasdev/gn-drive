@@ -5,84 +5,63 @@ Contributor notes for GN Drive. User-facing install/usage stays in [README.md](.
 ## Project map
 
 ```text
-cmd/gn-drive/          CLI entry (cobra): run, service, sync, board, profile, remote, …
-internal/
-  app/                 Composition root (DI, portal data-plane open/close)
-  api/                 chi HTTP API + SSE + session cookies
-  auth/                Master password, encrypt/decrypt config
-  store/               SQLite schema + repos
-  rclone/              Shell-out wrapper around rclone CLI
-  syncengine/          Task registry, profile schedules, WaitTask
-  flowengine/          Sequential flow execution
-  boardengine/         Board DAG topological execution
-  eventbus/            In-process typed events → SSE
-  service/             systemd / launchd / SCM + health writer
-  selfupdate/          GitHub Releases self-update
-  webui/               go:embed of built Vue dist
-  config/, ports/, instance/, logging/, browser/
-frontend/              Vue 3 SPA (source)
-  src/pages/           Unlock, Workspace, Settings (+ legacy page stubs)
-  src/stores/          Pinia: auth, flows, remotes, profiles, …
-internal/webui/dist/   Embedded SPA (built artifact; do not hand-edit)
-docs/                  Knowledge base (current state)
+crates/gn-drive-core/     Engine library (auth, store, rclone, engines, rpc::Dispatcher)
+crates/gn-drive-cli/      Binary `gn-drive`
+Sources/                  Swift engine + CLI + SwiftUI app (kept until the coordinator deletes it)
+internal/, cmd/, frontend/  Go + Vue reference only — do not extend
+docs/gpui/                RPC protocol and use cases the GPUI window codes against
+docs/rust-port.md         Swift → Rust module map and data-compat notes
+~/Github/ngosangns/ns-gpui/crates/gn-drive-gpui
+                          GPUI window. Path-depends on gn-drive-core and calls Dispatcher in-process.
 ```
 
 ## Runtime shape
 
-```mermaid
-flowchart TB
-  CLI["cmd/gn-drive"] --> App["internal/app"]
-  App --> API["internal/api"]
-  App --> SE["syncengine"]
-  App --> FE["flowengine"]
-  App --> BE["boardengine"]
-  App --> Auth["auth"]
-  App --> Store["store / SQLite"]
-  App --> RC["rclone client"]
-  API --> SPA["embedded Vue SPA"]
-  API --> SSE["/api/v1/events"]
-  SE --> RC
-  FE --> SE
-  BE --> RC
-  Auth --> Files["auth.json + *.enc"]
+```text
+gn-drive-gpui  --in process-->  rpc::Dispatcher::handle / subscribe
+gn-drive serve --stdio     -->  same Dispatcher over NDJSON
+Dispatcher --> AppContainer --> auth, store, sync/flow/board engines, rclone
 ```
 
-**Portal mode** (`gn-drive run`, not `--service`): process starts even when locked. SPA shows Unlock; after unlock/setup, `AfterUnlock` opens store + rclone and attaches engines.
+**Portal mode** (`gn-drive run`, and `serve`): the process starts while locked. Unlock opens the store and rclone and attaches the engines.
 
-**CLI one-shots** (`sync`, `profile`, `remote`, `board`, …): non-portal; require unlock via `--password` / unlocked plaintext config when a master password is set.
+**CLI one-shots** (`sync`, `profile`, `remote`, `board`, …): non-portal. A configured master password needs `--password` / `GN_DRIVE_PASSWORD`, or an already-plaintext config.
+
+There is no loopback HTTP server and no embedded SPA in the Rust build.
 
 ## Requirements
 
-- Go **1.26.5+**
-- **pnpm** 9+ (frontend)
-- **rclone** on `PATH` for real sync
-- Optional: [Task](https://taskfile.dev), [air](https://github.com/air-verse/air) for hot reload
+- Rust **1.95+** (edition 2024)
+- **rclone** on `PATH` for a real sync. Tests, smoke, and `task doctor` put a fake rclone first on `PATH` or pass `--rclone`
+- Optional: [Task](https://taskfile.dev)
+- Swift toolchain only for `task swift:*` and `scripts/gen-compat-fixtures.sh`
 
 ## Setup
 
 ```bash
 git clone https://github.com/gnasdev/gn-drive.git
 cd gn-drive
-task install
-# or: go mod download && cd frontend && pnpm install
+task build
+task test
 ```
 
 ## Common commands
 
 | Command | Purpose |
 |---------|---------|
-| `task dev` | Vite watch → `internal/webui/dist` + air restarts Go on port **53241** |
-| `task build` | Production frontend embed + `bin/gn-drive` |
-| `task test` | `go test -race ./…`, `vue-tsc`, e2e coverage |
-| `task lint` | golangci-lint + frontend ESLint |
-| `task doctor` | `go run ./cmd/gn-drive doctor` |
-| `task clean` | Remove bin/ and dist artifacts |
+| `task build` | `cargo build --workspace` |
+| `task test` | `cargo test --workspace` |
+| `task check` | `cargo fmt --all -- --check`, `clippy -D warnings`, tests |
+| `task smoke` | `scripts/rpc-smoke.sh` (fake rclone, temp config) |
+| `task cli:install:dev` | Release CLI → `~/.local/state/gn-drive/dev/bin/gn-drive` |
+| `task dev:install` | Dev CLI + `ns-gpui/scripts/install-dev.sh gn-drive` |
+| `task dev:run` | `cargo run -p gn-drive-gpui` with `GN_DRIVE_MOCK=1` |
+| `task dist` | Release CLI. The `.app` bundle is built in ns-gpui |
+| `task swift:*` | Previous SwiftPM tasks (`swift:build`, `swift:test`, `swift:dist`, …) |
 
-Dev URL: `http://127.0.0.1:53241/` — unlock in the browser if prompted. No separate Vite dev server; Go serves the SPA.
+The Go server and Vue SPA are reference only. Do not start them for GN Drive development.
 
-Air binary: `go install github.com/cosmtrek/air@latest` (or air-verse/air). Port stays fixed so restarts do not change the URL (see `.air.toml`, `scripts/dev.sh`, `internal/ports`).
-
-## Frontend notes
+## Frontend notes (reference only)
 
 - **Product shell**: Unlock → Workspace (`/`) → Settings (`/settings`). Legacy multi-page routes redirect to `/`.
 - **Domain**: Flow = unit of work; Operation = one source/target step; Remotes for path pickers. Profiles are CLI/API option bags, not workspace cards. Boards are not on the workspace surface.
@@ -94,22 +73,30 @@ See [frontend/SPEC.md](./frontend/SPEC.md).
 
 ## Backend notes
 
-- **Port**: default `53241` on `127.0.0.1` only (`internal/ports.DefaultPort`).
-- **Instance lock**: flock under config dir so only one portal process owns the data plane.
-- **Auth session**: cookie `gn-drive-session` (HttpOnly, SameSite=Strict, MaxAge 1d). Public routes: `/api/v1/status`, `/api/v1/events`, `/api/v1/auth/*`.
-- **SSE**: do not gzip `text/event-stream` (compress middleware excludes it).
-- **Profile / flow actions (product surface)**: `push` \| `bi` \| `bi-resync`. Legacy `pull` normalizes to `push` on profiles/flows; CLI `sync pull` still works for one-shot.
-- **SQLite schema** matches the former Wails desktop so existing `~/.config/gn-drive/` data loads without migration.
+- **Config dir**: `~/.config/gn-drive` (override `GN_DRIVE_CONFIG_DIR`). Files: `auth.json`, `rclone.conf` / `.enc`, `gn-drive.db` / `.enc`, `gn-drive.lock`, `service.health`.
+- **Instance lock**: flock under the config dir.
+- **Profile / flow actions**: `push` | `bi` | `bi-resync`. Legacy `pull` normalizes to `push`.
+- **SQLite schema** is the Swift/Wails schema. Existing `gn-drive.db` files open unchanged. See [docs/rust-port.md](./docs/rust-port.md).
+- **OAuth**: only `remotes.oauth.start` spawns `rclone authorize`, and only from that call. `remotes.add` and `gn-drive remote add` pass `--non-interactive` and do not open a browser. Tests use `FakeRunner` / `FakeSpawner`. Never point a test at the real rclone for a token backend.
 
 ## Release
 
-Tag `v*.*.*` runs `.github/workflows/release.yml`:
+`task dist` builds `target/release/gn-drive`. Packing `GN Drive.app` (window + bundled rclone) belongs to ns-gpui. The GitHub workflow that publishes the Go/Swift artifacts is unchanged until the coordinator switches it. The known self-update asset-name mismatch is documented in `docs/gpui/rpc.md` §14.2.
 
-- Matrix: darwin/arm64, linux/amd64, windows/amd64
-- Build Vue → copy to `internal/webui/dist` → `go build` with version ldflags
-- Publish GitHub Release artifacts
+## GPUI window & dev install
 
-Local parity: `task build` with `VERSION` / `COMMIT` env vars (see `Taskfile.yml` `LDFLAGS`).
+`ns-gpui/crates/gn-drive-gpui` depends on this repo's `gn-drive-core` by path and calls `gn_drive_core::rpc::Dispatcher` in-process (`handle(method, params) -> Result<Value, RpcError>`, `subscribe()`). Protocol: `docs/gpui/rpc.md`. Use cases: `docs/gpui/use-cases.md`. Keep that API stable; note any change under rpc.md "Changelog".
+
+| Command | Purpose |
+|---------|---------|
+| `task check` | fmt, clippy `-D warnings`, `cargo test --workspace` |
+| `task cli:install:dev` | Release `gn-drive` → `~/.local/state/gn-drive/dev/bin/gn-drive` (does not touch `~/.local/bin`) |
+| `task dev:install` | `cli:install:dev` + `$NS_GPUI_DIR/scripts/install-dev.sh gn-drive` |
+| `task dev:run` | `cargo run -p gn-drive-gpui` in `$NS_GPUI_DIR`, with `GN_DRIVE_MOCK=1` |
+
+`NS_GPUI_DIR` defaults to `~/Github/ngosangns/ns-gpui`.
+
+Safety: temp `GN_DRIVE_CONFIG_DIR`, fake rclone (`--rclone` or a temp `PATH`). Never `config create` / `reconnect` / `authorize` against a token backend, and never loop those tests. Do not launch `/Applications/GN Drive.app`. `task dev:run` stays on `GN_DRIVE_MOCK=1` unless you pass a fake rclone and a temp config yourself.
 
 ## Docs
 
@@ -123,7 +110,7 @@ When behavior changes, update the smallest set of docs and refresh `_sync.md`.
 
 ## Layout conventions
 
-- Constructor DI only — no package-level service singletons in app wiring
-- Prefer pure-Go dependencies (sqlite: modernc)
-- English comments for non-obvious contracts and edge cases
-- Tests next to packages (`*_test.go`); CLI coverage in `cmd/gn-drive/cmd_test.go`
+- `AppContainer` is the composition root. Engines are created before the data plane; store and rclone attach on unlock.
+- English comments for non-obvious contracts only.
+- Unit tests sit next to the module. Crate integration tests: `crates/gn-drive-core/tests/`, `crates/gn-drive-cli/tests/`.
+- Do not print secrets. Do not read the user's real config, keychain, or launchd from tests.

@@ -25,3 +25,6 @@ frontend/tsconfig.tsbuildinfo
 .build/
 .DS_Store
 dist/
+
+# Rust
+/target/

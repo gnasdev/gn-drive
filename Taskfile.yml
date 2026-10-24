@@ -1,56 +1,143 @@
 # GN Drive task definitions.
 #
-# The app is a native Swift package: GNDriveCore (engine) + gn-drive (CLI) +
-# GNDriveApp (SwiftUI macOS app). Engine runs in-process — no web server.
+# Engine + CLI are the Rust workspace (crates/gn-drive-core, crates/gn-drive-cli).
+# The GPUI window lives in ns-gpui and links gn-drive-core in-process.
+# Swift tasks stay under the `swift:` prefix until the coordinator removes Swift.
 #
-#   task build   — build debug binaries (gn-drive + GNDriveApp)
-#   task dist    — release build + bundle dist/GNDrive.app
-#   task dev     — rebuild & relaunch the app on file change (hot reload)
-#   task test    — run the XCTest suite
-#   task doctor  — run gn-drive doctor
-#
-# The Go backend + Vue frontend remain in-tree for reference only and no
-# longer have build tasks.
+#   task build            — cargo build --workspace
+#   task test             — cargo test --workspace
+#   task check            — fmt --check + clippy -D warnings + tests
+#   task cli:install:dev  — release gn-drive → ~/.local/state/gn-drive/dev/bin
+#   task dev:install      — that CLI + ns-gpui scripts/install-dev.sh gn-drive
+#   task dev:run          — cargo run -p gn-drive-gpui (GN_DRIVE_MOCK=1 by default)
+#   task dist             — release CLI; the .app bundle is built in ns-gpui
+#   task swift:*          — previous SwiftPM tasks
 
 version: "3"
 
 vars:
   VERSION: '{{.VERSION | default "dev"}}'
+  NS_GPUI_DIR:
+    sh: 'printf %s "${NS_GPUI_DIR:-$HOME/Github/ngosangns/ns-gpui}"'
+  DEV_BIN_DIR:
+    sh: 'printf %s "$HOME/.local/state/gn-drive/dev/bin"'
 
 tasks:
   build:
-    summary: Build debug binaries (gn-drive CLI + GNDriveApp)
+    summary: Build the Rust workspace (gn-drive-core + gn-drive CLI)
+    cmds:
+      - cargo build --workspace
+
+  test:
+    summary: Run Rust workspace tests (fake rclone only; no OAuth)
+    cmds:
+      - cargo test --workspace
+
+  check:
+    summary: fmt --check, clippy -D warnings, and workspace tests
+    cmds:
+      - cargo fmt --all -- --check
+      - cargo clippy --workspace --all-targets -- -D warnings
+      - cargo test --workspace
+
+  cli:install:dev:
+    summary: Release gn-drive CLI into the dev bin dir (not ~/.local/bin)
+    cmds:
+      - cargo build -p gn-drive-cli --release
+      - mkdir -p "{{.DEV_BIN_DIR}}"
+      - install -m 755 target/release/gn-drive "{{.DEV_BIN_DIR}}/gn-drive"
+      - echo "installed {{.DEV_BIN_DIR}}/gn-drive"
+
+  dev:install:
+    summary: Install the dev CLI, then the GPUI "GN Drive Dev.app" from ns-gpui
+    cmds:
+      - task: cli:install:dev
+      - '"{{.NS_GPUI_DIR}}/scripts/install-dev.sh" gn-drive'
+
+  dev:run:
+    summary: Run gn-drive-gpui. GN_DRIVE_MOCK=1 unless overridden (no engine, no OAuth)
+    env:
+      GN_DRIVE_MOCK: '{{.GN_DRIVE_MOCK | default "1"}}'
+    cmds:
+      - cargo run -p gn-drive-gpui --manifest-path "{{.NS_GPUI_DIR}}/Cargo.toml"
+
+  dist:
+    summary: Release CLI. The app bundle is produced by ns-gpui, not this repo
+    cmds:
+      - cargo build -p gn-drive-cli --release
+      - echo "Rust CLI: target/release/gn-drive"
+      - echo "App bundle: ns-gpui ({{.NS_GPUI_DIR}}), scripts/install-dev.sh gn-drive or that repo's dist task. This repo no longer packs the GPUI window. Swift .app remains 'task swift:dist' until Swift is removed."
+
+  doctor:
+    summary: gn-drive doctor against a temp config and a fake rclone
+    cmds:
+      - cargo build -p gn-drive-cli
+      - |
+        tmp="$(mktemp -d "${TMPDIR:-/tmp}/gnd-doctor.XXXXXX")"
+        trap 'rm -rf "$tmp"' EXIT
+        mkdir -p "$tmp/home" "$tmp/cfg" "$tmp/bin"
+        fake="$tmp/bin/rclone"
+        printf '%s\n' '#!/bin/sh' \
+          'case " $* " in *" authorize "*|*" reconnect "*|*" config create "*) echo refuse >&2; exit 99;; esac' \
+          'case "$1" in version) echo "rclone v1.99.0-fake";; esac' \
+          'exit 0' >"$fake"
+        chmod +x "$fake"
+        HOME="$tmp/home" GN_DRIVE_CONFIG_DIR="$tmp/cfg" GN_DRIVE_PASSWORD= \
+          PATH="$tmp/bin:/usr/bin:/bin" target/debug/gn-drive doctor
+
+  smoke:
+    summary: stdio RPC smoke with a fake rclone and a temp config dir
+    cmds:
+      - scripts/rpc-smoke.sh
+
+  swift:build:
+    summary: Swift debug binaries (gn-drive + GNDriveApp)
     cmds:
       - swift build --product gn-drive
       - swift build --product GNDriveApp
 
-  dist:
-    summary: Release build + bundle dist/GNDrive.app (app binary + CLI inside)
+  swift:dist:
+    summary: Swift release build + dist/GNDrive.app
     cmds:
       - scripts/bundle-app.sh release "{{.VERSION}}"
 
-  dev:
-    summary: Hot reload — rebuild & relaunch GNDriveApp when Sources/ change
+  swift:dev:
+    summary: SwiftUI hot reload
     cmds:
       - scripts/dev-swift.sh
 
-  test:
-    summary: Run the Swift test suite
+  swift:test:
+    summary: Swift test suite
     cmds:
       - swift test
 
-  doctor:
-    summary: Diagnose environment via gn-drive doctor
+  swift:check:
+    summary: Swift build, tests, and the Rust rpc-smoke script
+    cmds:
+      - swift build --product gn-drive
+      - swift build --product GNDriveApp
+      - swift test
+      - scripts/rpc-smoke.sh
+
+  swift:cli:install:dev:
+    summary: Release Swift gn-drive into the dev bin dir
+    cmds:
+      - swift build -c release --product gn-drive
+      - mkdir -p "{{.DEV_BIN_DIR}}"
+      - install -m 755 "$(swift build -c release --show-bin-path)/gn-drive" "{{.DEV_BIN_DIR}}/gn-drive"
+
+  swift:doctor:
+    summary: Swift gn-drive doctor
     cmds:
       - swift run gn-drive doctor
 
-  run:
-    summary: Run the gn-drive CLI in foreground (debug build)
+  swift:run:
+    summary: Swift gn-drive run (foreground)
     cmds:
       - swift run gn-drive run
 
-  clean:
-    summary: Clean Swift build artifacts
+  swift:clean:
+    summary: Remove Swift build artifacts
     cmds:
       - rm -rf .build dist
-      - echo "Cleaned build artifacts"
+      - echo "Cleaned Swift build artifacts"

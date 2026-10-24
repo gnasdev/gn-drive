@@ -1,0 +1,21 @@
+[workspace]
+resolver = "3"
+members = ["crates/gn-drive-core", "crates/gn-drive-cli"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
+rust-version = "1.95"
+version = "0.1.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true
+
+# Argon2 (64 MiB, t=3) is unusably slow unoptimised; keep tests fast.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
