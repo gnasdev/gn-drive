@@ -1,0 +1,7 @@
+# gn-drive-gpui
+
+GN Drive (`apps/gn-drive-gpui`) is the window for the rclone-powered sync manager in this repo. It spawns `gn-drive serve --stdio` and talks NDJSON to it (`docs/gpui/rpc.md`); `engine.rs` owns the child process (binary lookup: `GN_DRIVE_BIN`, the app bundle, `~/.local/state/gn-drive/dev/bin/gn-drive`, `/Applications/GNDrive.app`, `PATH`; request ids with timeouts; restart with backoff; killed on window close) and `main.rs` owns the view. Screens: unlock/setup, a flow rail, a pan/zoom flow canvas with node and edge cards and live per-edge progress, the inspector with the sync-config editor, Remotes, and Settings (General, Service, History, Logs, About). Authorization only starts from an explicit Add remote or Reconnect action; the window never retries it. `docs/gn-drive-parity.md` maps every use case to its status. With the `devtools` feature, `GN_DRIVE_MOCK=1` (or the dev command `mock`) swaps in an in-process fake engine with fixture flows, remotes and a running sync, so no rclone or OAuth is ever reached; `scripts/dev.sh gn-drive launch` always starts in mock mode unless `GN_DRIVE_LIVE=1`.
+
+The window links the shared chrome crate `ns-ui` from the `ns-gpui` repo and talks to `gn-drive`. Build and install the Dev app with `../ns-gpui/scripts/install-dev.sh gn-drive`; run it from cargo with `GN_DRIVE_MOCK=1 cargo run --release --features devtools` in this directory. Dev control (`ns-dev gn-drive …`) is described in `ns-gpui/docs/dev-channel.md`.
+
+Design notes: `docs/gpui/DESIGN.md`. Parity audit: `docs/gpui/gn-drive-parity.md`.

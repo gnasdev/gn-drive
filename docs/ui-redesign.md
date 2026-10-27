@@ -1,6 +1,6 @@
 # GN Drive UI audit and redesign (GN-59)
 
-Scope: the GPUI window, `ns-gpui/crates/gn-drive-gpui` (engine: `gn-drive-core`, unchanged). The Swift and Vue UIs are reference only.
+Scope: the GPUI window, `apps/gn-drive-gpui` (engine: `gn-drive-core`, unchanged). The Swift and Vue UIs are reference only.
 Evidence: isolated mock instance (separate HOME and TMPDIR, `GN_DRIVE_MOCK=1`, dev socket), screenshots in `~/.agent-scratch/gnd-redesign/shots/before` and `.../after`. No real data, no OAuth.
 
 ## 1. Audit (before)

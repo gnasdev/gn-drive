@@ -2,7 +2,7 @@
 
 Local-only sync engine and web UI for cloud storage, powered by [rclone](https://rclone.org/). One binary, one process, one port — the sync engine, HTTP API, and Vue 3 SPA share a single process and bind loopback only.
 
-> **Status**: engine and CLI are Rust (`crates/gn-drive-core`, `crates/gn-drive-cli`). The window is the GPUI app in `ns-gpui`, which links `gn-drive-core` in-process. Swift (`Sources/`) stays until the coordinator removes it. Go (`internal/`, `cmd/`) and the Vue SPA are reference only.
+> **Status**: engine and CLI are Rust (`crates/gn-drive-core`, `crates/gn-drive-cli`). The window is the GPUI app in `apps/gn-drive-gpui`, which links `gn-drive-core` in-process. Swift (`Sources/`) stays until the coordinator removes it. Go (`internal/`, `cmd/`) and the Vue SPA are reference only.
 
 ## Features
 
@@ -23,7 +23,7 @@ Local-only sync engine and web UI for cloud storage, powered by [rclone](https:/
 |-----------|------------|
 | Core | `gn-drive-core` — auth, SQLite, rclone, sync/flow/board, RPC `Dispatcher` |
 | CLI | `gn-drive-cli` — binary `gn-drive` (clap) |
-| UI | GPUI window in `~/Github/ngosangns/ns-gpui/crates/gn-drive-gpui` (path dep on this core) |
+| UI | GPUI window in `apps/gn-drive-gpui` (path dep on this core) |
 | Database | SQLite via `rusqlite` (bundled) — same schema and file names as Swift |
 | Sync | rclone shell-out behind `RcloneRunner` (tests use `FakeRunner`) |
 | Auth | Argon2id (`$argon2id$v=19$m=65536,t=3,p=4$…`) + AES-256-GCM `[12-byte nonce][ct\|\|tag]` |
@@ -106,17 +106,17 @@ gn-drive.pid         # pid file
 
 ## GPUI window & dev install
 
-The GPUI window (`gn-drive-gpui` in `~/Github/ngosangns/ns-gpui`) links `gn-drive-core` in-process and calls `Dispatcher::handle` / `subscribe` ([docs/gpui/rpc.md](./docs/gpui/rpc.md)). `gn-drive serve --stdio` is the same protocol on NDJSON. The SwiftUI app stays until the coordinator removes Swift.
+The GPUI window (`gn-drive-gpui` in `apps/gn-drive-gpui`) links `gn-drive-core` in-process and calls `Dispatcher::handle` / `subscribe` ([docs/gpui/rpc.md](./docs/gpui/rpc.md)). `gn-drive serve --stdio` is the same protocol on NDJSON. The SwiftUI app stays until the coordinator removes Swift.
 
 ```bash
 task cli:install:dev   # release gn-drive -> ~/.local/state/gn-drive/dev/bin/gn-drive
-task dev:install       # that, plus ns-gpui/scripts/install-dev.sh gn-drive
+task dev:install       # that, plus the Dev app via ns-gpui/scripts/install-dev.sh
 task dev:run           # cargo run -p gn-drive-gpui; GN_DRIVE_MOCK=1 unless overridden
 task check             # cargo fmt --check, clippy -D warnings, cargo test --workspace
 task smoke             # scripts/rpc-smoke.sh (fake rclone, temp config)
 ```
 
-`NS_GPUI_DIR` overrides the ns-gpui checkout (default `~/Github/ngosangns/ns-gpui`). `task dist` builds the release CLI; the `.app` bundle is produced in ns-gpui. Tests and the smoke script use a fake rclone and a temp `GN_DRIVE_CONFIG_DIR`. They never start an OAuth flow. Do not launch the release `/Applications` GN Drive app from here.
+`NS_GPUI_DIR` overrides the ns-gpui checkout that holds `scripts/install-dev.sh` (default `~/Github/ngosangns/ns-gpui`). `task dist` builds the release CLI; the Dev `.app` bundle comes from `task dev:install`. Tests and the smoke script use a fake rclone and a temp `GN_DRIVE_CONFIG_DIR`. They never start an OAuth flow. Do not launch the release `/Applications` GN Drive app from here.
 
 ## Documentation
 

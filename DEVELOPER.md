@@ -11,7 +11,7 @@ Sources/                  Swift engine + CLI + SwiftUI app (kept until the coord
 internal/, cmd/, frontend/  Go + Vue reference only — do not extend
 docs/gpui/                RPC protocol and use cases the GPUI window codes against
 docs/rust-port.md         Swift → Rust module map and data-compat notes
-~/Github/ngosangns/ns-gpui/crates/gn-drive-gpui
+apps/gn-drive-gpui
                           GPUI window. Path-depends on gn-drive-core and calls Dispatcher in-process.
 ```
 
@@ -54,9 +54,9 @@ task test
 | `task check` | `cargo fmt --all -- --check`, `clippy -D warnings`, tests |
 | `task smoke` | `scripts/rpc-smoke.sh` (fake rclone, temp config) |
 | `task cli:install:dev` | Release CLI → `~/.local/state/gn-drive/dev/bin/gn-drive` |
-| `task dev:install` | Dev CLI + `ns-gpui/scripts/install-dev.sh gn-drive` |
+| `task dev:install` | Dev CLI + Dev app (`ns-gpui/scripts/install-dev.sh gn-drive`) |
 | `task dev:run` | `cargo run -p gn-drive-gpui` with `GN_DRIVE_MOCK=1` |
-| `task dist` | Release CLI. The `.app` bundle is built in ns-gpui |
+| `task dist` | Release CLI. The Dev `.app` bundle comes from `task dev:install` |
 | `task swift:*` | Previous SwiftPM tasks (`swift:build`, `swift:test`, `swift:dist`, …) |
 
 The Go server and Vue SPA are reference only. Do not start them for GN Drive development.
@@ -81,11 +81,11 @@ See [frontend/SPEC.md](./frontend/SPEC.md).
 
 ## Release
 
-`task dist` builds `target/release/gn-drive`. Packing `GN Drive.app` (window + bundled rclone) belongs to ns-gpui. The GitHub workflow that publishes the Go/Swift artifacts is unchanged until the coordinator switches it. The known self-update asset-name mismatch is documented in `docs/gpui/rpc.md` §14.2.
+`task dist` builds `target/release/gn-drive`. Packing `GN Drive.app` (window + bundled rclone) is not done here. The GitHub workflow that publishes the Go/Swift artifacts is unchanged until the coordinator switches it. The known self-update asset-name mismatch is documented in `docs/gpui/rpc.md` §14.2.
 
 ## GPUI window & dev install
 
-`ns-gpui/crates/gn-drive-gpui` depends on this repo's `gn-drive-core` by path and calls `gn_drive_core::rpc::Dispatcher` in-process (`handle(method, params) -> Result<Value, RpcError>`, `subscribe()`). Protocol: `docs/gpui/rpc.md`. Use cases: `docs/gpui/use-cases.md`. Keep that API stable; note any change under rpc.md "Changelog".
+`apps/gn-drive-gpui` depends on this repo's `gn-drive-core` by path and calls `gn_drive_core::rpc::Dispatcher` in-process (`handle(method, params) -> Result<Value, RpcError>`, `subscribe()`). Protocol: `docs/gpui/rpc.md`. Use cases: `docs/gpui/use-cases.md`. Keep that API stable; note any change under rpc.md "Changelog".
 
 | Command | Purpose |
 |---------|---------|

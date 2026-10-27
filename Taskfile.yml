@@ -1,16 +1,16 @@
 # GN Drive task definitions.
 #
 # Engine + CLI are the Rust workspace (crates/gn-drive-core, crates/gn-drive-cli).
-# The GPUI window lives in ns-gpui and links gn-drive-core in-process.
+# The GPUI window lives in apps/gn-drive-gpui and links gn-drive-core in-process.
 # Swift tasks stay under the `swift:` prefix until the coordinator removes Swift.
 #
 #   task build            — cargo build --workspace
 #   task test             — cargo test --workspace
 #   task check            — fmt --check + clippy -D warnings + tests
 #   task cli:install:dev  — release gn-drive → ~/.local/state/gn-drive/dev/bin
-#   task dev:install      — that CLI + ns-gpui scripts/install-dev.sh gn-drive
+#   task dev:install      — that CLI + apps/gn-drive-gpui via ns-gpui scripts/install-dev.sh
 #   task dev:run          — cargo run -p gn-drive-gpui (GN_DRIVE_MOCK=1 by default)
-#   task dist             — release CLI; the .app bundle is built in ns-gpui
+#   task dist             — release CLI; the dev .app bundle comes from task dev:install
 #   task swift:*          — previous SwiftPM tasks
 
 version: "3"
@@ -49,7 +49,7 @@ tasks:
       - echo "installed {{.DEV_BIN_DIR}}/gn-drive"
 
   dev:install:
-    summary: Install the dev CLI, then the GPUI "GN Drive Dev.app" from ns-gpui
+    summary: Install the dev CLI, then the GPUI "GN Drive Dev.app" built from apps/gn-drive-gpui
     cmds:
       - task: cli:install:dev
       - '"{{.NS_GPUI_DIR}}/scripts/install-dev.sh" gn-drive'
@@ -59,14 +59,14 @@ tasks:
     env:
       GN_DRIVE_MOCK: '{{.GN_DRIVE_MOCK | default "1"}}'
     cmds:
-      - cargo run -p gn-drive-gpui --manifest-path "{{.NS_GPUI_DIR}}/Cargo.toml"
+      - cargo run --manifest-path apps/gn-drive-gpui/Cargo.toml
 
   dist:
-    summary: Release CLI. The app bundle is produced by ns-gpui, not this repo
+    summary: Release CLI. The release app bundle is not packed by this repo
     cmds:
       - cargo build -p gn-drive-cli --release
       - echo "Rust CLI: target/release/gn-drive"
-      - echo "App bundle: ns-gpui ({{.NS_GPUI_DIR}}), scripts/install-dev.sh gn-drive or that repo's dist task. This repo no longer packs the GPUI window. Swift .app remains 'task swift:dist' until Swift is removed."
+      - echo "Dev app bundle: task dev:install (apps/gn-drive-gpui, packed by {{.NS_GPUI_DIR}}/scripts/install-dev.sh). This repo no longer packs the GPUI window. Swift .app remains 'task swift:dist' until Swift is removed."
 
   doctor:
     summary: gn-drive doctor against a temp config and a fake rclone

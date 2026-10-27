@@ -1,6 +1,6 @@
 # Swift → Rust port
 
-GN Drive's engine and CLI live in this repo's Cargo workspace. The GPUI window is `crates/gn-drive-gpui` in `ns-gpui` (`$NS_GPUI_DIR`, default `~/Github/ngosangns/ns-gpui`). It links `gn-drive-core` in-process and calls `gn_drive_core::rpc::Dispatcher` (`handle` / `subscribe`). `gn-drive serve --stdio` is the same dispatcher over NDJSON.
+GN Drive's engine and CLI live in this repo's Cargo workspace. The GPUI window is `apps/gn-drive-gpui` (packed by `$NS_GPUI_DIR/scripts/install-dev.sh`, default `~/Github/ngosangns/ns-gpui`). It links `gn-drive-core` in-process and calls `gn_drive_core::rpc::Dispatcher` (`handle` / `subscribe`). `gn-drive serve --stdio` is the same dispatcher over NDJSON.
 
 Swift sources stay in `Sources/` until the coordinator deletes them. Do not delete them from this port.
 
@@ -66,8 +66,8 @@ That command builds the Swift package. It uses `MemorySecureStore` and a temp di
 
 ## What is not in this repo
 
-- The GPUI window. Build it from ns-gpui. `task dev:install` / `task dev:run`. `task dev:run` sets `GN_DRIVE_MOCK=1` unless you override it. A non-mock run needs a fake rclone and a temp config dir.
-- The `.app` bundle. `task dist` builds the release CLI and prints where the bundle step lives (ns-gpui). `task swift:dist` still packs the SwiftUI app.
+- The GPUI window. Build it from `apps/gn-drive-gpui`. `task dev:install` / `task dev:run`. `task dev:run` sets `GN_DRIVE_MOCK=1` unless you override it. A non-mock run needs a fake rclone and a temp config dir.
+- The `.app` bundle. `task dist` builds the release CLI and prints where the bundle step lives. `task swift:dist` still packs the SwiftUI app.
 - Deleting Swift. The coordinator does that after this port is accepted.
 
 ## Checks

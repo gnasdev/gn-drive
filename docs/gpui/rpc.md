@@ -2,7 +2,7 @@
 
 Status: **specification only**. `gn-drive serve --stdio` does not exist yet; this
 document is the contract for the Swift implementer and for the Rust GPUI window
-(`~/Github/ngosangns/ns-gpui/crates/gn-drive-gpui`).
+(`apps/gn-drive-gpui`).
 
 The engine stays in Swift. The Rust window spawns the CLI as a child process and
 talks newline-delimited JSON over its stdin/stdout. There is no loopback HTTP

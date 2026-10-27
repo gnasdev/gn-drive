@@ -1,0 +1,39 @@
+[package]
+name = "gn-drive-gpui"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+rust-version = "1.95"
+
+[[bin]]
+name = "gn-drive-gpui"
+path = "src/main.rs"
+
+[features]
+# `core` runs gn-drive-core in-process (the default engine). Without it the
+# window can only talk to a `gn-drive serve --stdio` child (stdio fallback).
+# In-process gn-drive-core is the engine. `GN_DRIVE_MOCK=1` still selects the
+# mock, and `GN_DRIVE_BACKEND=stdio` keeps the child-process fallback.
+default = ["core"]
+core = ["dep:gn-drive-core"]
+devtools = ["ns-ui/devtools"]
+
+[dependencies]
+gn-drive-core = { path = "../../crates/gn-drive-core", optional = true }
+ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components", rev = "cd365e92ea0c4467c439b8253963461ba0f6d155" }
+gpui = { package = "gpui-pre", version = "=0.3.8" }
+ns-ui = { git = "https://github.com/ngosangns/ns-gpui", rev = "c589b091c79d0d80d497343e4fb1a41aad539b25" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace]
+resolver = "3"
+
+# Smaller dev builds (2026-10-24 disk cleanup): keep line info for backtraces, drop full debuginfo;
+# no debuginfo at all for dependencies.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
